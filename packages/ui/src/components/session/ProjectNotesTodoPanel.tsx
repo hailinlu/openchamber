@@ -752,28 +752,6 @@ export const ProjectNotesTodoPanel: React.FC<ProjectNotesTodoPanelProps> = ({
 
   return (
     <div className={cn('w-full min-w-0 space-y-3 p-3', className)}>
-      <div className="space-y-1">
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="min-w-0 truncate typography-ui-label font-semibold text-foreground" title={projectRef.path}>
-            {t('rightSidebar.contextNotesTodo.notes.title', {
-              project: projectLabel?.trim() || projectRef.path.split('/').filter(Boolean).pop() || projectRef.path,
-            })}
-          </h3>
-          <span className="typography-meta text-muted-foreground">{notes.length}/{OPENCHAMBER_PROJECT_NOTES_MAX_LENGTH}</span>
-        </div>
-        <Textarea
-          value={notes}
-          onChange={(event) => setNotes(event.target.value.slice(0, OPENCHAMBER_PROJECT_NOTES_MAX_LENGTH))}
-          onBlur={handleNotesBlur}
-          placeholder={t('rightSidebar.contextNotesTodo.notes.placeholder')}
-          resizedHeight={notesPanelHeight}
-          onResizeHeightChange={setNotesPanelHeight}
-          useScrollShadow
-          scrollShadowSize={56}
-          disabled={isLoading}
-        />
-      </div>
-
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
@@ -958,6 +936,28 @@ export const ProjectNotesTodoPanel: React.FC<ProjectNotesTodoPanelProps> = ({
             aria-label={t('rightSidebar.contextNotesTodo.todo.resizeAria')}
           />
         )}
+      </div>
+
+      <div className="space-y-1">
+        <div className="flex items-center justify-between gap-2">
+          <h3 className="min-w-0 truncate typography-ui-label font-semibold text-foreground" title={projectRef.path}>
+            {t('rightSidebar.contextNotesTodo.notes.title', {
+              project: projectLabel?.trim() || projectRef.path.split('/').filter(Boolean).pop() || projectRef.path,
+            })}
+          </h3>
+          <span className="typography-meta text-muted-foreground">{notes.length}/{OPENCHAMBER_PROJECT_NOTES_MAX_LENGTH}</span>
+        </div>
+        <Textarea
+          value={notes}
+          onChange={(event) => setNotes(event.target.value.slice(0, OPENCHAMBER_PROJECT_NOTES_MAX_LENGTH))}
+          onBlur={handleNotesBlur}
+          placeholder={t('rightSidebar.contextNotesTodo.notes.placeholder')}
+          resizedHeight={notesPanelHeight}
+          onResizeHeightChange={setNotesPanelHeight}
+          useScrollShadow
+          scrollShadowSize={56}
+          disabled={isLoading}
+        />
       </div>
 
       <div className="space-y-2">

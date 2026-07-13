@@ -15,7 +15,8 @@ if (process.platform === 'win32' && !env.CSC_LINK && !env.WINDOWS_CSC_LINK) {
 const bunBinaryCandidates = [
   process.env.npm_execpath,
   process.env.BUN_INSTALL ? path.join(process.env.BUN_INSTALL, 'bin', process.platform === 'win32' ? 'bun.exe' : 'bun') : null,
-  process.platform === 'win32' ? 'bun.exe' : 'bun',
+  process.env.BUN ? path.resolve(process.env.BUN) : null,
+  'bun',
 ].filter(Boolean);
 
 const bunBinary = bunBinaryCandidates.find((candidate) => {
@@ -23,7 +24,7 @@ const bunBinary = bunBinaryCandidates.find((candidate) => {
     return candidate === 'bun' || candidate === 'bun.exe' || fs.existsSync(candidate);
   }
   return false;
-}) || (process.platform === 'win32' ? 'bun.exe' : 'bun');
+}) || 'bun';
 
 if (process.platform === 'linux' && !builderArgs.some((argument) => (
   argument === '--x64' || argument === '--arm64' || argument === '--arch' || argument.startsWith('--arch=')
@@ -34,6 +35,7 @@ if (process.platform === 'linux' && !builderArgs.some((argument) => (
 const child = spawn(bunBinary, ['x', 'electron-builder', ...builderArgs], {
   env,
   stdio: 'inherit',
+  shell: process.platform === 'win32',
 });
 
 child.on('exit', (code, signal) => {

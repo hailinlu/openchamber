@@ -1,7 +1,7 @@
 import React from "react";
 import { useSessionUIStore } from '@/sync/session-ui-store';
 import { cn } from "@/lib/utils";
-import { useDirectorySync } from "@/sync/sync-context";
+import { useDirectorySync, useDirectoryStore } from "@/sync/sync-context";
 import type { Todo } from "@opencode-ai/sdk/v2/client";
 
 // Compat aliases for old TodoItem shape
@@ -17,6 +17,9 @@ import { Icon } from "@/components/icon/Icon";
 import { useI18n } from "@/lib/i18n";
 
 const STATUS_ROW_CONTAINER_STYLE = { containerType: "inline-size" as const, containerName: "status-row" };
+
+/** Custom event dispatched when a user clicks a todo item to navigate to its source message. */
+const CHAT_SCROLL_TO_MESSAGE_EVENT = 'openchamber:chat-scroll-to-message';
 
 const statusConfig: Record<TodoStatus, { textClassName: string }> = {
   in_progress: {
@@ -60,9 +63,10 @@ const priorityLabelKey: Record<TodoPriority, string> = {
 
 interface TodoItemRowProps {
   todo: TodoItem;
+  onNavigate?: (todo: TodoItem) => void;
 }
 
-const TodoItemRow: React.FC<TodoItemRowProps> = ({ todo }) => {
+const TodoItemRow: React.FC<TodoItemRowProps> = ({ todo, onNavigate }) => {
   const { t } = useI18n();
   const config = statusConfig[todo.status] || statusConfig.pending;
   const statusKey = statusLabelKey[todo.status] ?? statusLabelKey.pending;
@@ -87,14 +91,17 @@ const TodoItemRow: React.FC<TodoItemRowProps> = ({ todo }) => {
           {t(statusKey as never)}
         </TooltipContent>
       </Tooltip>
-      <span
+      <button
+        type="button"
+        onClick={() => onNavigate?.(todo)}
         className={cn(
-          "flex-1 typography-ui-label",
-          config.textClassName
+          "flex-1 typography-ui-label text-left",
+          config.textClassName,
+          onNavigate && "hover:underline focus-visible:underline focus-visible:outline-none"
         )}
       >
         {todo.content}
-      </span>
+      </button>
       <Tooltip>
         <TooltipTrigger asChild>
           <span
@@ -153,7 +160,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
   leftAccessory,
 }) => {
   const { t } = useI18n();
-  const [isExpanded, setIsExpanded] = React.useState(false);
+  const [isExpanded, setIsExpanded] = React.useState(true);
   const currentSessionId = useSessionUIStore((state) => state.currentSessionId);
   const liveTodos = useDirectorySync(
     React.useCallback(
@@ -206,7 +213,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
     return { active, left };
   }, [visibleTodos]);
 
-  const hasTodoContent = showTodos && statusSummary.left > 0;
+  const hasTodoContent = showTodos && todos.length > 0;
   const hasAssistantContent = showAssistantStatus && (
     isWorking ||
     Boolean(wasAborted) ||
@@ -218,20 +225,63 @@ export const StatusRow: React.FC<StatusRowProps> = ({
 
   const hasContent = hasAssistantContent || hasTodoContent || hasLeftAccessory;
 
-  // Close popover when clicking outside
-  const popoverRef = React.useRef<HTMLDivElement>(null);
-  React.useEffect(() => {
-    if (!isExpanded) return;
+  const directoryStore = useDirectoryStore();
 
-    const handleClickOutside = (event: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(event.target as Node)) {
-        setIsExpanded(false);
+  const handleNavigateToTodo = React.useCallback((clickedTodo: TodoItem) => {
+    if (!currentSessionId) return;
+    const state = directoryStore.getState();
+    const messages = state.message[currentSessionId];
+    const allParts = state.part;
+    if (!messages?.length) return;
+
+    // Iterate from last to first so the latest "Update Todo List" tool
+    // output wins.  Only match a todo whose JSON content + status both
+    // line up (status === "in_progress" matches the "In Progress"
+    // rendered section heading).
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      const messageId = (msg as Record<string, unknown>).id as string | undefined;
+      if (!messageId) continue;
+      const parts = allParts[messageId];
+      if (!parts?.length) continue;
+
+      for (const part of parts) {
+        if (typeof part !== 'object' || !part) continue;
+        const p = part as Record<string, unknown>;
+        if (p.type !== 'tool') continue;
+
+        const toolState = p.state as Record<string, unknown> | undefined;
+        if (!toolState) continue;
+
+        const raw = typeof toolState.output === 'string'
+          ? toolState.output.trim()
+          : '';
+        if (!raw) continue;
+
+        // Try parsing the tool output as a JSON array of {content, status, priority}
+        try {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            const match = parsed.find(
+              (t: unknown) =>
+                typeof t === 'object' && t !== null &&
+                typeof (t as Record<string, unknown>).content === 'string' &&
+                (t as Record<string, unknown>).content === clickedTodo.content &&
+                (t as Record<string, unknown>).status === 'in_progress',
+            );
+            if (match) {
+              window.dispatchEvent(new CustomEvent(CHAT_SCROLL_TO_MESSAGE_EVENT, {
+                detail: { messageId, sessionId: currentSessionId },
+              }));
+              return;
+            }
+          }
+        } catch {
+          // Not valid JSON — skip
+        }
       }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, [isExpanded]);
+    }
+  }, [currentSessionId, directoryStore]);
 
   const toggleExpanded = () => setIsExpanded((prev) => !prev);
   const todoSummaryLabel = t('chat.statusRow.summary.activeLeft', {
@@ -320,24 +370,26 @@ export const StatusRow: React.FC<StatusRowProps> = ({
         </div>
 
         {/* Right: Abort (mobile only) + Todo */}
-        <div className={cn("relative flex items-center gap-2 flex-shrink-0", hasLeftAccessory ? "pr-1.5" : "-mr-3")} ref={popoverRef}>
+        <div className={cn("relative flex items-center gap-2 flex-shrink-0", hasLeftAccessory ? "pr-1.5" : "-mr-3")}>
           {abortButton}
           {todoTrigger}
 
-          {/* Popover dropdown */}
+          {/* Popover dropdown — floated at top-right of chat area */}
           {isExpanded && hasTodoContent && (
             <div
               style={{
-                maxWidth: "min(28rem, calc(100cqw - 4ch))",
+                maxWidth: "min(28rem, calc(100vw - 4ch))",
                 backgroundColor: "var(--surface-elevated)",
                 color: "var(--surface-elevated-foreground)",
+                top: "calc(var(--oc-header-height, 48px) + 8px)",
+                right: "calc(var(--oc-context-panel-width, 0px) + var(--oc-right-sidebar-width, 0px) + 12px)",
               }}
               className={cn(
-                "absolute right-0 bottom-full mb-1 z-50",
+                "fixed z-50",
                 "w-max min-w-[200px] rounded-xl p-1",
                 "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.8),inset_0_0_0_1px_rgba(0,0,0,0.04),0_0_0_1px_rgba(0,0,0,0.10),0_1px_2px_-0.5px_rgba(0,0,0,0.08),0_4px_8px_-2px_rgba(0,0,0,0.08),0_12px_20px_-4px_rgba(0,0,0,0.08)]",
                 "dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),inset_0_0_0_1px_rgba(255,255,255,0.08),0_0_0_1px_rgba(0,0,0,0.36),0_1px_1px_-0.5px_rgba(0,0,0,0.22),0_3px_3px_-1.5px_rgba(0,0,0,0.20),0_6px_6px_-3px_rgba(0,0,0,0.16)]",
-                "animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-2",
+                "animate-in fade-in-0 zoom-in-95 slide-in-from-top-2",
                 "duration-150"
               )}
             >
@@ -352,7 +404,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
               {/* Todo list */}
               <div className="px-1 max-h-[200px] overflow-y-auto">
                 {visibleTodos.map((todo, index) => (
-                  <TodoItemRow key={todo.id ?? `todo-${index}`} todo={todo} />
+                  <TodoItemRow key={todo.id ?? `todo-${index}`} todo={todo} onNavigate={handleNavigateToTodo} />
                 ))}
               </div>
             </div>

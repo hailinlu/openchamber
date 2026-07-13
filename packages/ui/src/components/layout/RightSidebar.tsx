@@ -55,6 +55,13 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ isOpen, children, cl
     sidebar.style.maxWidth = '';
   }, [isOpen, isResizing, openWidth]);
 
+  // Sync sidebar width to document root so fixed-positioned elements
+  // (e.g. the Tasks popover) can read it via CSS variable.
+  React.useEffect(() => {
+    const width = isOpen ? openWidth : 0;
+    document.documentElement.style.setProperty('--oc-right-sidebar-width', `${width}px`);
+  }, [isOpen, openWidth]);
+
   const handlePointerDown = (event: React.PointerEvent) => {
     if (!isOpen) {
       return;

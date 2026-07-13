@@ -55,6 +55,7 @@ import { getEmbeddedSessionChatOriginSessionId } from '@/components/layout/conte
 const EMPTY_MESSAGES: Array<{ info: Message; parts: Part[] }> = [];
 const IDLE_SESSION_STATUS = { type: 'idle' as const };
 const CHAT_FORCE_SCROLL_BOTTOM_EVENT = 'openchamber:chat-force-scroll-bottom';
+const CHAT_SCROLL_TO_MESSAGE_EVENT = 'openchamber:chat-scroll-to-message';
 const DEFAULT_RETRY_MESSAGE = 'Quota limit reached. Retrying automatically.';
 const CHAT_SCROLL_STYLE = {
     overflowAnchor: 'none',
@@ -795,6 +796,23 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ autoOpenDraft = tr
             window.removeEventListener(CHAT_FORCE_SCROLL_BOTTOM_EVENT, handleForceScrollBottom as EventListener);
         };
     }, [currentSessionId, goToBottom]);
+
+    React.useEffect(() => {
+        if (typeof window === 'undefined' || !currentSessionId || !messageListRef) return;
+
+        const handleScrollToMessage = (event: Event) => {
+            const customEvent = event as CustomEvent<{ messageId?: string; sessionId?: string }>;
+            if (customEvent.detail?.sessionId && customEvent.detail.sessionId !== currentSessionId) return;
+            const messageId = customEvent.detail?.messageId;
+            if (!messageId) return;
+            messageListRef.current?.scrollToMessageId(messageId, { behavior: 'smooth' });
+        };
+
+        window.addEventListener(CHAT_SCROLL_TO_MESSAGE_EVENT, handleScrollToMessage as EventListener);
+        return () => {
+            window.removeEventListener(CHAT_SCROLL_TO_MESSAGE_EVENT, handleScrollToMessage as EventListener);
+        };
+    }, [currentSessionId, messageListRef]);
 
     React.useEffect(() => {
         if (typeof window === 'undefined' || !currentSessionId || isDesktopExpandedInput) {

@@ -17,6 +17,7 @@ function run(label, command, args, env = {}, options = {}) {
     stdio: 'inherit',
     env: { ...process.env, ...env },
     detached: useDetachedChildren,
+    shell: process.platform === 'win32',
   }).on('error', (error) => {
     console.error(`[dev:web:hmr] Failed to start ${label}:`, error);
   });

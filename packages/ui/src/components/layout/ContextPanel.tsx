@@ -2089,6 +2089,12 @@ export const ContextPanel: React.FC = () => {
   }, [tabs]);
   const sessionTitleById = useSessionTitleMap(directoryKey || undefined, chatSessionIDs);
 
+  // Sync context-panel width to document root so fixed-positioned elements
+  // (e.g. the Tasks popover) can account for it via CSS variable.
+  React.useEffect(() => {
+    document.documentElement.style.setProperty('--oc-context-panel-width', `${isOpen ? width : 0}px`);
+  }, [isOpen, width]);
+
   const [isResizing, setIsResizing] = React.useState(false);
   const [suppressWidthTransition, setSuppressWidthTransition] = React.useState(false);
   const startXRef = React.useRef(0);
