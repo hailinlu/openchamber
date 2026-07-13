@@ -234,50 +234,54 @@ export const StatusRow: React.FC<StatusRowProps> = ({
     const allParts = state.part;
     if (!messages?.length) return;
 
-    // Collect all "Update Todo List" tool messages (oldest first).
-    const toolMessages: string[] = [];
-    for (const msg of messages) {
+    // Iterate from last to first so the latest "Update Todo List" tool
+    // output wins.  Only match a todo whose JSON content + status both
+    // line up (status === "in_progress" matches the "In Progress"
+    // rendered section heading).
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
       const messageId = (msg as Record<string, unknown>).id as string | undefined;
       if (!messageId) continue;
       const parts = allParts[messageId];
       if (!parts?.length) continue;
+
       for (const part of parts) {
         if (typeof part !== 'object' || !part) continue;
         const p = part as Record<string, unknown>;
         if (p.type !== 'tool') continue;
-        const raw = typeof (p.state as Record<string, unknown> | undefined)?.output === 'string'
-          ? (p.state as Record<string, unknown>).output as string : '';
+
+        const toolState = p.state as Record<string, unknown> | undefined;
+        if (!toolState) continue;
+
+        const raw = typeof toolState.output === 'string'
+          ? toolState.output.trim()
+          : '';
         if (!raw) continue;
+
+        // Try parsing the tool output as a JSON array of {content, status, priority}
         try {
           const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            toolMessages.push(messageId);
+          if (Array.isArray(parsed)) {
+            const match = parsed.find(
+              (t: unknown) =>
+                typeof t === 'object' && t !== null &&
+                typeof (t as Record<string, unknown>).content === 'string' &&
+                (t as Record<string, unknown>).content === clickedTodo.content &&
+                (t as Record<string, unknown>).status === 'in_progress',
+            );
+            if (match) {
+              window.dispatchEvent(new CustomEvent(CHAT_SCROLL_TO_MESSAGE_EVENT, {
+                detail: { messageId, sessionId: currentSessionId },
+              }));
+              return;
+            }
           }
-        } catch { /* skip */ }
+        } catch {
+          // Not valid JSON — skip
+        }
       }
     }
-    if (!toolMessages.length) return;
-
-    // Each "Update Todo List" tool output advances the todo list by one
-    // step (the Nth todo moves from pending → in_progress → completed).
-    // The LAST tool message shows the final/current state — skip it for
-    // navigation so clicking the LAST todo (bottom of popover) targets
-    // the SECOND-TO-LAST tool message where it was actively worked on.
-    const clickedIdx = visibleTodos.findIndex((t) => t.id && t.id === clickedTodo.id);
-    if (clickedIdx < 0) return;
-
-    // visibleTodos count = total steps, toolMessages = steps + 1 (final state)
-    // target = toolMessages[toolMessages.length - 2 - (total - 1 - clickedIdx)]
-    const total = visibleTodos.length;
-    const fromEnd = total - clickedIdx;          // 1-based from end (1=last)
-    const targetMsgIdx = toolMessages.length - 1 - fromEnd;
-    if (targetMsgIdx < 0 || targetMsgIdx >= toolMessages.length) return;
-
-    const targetMessageId = toolMessages[targetMsgIdx];
-    window.dispatchEvent(new CustomEvent(CHAT_SCROLL_TO_MESSAGE_EVENT, {
-      detail: { messageId: targetMessageId, sessionId: currentSessionId },
-    }));
-  }, [currentSessionId, directoryStore, visibleTodos]);
+  }, [currentSessionId, directoryStore]);
 
   const toggleExpanded = () => setIsExpanded((prev) => !prev);
   const todoSummaryLabel = t('chat.statusRow.summary.activeLeft', {
