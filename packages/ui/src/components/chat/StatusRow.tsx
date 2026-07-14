@@ -100,7 +100,7 @@ const TodoItemRow: React.FC<TodoItemRowProps> = ({ todo, onNavigate }) => {
           onNavigate && "hover:underline focus-visible:underline focus-visible:outline-none"
         )}
       >
-        {todo.content}
+        {todo.content.replace(/【[^】]*】/g, '').trim()}
       </button>
       <Tooltip>
         <TooltipTrigger asChild>
@@ -318,7 +318,7 @@ export const StatusRow: React.FC<StatusRowProps> = ({
       {/* Desktop: show task text; Mobile/VSCode: just "Tasks" */}
       {!isCompact && activeTodo ? (
         <span className="status-row__active-todo typography-ui-label text-foreground truncate max-w-[200px]">
-          {activeTodo.content}
+          {activeTodo.content.replace(/【[^】]*】/g, '').trim()}
         </span>
       ) : (
         <span className="typography-ui-label">{t('chat.statusRow.tasksTitle')}</span>
