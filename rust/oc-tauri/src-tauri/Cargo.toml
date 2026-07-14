@@ -1,0 +1,23 @@
+[package]
+name = "oc-tauri"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "OpenChamber 桌面壳 (Tauri, 替换 packages/electron)"
+
+[lib]
+name = "oc_tauri_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.6" }
+
+[dependencies]
+oc-core = { workspace = true }
+tauri = { version = "2.11" }
+tauri-plugin-log = "2"
+tauri-plugin-shell = "2"
+serde = { workspace = true }
+serde_json = { workspace = true }
+log = "0.4"

@@ -14,7 +14,7 @@ members = [
     "oc-core",
     "oc-opencode-sdk",
     "oc-server",
-    "oc-tauri",
+    "oc-tauri/src-tauri",
 ]
 
 [workspace.package]
