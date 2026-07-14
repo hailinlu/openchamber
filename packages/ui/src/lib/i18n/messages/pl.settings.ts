@@ -967,6 +967,8 @@ export const settingsDict = {
   'settings.openchamber.visual.field.darkTheme': 'Ciemny motyw',
   'settings.openchamber.visual.field.diffLayoutAria': 'Układ diffa: {option}',
   'settings.openchamber.visual.field.editTools': 'Narzędzia edycji',
+  'settings.openchamber.visual.field.showNonEditToolCalls': 'Pokaż wywołania narzędzi innych niż edycja',
+  'settings.openchamber.visual.field.showNonEditToolCallsAria': 'Pokaż wywołania narzędzi innych niż edycja',
 
   'settings.openchamber.visual.field.enableSpellcheckInTextInputs': 'Włącz sprawdzanie pisowni w polach tekstowych',
   'settings.openchamber.visual.field.enableSpellcheckInTextInputsAria': 'Włącz sprawdzanie pisowni w polach tekstowych',

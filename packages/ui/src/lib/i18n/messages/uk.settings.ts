@@ -1750,6 +1750,8 @@ export const settingsDict = {
   "settings.openchamber.visual.field.showExpandedEditToolsAria": "Показати розширені інструменти редагування",
   "settings.openchamber.visual.field.bash": "Bash",
   "settings.openchamber.visual.field.editTools": "Інструменти редагування",
+  "settings.openchamber.visual.field.showNonEditToolCalls": "Показувати виклики інструментів, крім редагування",
+  "settings.openchamber.visual.field.showNonEditToolCallsAria": "Показувати виклики інструментів, крім редагування",
   "settings.openchamber.visual.field.userMessageRenderingAria": "Відображення повідомлень користувача: {option}",
   "settings.openchamber.visual.field.mermaidRenderingAria": "Візуалізація Mermaid: {option}",
   "settings.openchamber.visual.field.diffLayoutAria": "Компонування diff: {option}",

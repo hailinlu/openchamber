@@ -113,7 +113,7 @@ function clearViteCache() {
 
 clearViteCache();
 
-const api = run('api', 'bun', ['run', '--cwd', 'packages/web', 'dev:server:watch'], {
+const api = run('api', 'node', ['scripts/dev-server.mjs'], {
   OPENCHAMBER_PORT: backendPort,
 });
 const vite = run(

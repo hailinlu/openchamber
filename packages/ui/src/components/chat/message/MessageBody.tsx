@@ -39,7 +39,7 @@ import { Icon } from "@/components/icon/Icon";
 import { formatTimestampForDisplay } from './timeFormat';
 import { ToolRevealOnMount } from './parts/ToolRevealOnMount';
 import { StaticToolRow } from './parts/ProgressiveGroup';
-import { isExpandableTool, isStandaloneTool } from './parts/toolRenderUtils';
+import { isExpandableTool, isStandaloneTool, EDIT_TOOL_NAMES } from './parts/toolRenderUtils';
 import TurnActivity from '../components/TurnActivity';
 import { createProjectPlanFile } from '@/lib/openchamberConfig';
 import { resolveProjectForSessionDirectory } from '@/lib/projectResolution';
@@ -421,6 +421,7 @@ interface MessageBodyProps {
     userActionsMode?: 'inline' | 'external-content' | 'external-actions';
     stickyUserHeaderEnabled?: boolean;
     reviewTransferDirection?: ReviewTransferDirection | null;
+    hideNonEditToolCalls?: boolean;
 }
 
 const TOOL_REVEAL_CACHE_MAX = 200;
@@ -1039,8 +1040,9 @@ const AssistantMessageBody = React.memo(({
     hasTextContent = false,
     onCopyMessage,
     onAuxiliaryContentComplete,
-    showReasoningTraces = false,
+    showReasoningTraces = true,
     turnGroupingContext,
+    hideNonEditToolCalls = false,
     errorMessage,
     errorVariant = 'error',
     reviewTransferDirection = null,
@@ -1728,6 +1730,7 @@ const AssistantMessageBody = React.memo(({
                             animatedToolIds={animatedToolIdsLookup}
                             diffStats={turnGroupingContext.diffStats}
                             renderJustificationActions={renderJustificationActions}
+                            hideNonEditToolCalls={hideNonEditToolCalls}
                         />
                     </div>
                 );
@@ -1836,6 +1839,13 @@ const AssistantMessageBody = React.memo(({
                     continue;
                 }
 
+                // When the user opts to hide non-edit tool calls, skip everything
+                // except edit-family tools (edit/write/multiedit/apply_patch/...).
+                if (hideNonEditToolCalls && !EDIT_TOOL_NAMES.has(toolName)) {
+                    i++;
+                    continue;
+                }
+
                 // Expandable tools: bash, edit, write, task, question — individual rows
                 if (isExpandableTool(toolName)) {
                     rendered.push(
@@ -1914,6 +1924,7 @@ const AssistantMessageBody = React.memo(({
         shouldShowTool,
         effectiveStreamPhase,
         showReasoningTraces,
+        hideNonEditToolCalls,
         shouldDeferSortedInlineText,
         toggleActivityGroup,
         turnGroupingContext,

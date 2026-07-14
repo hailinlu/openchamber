@@ -1783,6 +1783,8 @@ export const settingsDict = {
   'settings.openchamber.visual.field.showExpandedEditToolsAria': 'Show expanded edit tools',
   'settings.openchamber.visual.field.bash': 'Bash',
   'settings.openchamber.visual.field.editTools': 'Edit tools',
+  'settings.openchamber.visual.field.showNonEditToolCalls': 'Show non-Edit tool calls',
+  'settings.openchamber.visual.field.showNonEditToolCallsAria': 'Show non-Edit tool calls',
   'settings.openchamber.visual.field.userMessageRenderingAria': 'User message rendering: {option}',
   'settings.openchamber.visual.field.mermaidRenderingAria': 'Mermaid rendering: {option}',
   'settings.openchamber.visual.field.diffLayoutAria': 'Diff layout: {option}',

@@ -1750,6 +1750,8 @@ export const settingsDict = {
   'settings.openchamber.visual.field.showExpandedEditToolsAria': '확장된 편집 도구 표시',
   'settings.openchamber.visual.field.bash': 'Bash',
   'settings.openchamber.visual.field.editTools': '편집 도구',
+  'settings.openchamber.visual.field.showNonEditToolCalls': 'Edit 외 도구 호출 표시',
+  'settings.openchamber.visual.field.showNonEditToolCallsAria': 'Edit 외 도구 호출 표시',
   'settings.openchamber.visual.field.userMessageRenderingAria': '사용자 메시지 렌더링: {option}',
   'settings.openchamber.visual.field.mermaidRenderingAria': 'Mermaid 렌더링: {option}',
   'settings.openchamber.visual.field.diffLayoutAria': 'Diff 레이아웃: {option}',

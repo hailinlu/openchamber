@@ -1659,6 +1659,8 @@ export const settingsDict = {
   'settings.openchamber.visual.field.showExpandedEditToolsAria': 'Afficher les outils d\'édition étendus',
   'settings.openchamber.visual.field.bash': 'Bash',
   'settings.openchamber.visual.field.editTools': 'Outils d\'édition',
+  'settings.openchamber.visual.field.showNonEditToolCalls': 'Afficher les appels d\'outils autres que d\'édition',
+  'settings.openchamber.visual.field.showNonEditToolCallsAria': 'Afficher les appels d\'outils autres que d\'édition',
   'settings.openchamber.visual.field.userMessageRenderingAria': 'Rendu du message utilisateur : {option}',
   'settings.openchamber.visual.field.mermaidRenderingAria': 'Rendu Mermaid : {option}',
   'settings.openchamber.visual.field.diffLayoutAria': 'Disposition des différences : {option}',

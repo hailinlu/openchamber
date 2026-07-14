@@ -1661,6 +1661,8 @@
   'settings.openchamber.visual.field.showExpandedEditToolsAria': '預設展開編輯工具',
   'settings.openchamber.visual.field.bash': 'Bash',
   'settings.openchamber.visual.field.editTools': '編輯工具',
+  'settings.openchamber.visual.field.showNonEditToolCalls': '顯示非 Edit 工具呼叫',
+  'settings.openchamber.visual.field.showNonEditToolCallsAria': '顯示非 Edit 工具呼叫',
   'settings.openchamber.visual.field.userMessageRenderingAria': '使用者訊息渲染：{option}',
   'settings.openchamber.visual.field.mermaidRenderingAria': 'Mermaid 渲染：{option}',
   'settings.openchamber.visual.field.diffLayoutAria': '差異佈局：{option}',
