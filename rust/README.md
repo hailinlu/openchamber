@@ -41,5 +41,9 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
 - [x] Tauri 启动加载 UI (dev URL 模式, `cargo tauri dev` 验证 WebView 渲染)
 - [x] sidecar 管理 (`sidecar.rs`: `SidecarBuilder`/`SidecarHandle`, 平台整树杀,
       `/health` 就绪门, `cargo test` 6/6 通过)
-- [ ] IPC 契约对等 (`window.__OPENCHAMBER_DESKTOP__`)
-- [ ] 原生集成迁移 (窗口/托盘/菜单/深链/自动更新/SSH)
+- [x] IPC 契约对等 (`window.__OPENCHAMBER_DESKTOP__`)
+      — `init_script` 注入标量全局变量 + 5 方法桥 (invoke/openDialog/grantFileAccess/openExternal/listen),
+      `openchamber_invoke` 分发 ~35 命令 (含 17 个 `COMMANDS_SAFE_FOR_REMOTE` origin 门),
+      事件双路径 (handler + DOM CustomEvent), `cargo test` 15/15 通过
+- [x] 原生集成 (窗口 chrome / shell / 通知 / 对话框 / 静态托盘 / 应用菜单 / 深链 / 开机自启)
+- [ ] SSH 管理 / 动画托盘 / vibrancy / mini-chat / 应用发现 / auto-update (后续专项)

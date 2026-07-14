@@ -8,8 +8,10 @@
     "devUrl": "http://127.0.0.1:3000"
   },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
+        "label": "main",
         "title": "OpenChamber",
         "width": 1280,
         "height": 800,
