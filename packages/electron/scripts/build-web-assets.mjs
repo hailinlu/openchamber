@@ -85,6 +85,13 @@ await fs.mkdir(resourcesDir, { recursive: true });
 const stagedWebDistDir = await fs.mkdtemp(path.join(resourcesDir, 'web-dist-staging-'));
 await copyDir(webDistDir, stagedWebDistDir);
 await removeDir(resourcesWebDistDir);
-await fs.rename(stagedWebDistDir, resourcesWebDistDir);
+try {
+  await fs.rename(stagedWebDistDir, resourcesWebDistDir);
+} catch {
+  // Windows: rename fails to overwrite an existing directory.
+  // Fall back to copy + remove.
+  await copyDir(stagedWebDistDir, resourcesWebDistDir);
+  await removeDir(stagedWebDistDir);
+}
 
 console.log(`[electron] web assets ready: ${resourcesWebDistDir}`);
