@@ -50,6 +50,22 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
 - [x] oc-opencode-sdk: health() 实现 (GET /global/health + Basic auth)
 - [x] `cargo test` 25/25 通过 (oc-server 22 + oc-opencode-sdk 3), clippy 0 警告
 
+**阶段 2 — 实时传输层 (SSE + WebSocket)** (完成):
+- [x] SSE 透传代理 (`realtime/sse_proxy.rs`: `/api/event`, `/api/global/event`
+      — 纯 chunk 透传 + 20s 边界感知心跳 `:heartbeat\n\n` + Last-Event-ID 透传)
+- [x] WS 全局事件桥 (`realtime/ws_bridge.rs`: `/api/global/event/ws`
+      — 共享上游 reader + 2048 事件 replay ring + ready 握手 + reconnect-after-ready)
+- [x] WS 目录事件桥 (`realtime/ws_bridge.rs`: `/api/event/ws`
+      — 每连接独享上游 reader + Last-Event-ID 续传, 无 replay)
+- [x] 上游 SSE reader (`realtime/upstream_reader.rs`: stall 检测 + 无声重连
+      + Last-Event-ID 跨重连持久 + SSE envelope 解析)
+- [x] 全局 hub (`realtime/global_hub.rs`: 单共享 reader → broadcast fan-out
+      + bounded replay ring + 状态通知)
+- [x] WS 帧协议 (`realtime/protocol.rs`: ready/event/error/backpressure
+      4 种 JSON-over-text-frames, 与 `event-pipeline.ts` 对齐)
+- [x] 背压三层 (max_write_buffer 16MB 硬断 + 12MB 警告帧 + send().await 天然背压)
+- [x] `cargo test` 52/52 通过 (新增 25 测试), clippy 0 警告
+
 **阶段 4A — Tauri 桌面壳 (优先, sidecar 过渡)** (进行中):
 - [x] `tauri-cli` 初始化, workspace 集成
 - [x] Tauri 启动加载 UI (dev URL 模式, `cargo tauri dev` 验证 WebView 渲染)

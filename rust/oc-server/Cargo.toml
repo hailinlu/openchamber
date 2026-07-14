@@ -14,6 +14,7 @@ oc-core = { workspace = true }
 oc-opencode-sdk = { workspace = true }
 axum = { workspace = true }
 tokio = { workspace = true }
+tokio-util = "0.7"
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors", "fs", "trace"] }
 serde = { workspace = true }

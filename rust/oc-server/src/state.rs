@@ -6,6 +6,7 @@ use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
 
 use crate::config::Config;
+use crate::realtime::global_hub::GlobalHub;
 
 /// 应用全局状态。
 ///
@@ -25,6 +26,8 @@ pub struct AppState {
     pub opencode_ready: Arc<AtomicBool>,
     /// HTTP 客户端 (供 proxy 流式转发, 复用连接池)。
     pub http_client: reqwest::Client,
+    /// 全局消息流 hub (单上游 SSE reader + replay + broadcast)。
+    pub global_hub: Arc<GlobalHub>,
 }
 
 impl AppState {
@@ -38,6 +41,12 @@ impl AppState {
             .build()
             .expect("failed to build proxy http client");
 
+        let global_hub = Arc::new(GlobalHub::new(
+            opencode_base_url.clone(),
+            opencode_auth_header.clone(),
+            http_client.clone(),
+        ));
+
         Self {
             config,
             version: env!("CARGO_PKG_VERSION"),
@@ -46,6 +55,7 @@ impl AppState {
             opencode_auth_header,
             opencode_ready: Arc::new(AtomicBool::new(false)),
             http_client,
+            global_hub,
         }
     }
 
