@@ -1,0 +1,54 @@
+# OpenChamber Rust workspace.
+#
+# 渐进式迁移目标 (见 docs/plan/rust-migration-plan.md):
+#   - oc-server       → 替换 packages/web/server (Express → axum)
+#   - oc-tauri        → 替换 packages/electron (桌面壳)
+#   - oc-opencode-sdk → 替换 @opencode-ai/sdk 的服务端用法
+#   - oc-core         → 跨 crate 共享类型与错误
+#
+# 当前为阶段 0 脚手架: 仅骨架 + 依赖链编译验证, 不含业务逻辑。
+
+[workspace]
+resolver = "2"
+members = [
+    "oc-core",
+    "oc-opencode-sdk",
+    "oc-server",
+    "oc-tauri",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.85"
+license = "MIT"
+
+# 共享依赖版本集中管理, 各 crate 按 need 引用。
+[workspace.dependencies]
+# 异步运行时
+tokio = { version = "1", features = ["full"] }
+# HTTP 服务器 + 客户端
+axum = { version = "0.8", features = ["ws"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+# WebSocket
+tokio-tungstenite = { version = "0.27", features = ["rustls-tls-webpki-roots"] }
+# 序列化
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml = "0.9"
+# 错误处理
+thiserror = "2"
+anyhow = "1"
+# 日志/追踪
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+# CLI
+clap = { version = "4", features = ["derive", "env"] }
+# 内部 crate
+oc-core = { path = "oc-core" }
+oc-opencode-sdk = { path = "oc-opencode-sdk" }
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

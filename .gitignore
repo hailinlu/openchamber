@@ -68,3 +68,7 @@ workspaces/
 *.pid
 .worktrees/
 test-results/
+
+# Rust build artifacts
+rust/target/
+rust/**/target/
