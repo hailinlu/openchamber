@@ -37,6 +37,7 @@
     "lint:mobile": "bun run --cwd packages/mobile lint",
     "clean": "bun run --filter '*' clean",
     "changelog-card": "node scripts/changelog-card/generate.mjs",
+    "snapshot:routes": "node scripts/snapshot-api-routes.mjs",
     "postinstall": "node ./fix-deprecation.js && patch-package",
     "dev:web": "bun run --cwd packages/web build:watch",
     "dev:web:server": "bun run --cwd packages/web dev:server:watch",

@@ -36,6 +36,19 @@ struct SidecarState {
 
 static SIDECAR: Mutex<Option<SidecarState>> = Mutex::new(None);
 
+/// 获取 sidecar base_url (供 IPC 命令 HTTP 调用 sidecar 端点)。
+///
+/// 返回 `http://127.0.0.1:<port>`，sidecar 未启动时返回 None。
+/// 用例: `dialog_cmd::openchamber_file_grant` 调 `POST /api/fs/grant`。
+pub fn sidecar_base_url() -> Option<String> {
+    SIDECAR
+        .lock()
+        .ok()?
+        .as_ref()
+        .and_then(|s| s.handle.as_ref())
+        .map(|h| h.base_url())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()

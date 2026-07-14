@@ -29,12 +29,14 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
 
 ## 当前进度
 
-**阶段 0 — 脚手架** (进行中):
+**阶段 0 — 脚手架** (完成):
 - [x] cargo workspace + 4 个 crate 骨架
 - [x] Win10 编译验证 (`cargo check`)
 - [x] Tauri 应用初始化 (`oc-tauri/src-tauri`, `cargo check` 通过)
-- [ ] `/api` 契约快照 (路由清单 + TS schema 导出)
-- [ ] 前置解耦: 抽出 `mintOutsideFileGrant` (解锁桌面壳独立迁移)
+- [x] `/api` 契约快照 (273 路由 + 5 WS + 5 SSE + catch-all proxy,
+      `bun run snapshot:routes` → `rust/oc-server/api-routes-snapshot.json`)
+- [x] 前置解耦: `mintOutsideFileGrant` 走 HTTP `POST /api/fs/grant`
+      (Tauri 跨进程调用 sidecar, Electron 保持原 import)
 
 **阶段 4A — Tauri 桌面壳 (优先, sidecar 过渡)** (进行中):
 - [x] `tauri-cli` 初始化, workspace 集成

@@ -540,6 +540,26 @@ export const registerFsRoutes = (app, dependencies) => {
     job.updatedAt = Date.now();
   };
 
+  // Mint an outside-workspace file grant token. Cross-process consumers
+  // (e.g. the Tauri shell) can't import mintOutsideFileGrant directly because
+  // the grant Map lives in this process — they POST here instead.
+  // Electron still imports mintOutsideFileGrant directly (same-process).
+  app.post('/api/fs/grant', async (req, res) => {
+    try {
+      const { path: targetPath, scopes } = req.body ?? {};
+      const grant = await mintOutsideFileGrant(targetPath, {
+        scopes: scopes || ['stat', 'read', 'raw'],
+        fsPromises,
+        path,
+      });
+      return res.json(grant);
+    } catch (error) {
+      const message = (error && error.message) || 'Failed to mint file grant';
+      const isClientError = message.includes('required') || message.includes('file path');
+      return res.status(isClientError ? 400 : 500).json({ error: message });
+    }
+  });
+
   app.get('/api/fs/home', (_req, res) => {
     try {
       const home = os.homedir();

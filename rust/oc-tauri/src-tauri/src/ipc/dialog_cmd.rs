@@ -5,17 +5,19 @@
 //! - `openchamber:file:grant-existing` → `openchamber_file_grant`
 //!
 //! origin 门: 仅 local-origin 可用 (复现 main.mjs:4543-4548 的 isLocalSender 门)。
+//!
+//! Grant 跨进程: Tauri 进程不能直接 import Node sidecar 的 `mintOutsideFileGrant`
+//! (grant Map 存在于 sidecar 进程)。改为 HTTP 调用 sidecar 的 `POST /api/fs/grant`。
 
 use serde_json::{json, Value};
 use tauri::{AppHandle, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
-/// `openchamber_dialog_open` — args: `{ options: { directory, multiple, title, filters, defaultPath } }`
+/// `openchamber_dialog_open` — args: `{ options: { directory, multiple, returnGrant, title, filters, defaultPath } }`
 ///
 /// 复现 Electron dialog.showOpenDialog。
 /// 返回: string | string[] | null (multiple → 数组, single → string, 取消 → null)。
-///
-/// returnGrant 分支暂不支持 (需接 web server 的 mintOutsideFileGrant)。
+/// 当 returnGrant=true 时返回 `{ path, outsideFileGrant, expiresAt }` (或数组)。
 #[tauri::command]
 pub async fn openchamber_dialog_open(
     options: Value,
@@ -33,6 +35,10 @@ pub async fn openchamber_dialog_open(
         .unwrap_or(false);
     let multiple = options
         .get("multiple")
+        .and_then(|v| v.as_bool())
+        .unwrap_or(false);
+    let return_grant = options
+        .get("returnGrant")
         .and_then(|v| v.as_bool())
         .unwrap_or(false);
     let title = options.get("title").and_then(|v| v.as_str());
@@ -76,45 +82,66 @@ pub async fn openchamber_dialog_open(
     if directory {
         if multiple {
             let paths = dialog.blocking_pick_folders();
-            return Ok(format_multi_result(paths));
+            let arr: Vec<String> = paths.unwrap_or_default().iter().map(|p| p.to_string()).collect();
+            return Ok(json!(arr));
         } else {
             let path = dialog.blocking_pick_folder();
-            return Ok(format_single_result(path));
+            return Ok(path.map(|p| json!(p.to_string())).unwrap_or(Value::Null));
+        }
+    }
+
+    let picked = if multiple {
+        let paths = dialog.blocking_pick_files();
+        paths
+            .unwrap_or_default()
+            .into_iter()
+            .map(|p| p.to_string())
+            .collect::<Vec<_>>()
+    } else {
+        match dialog.blocking_pick_file() {
+            Some(p) => vec![p.to_string()],
+            None => vec![],
+        }
+    };
+
+    // returnGrant 分支: 对每个选中文件 mint grant token (复现 Electron grantFilePath)
+    if return_grant && !picked.is_empty() {
+        if multiple {
+            let grants: Vec<Value> = mint_grants_for_paths(picked).await;
+            return Ok(json!(grants));
+        } else {
+            return mint_grant_via_sidecar(&picked[0])
+                .await
+                .map(|g| json!(g))
+                .or_else(|_| Ok(json!({ "path": picked[0] })));
         }
     }
 
     if multiple {
-        let paths = dialog.blocking_pick_files();
-        Ok(format_multi_result(paths))
+        Ok(json!(picked))
     } else {
-        let path = dialog.blocking_pick_file();
-        Ok(format_single_result(path))
+        Ok(picked.into_iter().next().map(Value::String).unwrap_or(Value::Null))
     }
 }
 
-/// 格式化单选结果 → string | null
-fn format_single_result(result: Option<tauri_plugin_dialog::FilePath>) -> Value {
-    match result {
-        Some(path) => json!(path.to_string()),
-        None => Value::Null,
+/// 对多个路径逐个 mint grant (顺序调用, 避免 sidecar 并发压力)。
+async fn mint_grants_for_paths(paths: Vec<String>) -> Vec<Value> {
+    let mut results = Vec::with_capacity(paths.len());
+    for p in &paths {
+        let val = mint_grant_via_sidecar(p)
+            .await
+            .map(|g| json!(g))
+            .unwrap_or_else(|_| json!({ "path": p }));
+        results.push(val);
     }
-}
-
-/// 格式化多选结果 → string[]
-fn format_multi_result(result: Option<Vec<tauri_plugin_dialog::FilePath>>) -> Value {
-    match result {
-        Some(paths) => {
-            let arr: Vec<String> = paths.iter().map(|p| p.to_string()).collect();
-            json!(arr)
-        }
-        None => json!([]),
-    }
+    results
 }
 
 /// `openchamber_file_grant` — args: `{ filePath: string }`
 ///
-/// 复现 mintOutsideFileGrant (security-scoped read token)。
-/// 暂 stub: 需接 web server 的 grant API。返回路径本身作为 grant 占位。
+/// 复现 Electron `mintOutsideFileGrant` (security-scoped read token)。
+/// Tauri 进程不能直接 import Node 的 grant Map, 改为 HTTP 调 sidecar `POST /api/fs/grant`。
+/// 失败时返回路径本身 (无 grant), 与 Electron `grantFilePath` 的降级行为一致。
 #[tauri::command]
 pub async fn openchamber_file_grant(
     file_path: String,
@@ -128,14 +155,38 @@ pub async fn openchamber_file_grant(
         return Err("filePath is required".into());
     }
 
-    // TODO: 调用 web server /api/fs/grant mintOutsideFileGrant
-    // 暂返回占位 grant (path + 空 grant + 30分钟过期)
-    let expires_at = chrono::Utc::now().timestamp_millis() + 30 * 60 * 1000;
-    Ok(json!({
-        "path": file_path,
-        "outsideFileGrant": null,
-        "expiresAt": expires_at,
-    }))
+    mint_grant_via_sidecar(&file_path)
+        .await
+        .map(|g| json!(g))
+        .or_else(|_| Ok(json!({ "path": file_path })))
+}
+
+/// 通过 sidecar HTTP 端点 mint outside-workspace file grant。
+///
+/// 调用 `POST {sidecar_base}/api/fs/grant` → `{ path, outsideFileGrant, expiresAt }`。
+/// sidecar 未启动或 HTTP 失败时返回 Err (调用方决定降级行为)。
+async fn mint_grant_via_sidecar(file_path: &str) -> Result<Value, String> {
+    let base_url = crate::sidecar_base_url()
+        .ok_or_else(|| "sidecar not started".to_string())?;
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post(format!("{}/api/fs/grant", base_url))
+        .json(&json!({
+            "path": file_path,
+            "scopes": ["stat", "read", "raw"],
+        }))
+        .send()
+        .await
+        .map_err(|e| format!("grant request failed: {}", e))?;
+
+    if !resp.status().is_success() {
+        return Err(format!("grant endpoint returned {}", resp.status()));
+    }
+
+    resp.json::<Value>()
+        .await
+        .map_err(|e| format!("failed to parse grant response: {}", e))
 }
 
 /// 判断窗口 origin 是否 local (loopback 或 openchamber-ui:// 协议)。
