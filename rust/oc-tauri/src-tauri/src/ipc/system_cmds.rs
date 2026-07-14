@@ -144,7 +144,7 @@ pub async fn get_minimize_to_tray(_args: &Value, _app: &AppHandle) -> Result<Val
 }
 
 /// `desktop_set_minimize_to_tray` — args: `{ enabled }`
-pub async fn set_minimize_to_tray(args: &Value, _app: &AppHandle) -> Result<Value, String> {
+pub async fn set_minimize_to_tray(_args: &Value, _app: &AppHandle) -> Result<Value, String> {
     #[cfg(target_os = "windows")]
     {
         let _enabled = args.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);

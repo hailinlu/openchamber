@@ -25,7 +25,9 @@ pub async fn handle_tray_update(args: &Value, app: &AppHandle) -> Result<Value, 
         .unwrap_or(0);
     #[cfg(target_os = "macos")]
     {
-        let _ = app.set_badge_count(badge_count as i64);
+        if let Some(window) = app.get_webview_window("main") {
+            let _ = window.set_badge_count(Some(badge_count));
+        }
     }
 
     // 构建并设置托盘菜单 (异步在 spawn_blocking 或直接同步构建)

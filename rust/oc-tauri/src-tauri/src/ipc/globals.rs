@@ -147,6 +147,14 @@ pub fn build_init_script(ctx: &RuntimeContext) -> String {
         mac_vibrancy_supported
     ));
 
+    // __OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ — 前端的桌面启动状态机依赖此值。
+    // 复现 Electron main.mjs buildInitScript。
+    // sidecar 已就绪(健康检查通过)后才设置, 此时 local 后端一定可达。
+    globals.push(format_js_global(
+        "__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__",
+        &serde_json::json!({"target": "local", "status": "ok"}),
+    ));
+
     let globals_js = globals.join("\n");
 
     // --- __OPENCHAMBER_DESKTOP__ 桥对象 ---

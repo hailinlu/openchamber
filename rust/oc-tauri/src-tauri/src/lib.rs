@@ -58,6 +58,7 @@ pub fn run() {
                 let handle = rt.block_on(async {
                     SidecarBuilder::new()
                         .ready_timeout(std::time::Duration::from_secs(45))
+                        .arg("--api-only")
                         .start()
                         .await
                 });

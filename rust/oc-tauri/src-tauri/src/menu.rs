@@ -7,7 +7,7 @@
 
 use serde_json::json;
 use tauri::{
-    menu::{Menu, MenuItem, PredefinedMenuItem, Submenu},
+    menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu},
     AppHandle, Emitter, Manager,
 };
 
@@ -47,7 +47,7 @@ fn build_mac_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         app_name,
         true,
         &[
-            &PredefinedMenuItem::about(app, Some(about_meta))?,
+            &PredefinedMenuItem::about(app, None, Some(about_meta))?,
             &PredefinedMenuItem::separator(app)?,
             &MenuItem::with_id(app, "menu_settings", "Settings...", true, Some("CmdOrCtrl+,"))?,
             &PredefinedMenuItem::separator(app)?,
