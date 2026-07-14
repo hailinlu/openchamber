@@ -234,50 +234,55 @@ export const StatusRow: React.FC<StatusRowProps> = ({
     const allParts = state.part;
     if (!messages?.length) return;
 
-    // Iterate from last to first so the latest "Update Todo List" tool
-    // output wins.  Only match a todo whose JSON content + status both
-    // line up (status === "in_progress" matches the "In Progress"
-    // rendered section heading).
-    for (let i = messages.length - 1; i >= 0; i--) {
-      const msg = messages[i];
-      const messageId = (msg as Record<string, unknown>).id as string | undefined;
-      if (!messageId) continue;
-      const parts = allParts[messageId];
-      if (!parts?.length) continue;
+    // Two passes, both newest-to-oldest so the latest "Update Todo List"
+    // tool output wins:
+    //   1. Require status === "in_progress" (matches the "In Progress"
+    //      rendered section heading).
+    //   2. Fallback: match by content only, any status. Lets the user
+    //      locate completed/pending todos instead of silently no-op'ing.
+    for (const requireInProgress of [true, false]) {
+      for (let i = messages.length - 1; i >= 0; i--) {
+        const msg = messages[i];
+        const messageId = (msg as Record<string, unknown>).id as string | undefined;
+        if (!messageId) continue;
+        const parts = allParts[messageId];
+        if (!parts?.length) continue;
 
-      for (const part of parts) {
-        if (typeof part !== 'object' || !part) continue;
-        const p = part as Record<string, unknown>;
-        if (p.type !== 'tool') continue;
+        for (const part of parts) {
+          if (typeof part !== 'object' || !part) continue;
+          const p = part as Record<string, unknown>;
+          if (p.type !== 'tool') continue;
 
-        const toolState = p.state as Record<string, unknown> | undefined;
-        if (!toolState) continue;
+          const toolState = p.state as Record<string, unknown> | undefined;
+          if (!toolState) continue;
 
-        const raw = typeof toolState.output === 'string'
-          ? toolState.output.trim()
-          : '';
-        if (!raw) continue;
+          const raw = typeof toolState.output === 'string'
+            ? toolState.output.trim()
+            : '';
+          if (!raw) continue;
 
-        // Try parsing the tool output as a JSON array of {content, status, priority}
-        try {
-          const parsed = JSON.parse(raw);
-          if (Array.isArray(parsed)) {
-            const match = parsed.find(
-              (t: unknown) =>
-                typeof t === 'object' && t !== null &&
-                typeof (t as Record<string, unknown>).content === 'string' &&
-                (t as Record<string, unknown>).content === clickedTodo.content &&
-                (t as Record<string, unknown>).status === 'in_progress',
-            );
-            if (match) {
-              window.dispatchEvent(new CustomEvent(CHAT_SCROLL_TO_MESSAGE_EVENT, {
-                detail: { messageId, sessionId: currentSessionId },
-              }));
-              return;
+          // Try parsing the tool output as a JSON array of {content, status, priority}
+          try {
+            const parsed = JSON.parse(raw);
+            if (Array.isArray(parsed)) {
+              const match = parsed.find(
+                (t: unknown) =>
+                  typeof t === 'object' && t !== null &&
+                  typeof (t as Record<string, unknown>).content === 'string' &&
+                  (t as Record<string, unknown>).content === clickedTodo.content &&
+                  (!requireInProgress ||
+                    (t as Record<string, unknown>).status === 'in_progress'),
+              );
+              if (match) {
+                window.dispatchEvent(new CustomEvent(CHAT_SCROLL_TO_MESSAGE_EVENT, {
+                  detail: { messageId, sessionId: currentSessionId },
+                }));
+                return;
+              }
             }
+          } catch {
+            // Not valid JSON — skip
           }
-        } catch {
-          // Not valid JSON — skip
         }
       }
     }
