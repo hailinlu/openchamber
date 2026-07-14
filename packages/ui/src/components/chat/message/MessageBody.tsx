@@ -1862,8 +1862,17 @@ const AssistantMessageBody = React.memo(({
                             : parseTodoJson(rawOutput);
                         const inProgress = todos.filter((t) => t.status === 'in_progress');
                         if (inProgress.length > 0) {
+                            const handleNavigate = () => {
+                                window.dispatchEvent(new CustomEvent('openchamber:chat-scroll-to-message', {
+                                    detail: { messageId, sessionId },
+                                }));
+                            };
                             rendered.push(
-                                <div key={`todo-summary-${part.id}`} className="px-1 py-0.5 text-xs text-muted-foreground/75 italic">
+                                <div
+                                    key={`todo-summary-${part.id}`}
+                                    className="px-1 py-0.5 text-xs text-muted-foreground/75 italic cursor-pointer hover:underline"
+                                    onClick={handleNavigate}
+                                >
                                     → {inProgress.map((t) => String(t.content ?? '')).join(' → ')}
                                 </div>
                             );
