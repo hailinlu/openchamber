@@ -56,7 +56,7 @@ fn build_mac_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
             &PredefinedMenuItem::hide(app, None)?,
             &PredefinedMenuItem::hide_others(app, None)?,
             &PredefinedMenuItem::separator(app)?,
-            &MenuItem::with_id(app, "menu_quit", &format!("Quit {}", app_name), true, Some("CmdOrCtrl+Q"))?,
+            &MenuItem::with_id(app, "menu_quit", format!("Quit {}", app_name), true, Some("CmdOrCtrl+Q"))?,
         ],
     )?;
 

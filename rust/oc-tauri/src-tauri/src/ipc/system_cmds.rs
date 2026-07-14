@@ -4,11 +4,14 @@
 //! lan_address: 枚举网卡 IPv4 (非 loopback)
 //! launch_at_login: tauri-plugin-autostart
 //! notify: tauri-plugin-notification
-//! minimize_to_tray / keep_awake: settings 读写 (keep_awake 暂 stub)
+//! minimize_to_tray / keep_awake: settings.json 持久化 + 平台 power API
 
 use serde_json::{json, Value};
 use tauri::AppHandle;
 use tauri_plugin_autostart::ManagerExt;
+
+use crate::settings::SettingsStore;
+use crate::power::global_keep_awake;
 
 /// `desktop_get_lan_address` — 枚举网卡 IPv4, 返回第一个非 loopback 地址。
 ///
@@ -130,12 +133,13 @@ pub async fn notify(args: &Value, app: &AppHandle) -> Result<Value, String> {
 
 /// `desktop_get_minimize_to_tray` — → `{ supported, enabled }`
 ///
-/// 仅 Windows 支持最小化到托盘 (Electron 一致)。settings 持久化后移。
+/// 仅 Windows 支持最小化到托盘 (Electron 一致)。
+/// 读 settings.json `desktopMinimizeToTrayEnabled`。
 pub async fn get_minimize_to_tray(_args: &Value, _app: &AppHandle) -> Result<Value, String> {
     #[cfg(target_os = "windows")]
     {
-        // TODO: 读 settings.json desktopMinimizeToTrayEnabled
-        Ok(json!({ "supported": true, "enabled": false }))
+        let enabled = SettingsStore::get_bool("desktopMinimizeToTrayEnabled", false);
+        Ok(json!({ "supported": true, "enabled": enabled }))
     }
     #[cfg(not(target_os = "windows"))]
     {
@@ -144,27 +148,64 @@ pub async fn get_minimize_to_tray(_args: &Value, _app: &AppHandle) -> Result<Val
 }
 
 /// `desktop_set_minimize_to_tray` — args: `{ enabled }`
-pub async fn set_minimize_to_tray(_args: &Value, _app: &AppHandle) -> Result<Value, String> {
+///
+/// 仅 Windows: 写 settings.json `desktopMinimizeToTrayEnabled`。
+/// 后续托盘重建由调用方 (UI) 通过 desktop_tray_update 触发。
+pub async fn set_minimize_to_tray(args: &Value, _app: &AppHandle) -> Result<Value, String> {
     #[cfg(target_os = "windows")]
     {
-        let _enabled = args.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
-        // TODO: 写 settings.json + 重建托盘
-        Ok(json!({ "supported": true, "enabled": _enabled }))
+        let enabled = args.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+        // 原子写入 settings.json
+        let store = SettingsStore::new();
+        store.set("desktopMinimizeToTrayEnabled", json!(enabled))?;
+        Ok(json!({ "supported": true, "enabled": enabled }))
     }
     #[cfg(not(target_os = "windows"))]
     {
+        let _ = args;
         Ok(json!({ "supported": false, "enabled": false }))
     }
 }
 
 /// `desktop_get_keep_awake` — → `{ supported, enabled, active }`
 ///
-/// powerSaveBlocker 等价: 防止系统休眠。暂 stub (后续接平台 power API)。
+/// 复现 Electron `readDesktopKeepAwakeStatus` (main.mjs:226-228):
+/// - enabled = settings `desktopKeepAwakeEnabled`
+/// - active = 当前 blocker 是否活跃
 pub async fn get_keep_awake(_args: &Value, _app: &AppHandle) -> Result<Value, String> {
-    Ok(json!({ "supported": false, "enabled": false, "active": false }))
+    #[cfg(any(target_os = "macos", target_os = "windows"))]
+    {
+        let enabled = SettingsStore::get_bool("desktopKeepAwakeEnabled", false);
+        let (_, active) = global_keep_awake().status(enabled);
+        Ok(json!({ "supported": true, "enabled": enabled, "active": active }))
+    }
+    #[cfg(all(unix, not(target_os = "macos")))]
+    {
+        // Linux: best-effort, 可能不支持 systemd-inhibit
+        let enabled = SettingsStore::get_bool("desktopKeepAwakeEnabled", false);
+        let (_, active) = global_keep_awake().status(enabled);
+        Ok(json!({ "supported": true, "enabled": enabled, "active": active }))
+    }
 }
 
 /// `desktop_set_keep_awake` — args: `{ enabled }`
-pub async fn set_keep_awake(_args: &Value, _app: &AppHandle) -> Result<Value, String> {
-    Ok(json!({ "supported": false, "enabled": false, "active": false }))
+///
+/// 复现 Electron `setDesktopKeepAwakeActive` (main.mjs:220-243):
+/// 持久化设置 + 立即激活/禁用 blocker。
+pub async fn set_keep_awake(args: &Value, _app: &AppHandle) -> Result<Value, String> {
+    let enabled = args.get("enabled").and_then(|v| v.as_bool()).unwrap_or(false);
+
+    // 持久化到 settings.json
+    let store = SettingsStore::new();
+    store.set("desktopKeepAwakeEnabled", json!(enabled))?;
+
+    // 激活/禁用
+    if enabled {
+        global_keep_awake().enable().await?;
+    } else {
+        global_keep_awake().disable()?;
+    }
+
+    let (_, active) = global_keep_awake().status(enabled);
+    Ok(json!({ "supported": true, "enabled": enabled, "active": active }))
 }

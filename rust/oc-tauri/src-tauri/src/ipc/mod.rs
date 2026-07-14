@@ -85,6 +85,18 @@ async fn dispatch(
         }
         "desktop_close_current_window" => window_cmds::close_current_window(args, window).await,
         "desktop_set_window_theme" => window_cmds::set_window_theme(args, window).await,
+        "desktop_set_vibrancy" => window_cmds::set_vibrancy(args, app).await,
+        "desktop_focus_main_window" => window_cmds::focus_main_window(args, app).await,
+
+        // --- mini-chat ---
+        "desktop_open_session_mini_chat_window" => {
+            crate::mini_chat::open_session_mini_chat(args, app).await
+        }
+        "desktop_open_draft_mini_chat_window" => {
+            crate::mini_chat::open_draft_mini_chat(args, app).await
+        }
+        "desktop_set_window_pinned" => crate::mini_chat::set_window_pinned(args, window).await,
+        "desktop_get_window_pinned" => crate::mini_chat::get_window_pinned(args, window).await,
 
         // --- shell / 文件 ---
         "desktop_open_external_url" => shell_cmds::open_external_url(args, window).await,
@@ -104,12 +116,38 @@ async fn dispatch(
         "desktop_get_keep_awake" => system_cmds::get_keep_awake(args, app).await,
         "desktop_set_keep_awake" => system_cmds::set_keep_awake(args, app).await,
 
+        // --- hosts / discovery ---
+        "desktop_hosts_get" => crate::discovery::hosts_get(args, app).await,
+        "desktop_hosts_set" => crate::discovery::hosts_set(args, app).await,
+        "desktop_host_probe" => crate::discovery::host_probe(args, app).await,
+        "desktop_install_id_get" => crate::discovery::install_id_get(args, app).await,
+        "desktop_local_client_token_get" => {
+            crate::discovery::local_client_token_get(args, app).await
+        }
+        "desktop_remote_password_login" => crate::discovery::remote_password_login(args, app).await,
+
+        // --- updater ---
+        "desktop_check_for_updates" => crate::updater::check_for_updates(args, app).await,
+        "desktop_download_and_install_update" => {
+            crate::updater::download_and_install(args, app).await
+        }
+        "desktop_restart" => crate::updater::restart(args, app).await,
+
+        // --- SSH ---
+        "desktop_ssh_instances_get" => crate::ssh::instances_get(args, app).await,
+        "desktop_ssh_instances_set" => crate::ssh::instances_set(args, app).await,
+        "desktop_ssh_import_hosts" => crate::ssh::import_hosts(args, app).await,
+        "desktop_ssh_connect" => crate::ssh::connect(args, app).await,
+        "desktop_ssh_disconnect" => crate::ssh::disconnect(args, app).await,
+        "desktop_ssh_status" => crate::ssh::status(args, app).await,
+        "desktop_ssh_logs" => crate::ssh::logs(args, app).await,
+        "desktop_ssh_logs_clear" => crate::ssh::logs_clear(args, app).await,
+
         // --- 托盘 (tray.rs 实现, 通过 tray state 路由) ---
         "desktop_tray_update" => crate::tray::handle_tray_update(args, app).await,
 
         // --- 未实现的命令: 明确 error ---
-        "desktop_set_vibrancy"
-        | "desktop_show_app_menu"
+        "desktop_show_app_menu"
         | "desktop_open_in_app"
         | "desktop_open_file_in_app"
         | "desktop_read_file"
@@ -118,31 +156,9 @@ async fn dispatch(
         | "desktop_get_installed_apps"
         | "desktop_capture_page_rect"
         | "desktop_browser_capture_page"
-        | "desktop_hosts_get"
-        | "desktop_hosts_set"
-        | "desktop_local_client_token_get"
-        | "desktop_install_id_get"
-        | "desktop_host_probe"
-        | "desktop_remote_password_login"
         | "desktop_new_window"
         | "desktop_new_window_for_host"
-        | "desktop_new_window_at_url"
-        | "desktop_open_session_mini_chat_window"
-        | "desktop_open_draft_mini_chat_window"
-        | "desktop_set_window_pinned"
-        | "desktop_get_window_pinned"
-        | "desktop_focus_main_window"
-        | "desktop_check_for_updates"
-        | "desktop_download_and_install_update"
-        | "desktop_restart"
-        | "desktop_ssh_instances_get"
-        | "desktop_ssh_instances_set"
-        | "desktop_ssh_import_hosts"
-        | "desktop_ssh_connect"
-        | "desktop_ssh_disconnect"
-        | "desktop_ssh_status"
-        | "desktop_ssh_logs"
-        | "desktop_ssh_logs_clear" => {
+        | "desktop_new_window_at_url" => {
             Err(format!("Command '{}' not yet implemented in Tauri shell", cmd))
         }
 

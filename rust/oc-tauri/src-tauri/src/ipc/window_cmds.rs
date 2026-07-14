@@ -4,7 +4,9 @@
 //! 由 `ipc/mod.rs::dispatch` 的 match 分支调用。
 
 use serde_json::{json, Value};
-use tauri::WebviewWindow;
+use tauri::{AppHandle, Manager, WebviewWindow};
+
+use crate::settings::SettingsStore;
 
 /// `desktop_start_window_drag` — 启动无边框窗口拖拽。
 pub async fn start_window_drag(_args: &Value, window: &WebviewWindow) -> Result<Value, String> {
@@ -84,6 +86,36 @@ pub async fn set_window_theme(args: &Value, window: &WebviewWindow) -> Result<Va
         window.set_theme(Some(t)).map_err(|e| e.to_string())?;
     } else {
         window.set_theme(None).map_err(|e| e.to_string())?;
+    }
+    Ok(Value::Null)
+}
+
+/// `desktop_set_vibrancy` — args: `{ enabled: boolean }`
+///
+/// 复现 Electron main.mjs:3888-3906:
+/// 持久化 `desktopVibrancy` 到 settings.json，返回 `{ enabled, requiresRestart: true }`。
+/// vibrancy 是窗口创建时决定的材质，切换需重启 (与 Electron 一致)。
+pub async fn set_vibrancy(args: &Value, _app: &AppHandle) -> Result<Value, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let enabled = args.get("enabled").and_then(|v| v.as_bool()).unwrap_or(true);
+        let store = SettingsStore::new();
+        store.set("desktopVibrancy", json!(enabled))?;
+        Ok(json!({ "enabled": enabled, "requiresRestart": true }))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        // 非 macOS: 不支持 vibrancy
+        Ok(json!({ "enabled": false, "requiresRestart": false }))
+    }
+}
+
+/// `desktop_focus_main_window` — 聚焦 (show + unminimize + focus) 主窗口。
+pub async fn focus_main_window(_args: &Value, app: &AppHandle) -> Result<Value, String> {
+    if let Some(window) = app.get_webview_window("main") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
     }
     Ok(Value::Null)
 }

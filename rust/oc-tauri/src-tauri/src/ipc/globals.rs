@@ -137,14 +137,20 @@ pub fn build_init_script(ctx: &RuntimeContext) -> String {
     ));
 
     // __OPENCHAMBER_ELECTRON__ — 壳身份标识。UI 的 isElectronShell() 检查它。
-    // 我们保持同名但 runtime 标为 'tauri', macVibrancy 暂不支持。
     // 注意: UI 的 isElectronShell() 检查的是 runtime === 'electron'。
     // 为了让 UI 在 Tauri 下也走桌面壳分支, 我们仍标 runtime: 'electron'
-    // (桥接口完全等价, UI 不需要区分)。macVibrancySupported 在非 mac 上为 false。
+    // (桥接口完全等价, UI 不需要区分)。
+    // macVibrancy: 读 settings (默认 true, 与 Electron desktopVibrancy !== false 一致)。
+    // macVibrancySupported: 仅 macOS 为 true。
     let mac_vibrancy_supported = cfg!(target_os = "macos");
+    let mac_vibrancy = if mac_vibrancy_supported {
+        crate::settings::SettingsStore::get_bool("desktopVibrancy", true)
+    } else {
+        false
+    };
     globals.push(format!(
-        "(function(){{window.__OPENCHAMBER_ELECTRON__={{runtime:'electron',macVibrancy:false,macVibrancySupported:{}}};}})();",
-        mac_vibrancy_supported
+        "(function(){{window.__OPENCHAMBER_ELECTRON__={{runtime:'electron',macVibrancy:{},macVibrancySupported:{}}};}})();",
+        mac_vibrancy, mac_vibrancy_supported
     ));
 
     // __OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ — 前端的桌面启动状态机依赖此值。

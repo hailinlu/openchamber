@@ -19,14 +19,22 @@
     "core:window:allow-show",
     "core:window:allow-hide",
     "core:window:allow-set-focus",
+    "core:window:allow-set-theme",
+    "core:window:allow-unminimize",
+    "core:window:allow-set-always-on-top",
+    "core:window:allow-set-visible-on-all-workspaces",
+    "core:window:allow-set-progress-bar",
+    "core:window:allow-is-always-on-top",
     "core:event:allow-emit",
     "core:event:allow-emit-to",
     "core:event:allow-listen",
     "core:webview:allow-internal-toggle-devtools",
+    "core:webview:allow-create-webview-window",
     "shell:allow-open",
     "dialog:default",
     "notification:default",
     "autostart:default",
-    "deep-link:default"
+    "deep-link:default",
+    "updater:default"
   ]
 }

@@ -43,7 +43,15 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
       `/health` 就绪门, `cargo test` 6/6 通过)
 - [x] IPC 契约对等 (`window.__OPENCHAMBER_DESKTOP__`)
       — `init_script` 注入标量全局变量 + 5 方法桥 (invoke/openDialog/grantFileAccess/openExternal/listen),
-      `openchamber_invoke` 分发 ~35 命令 (含 17 个 `COMMANDS_SAFE_FOR_REMOTE` origin 门),
+      `openchamber_invoke` 分发 ~50 命令 (含 17 个 `COMMANDS_SAFE_FOR_REMOTE` origin 门),
       事件双路径 (handler + DOM CustomEvent), `cargo test` 15/15 通过
-- [x] 原生集成 (窗口 chrome / shell / 通知 / 对话框 / 静态托盘 / 应用菜单 / 深链 / 开机自启)
-- [ ] SSH 管理 / 动画托盘 / vibrancy / mini-chat / 应用发现 / auto-update (后续专项)
+- [x] 原生集成 (窗口 chrome / shell / 通知 / 对话框 / 应用菜单 / 深链 / 开机自启)
+- [x] settings.json 原子持久化 (`settings.rs`, 与 Electron 共享同一文件)
+- [x] keep-awake (`power.rs`: macOS caffeinate / Windows SetThreadExecutionState / Linux systemd-inhibit)
+- [x] 动画托盘 (`tray.rs`: 16 帧 ping-pong breathing 动画, title/tooltip, 状态行图标, macOS template)
+- [x] macOS Vibrancy (`window-vibrancy`: Sidebar 材质, settings 驱动, flash 防护)
+- [x] Mini-chat 多窗口 (`mini_chat.rs`: session/draft 模式, 去重, pinning)
+- [x] Auto-update (`updater.rs`: tauri-plugin-updater, 404 容错, 进度事件)
+- [x] 应用发现 (`discovery.rs`: host probe /health + /version, pairing candidate)
+- [x] SSH 管理 (`ssh/`: ControlMaster 编排, ~1300 行, 1:1 移植 ssh-manager.mjs)
+- [x] `cargo test` 69/69 通过
