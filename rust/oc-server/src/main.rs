@@ -2,7 +2,7 @@
 //!
 //! 替换目标: `packages/web/server/index.js` (Express, ~1691 行)。
 //!
-//! 阶段 1-2 实现:
+//! 阶段 1-3a 实现:
 //!   - CLI/env 解析 (clap, 对应 cli-options.js)
 //!   - 绑定地址安全检查 (bind-host.js 等价)
 //!   - OpenCode 进程生命周期 (spawn + 就绪门 + 优雅关闭)
@@ -12,23 +12,29 @@
 //!   - SSE 透传代理 (/api/event, /api/global/event) — 边界感知心跳
 //!   - WS 全局事件桥 (/api/global/event/ws) — 共享 reader + replay
 //!   - WS 目录事件桥 (/api/event/ws) — 每连接独享 reader
+//!   - 文本摘要 (/api/text/summarize)
+//!   - 文件系统路由 (/api/fs/*) — 15 个端点
 //!
 //! 后续阶段:
-//!   - 阶段 3: 功能模块路由 (fs/git/github/terminal/...)
+//!   - 阶段 3b: git / github / tunnels / ui-auth / terminal / ...
 
 mod bind_host;
 mod config;
+mod error;
+mod fs;
 mod opencode;
+mod project_dir;
 mod proxy;
 mod realtime;
 mod routes;
 mod state;
 mod static_files;
+mod text;
 
 use std::sync::Arc;
 
 use anyhow::Context;
-use axum::routing::{any, get};
+use axum::routing::{any, get, post};
 use axum::Router;
 use tracing_subscriber::EnvFilter;
 
@@ -97,6 +103,24 @@ fn build_router(state: Arc<AppState>, config: &Config) -> Router {
         .route("/api/version", get(routes::version))
         .route("/api/system/info", get(routes::system_info))
         .route("/robots.txt", get(routes::robots_txt))
+        // 文本摘要 (阶段 3a)
+        .route("/api/text/summarize", post(text::routes::summarize))
+        // 文件系统路由 (阶段 3a, 15 个端点)
+        .route("/api/fs/grant", post(fs::routes::grant))
+        .route("/api/fs/home", get(fs::routes::home))
+        .route("/api/fs/mkdir", post(fs::routes::mkdir))
+        .route("/api/fs/clone", post(fs::routes::clone))
+        .route("/api/fs/stat", get(fs::routes::stat))
+        .route("/api/fs/read", get(fs::routes::read))
+        .route("/api/fs/raw", get(fs::routes::raw))
+        .route("/api/fs/serve/{rest}", get(fs::routes::serve))
+        .route("/api/fs/write", post(fs::routes::write))
+        .route("/api/fs/delete", post(fs::routes::delete))
+        .route("/api/fs/rename", post(fs::routes::rename))
+        .route("/api/fs/reveal", post(fs::routes::reveal))
+        .route("/api/fs/exec", post(fs::routes::exec))
+        .route("/api/fs/exec/{job_id}", get(fs::routes::exec_status))
+        .route("/api/fs/list", get(fs::routes::list))
         // SSE 透传代理 (具体路由, 优先于 catch-all)
         .route("/api/global/event", get(realtime::sse_proxy::sse_proxy_handler))
         .route("/api/event", get(realtime::sse_proxy::sse_proxy_handler))
@@ -105,7 +129,7 @@ fn build_router(state: Arc<AppState>, config: &Config) -> Router {
         .route("/api/event/ws", any(realtime::ws_bridge::directory_ws_handler))
         // OpenCode 反向代理 (/api/* catch-all)
         // nest 会剥离 /api 前缀, proxy_handler 收到的 path 是去掉 /api 后的部分。
-        // 具体路由 (SSE/WS/version/system-info) 已在上面注册, axum 优先匹配。
+        // 具体路由 (fs/text/SSE/WS/version/system-info) 已在上面注册, axum 优先匹配。
         .nest("/api", Router::new().fallback(any(proxy::proxy_handler)));
 
     // 静态 dist 托管 + SPA fallback

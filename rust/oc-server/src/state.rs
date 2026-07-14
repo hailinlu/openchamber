@@ -2,10 +2,14 @@
 //!
 //! 通过 `Arc<AppState>` 在 axum handler 间共享。
 
+use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
+use std::time::Duration;
 
 use crate::config::Config;
+use crate::fs::exec::ExecJobStore;
+use crate::fs::grants::GrantStore;
 use crate::realtime::global_hub::GlobalHub;
 
 /// 应用全局状态。
@@ -28,6 +32,12 @@ pub struct AppState {
     pub http_client: reqwest::Client,
     /// 全局消息流 hub (单上游 SSE reader + replay + broadcast)。
     pub global_hub: Arc<GlobalHub>,
+    /// Outside-workspace 文件授权存储 (fs 模块)。
+    pub grant_store: Arc<GrantStore>,
+    /// 命令执行 job 存储 (fs 模块)。
+    pub exec_job_store: Arc<ExecJobStore>,
+    /// settings.json 路径 (工作区目录解析用)。
+    pub settings_path: PathBuf,
 }
 
 impl AppState {
@@ -47,6 +57,22 @@ impl AppState {
             http_client.clone(),
         ));
 
+        let grant_store = Arc::new(GrantStore::new(Duration::from_secs(
+            crate::fs::GRANT_TTL_SECS,
+        )));
+        let exec_job_store = Arc::new(ExecJobStore::new(Duration::from_secs(
+            crate::fs::EXEC_JOB_TTL_SECS,
+        )));
+
+        // settings.json 路径: $OPENCHAMBER_DATA_DIR/settings.json 或 ~/.config/openchamber/settings.json
+        let data_dir = std::env::var("OPENCHAMBER_DATA_DIR")
+            .map(PathBuf::from)
+            .unwrap_or_else(|_| {
+                let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
+                PathBuf::from(home).join(".config").join("openchamber")
+            });
+        let settings_path = data_dir.join("settings.json");
+
         Self {
             config,
             version: env!("CARGO_PKG_VERSION"),
@@ -56,6 +82,9 @@ impl AppState {
             opencode_ready: Arc::new(AtomicBool::new(false)),
             http_client,
             global_hub,
+            grant_store,
+            exec_job_store,
+            settings_path,
         }
     }
 

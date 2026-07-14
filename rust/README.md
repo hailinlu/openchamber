@@ -66,6 +66,28 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
 - [x] 背压三层 (max_write_buffer 16MB 硬断 + 12MB 警告帧 + send().await 天然背压)
 - [x] `cargo test` 52/52 通过 (新增 25 测试), clippy 0 警告
 
+**阶段 3a (前半) — 功能模块: text + fs** (完成):
+- [x] axum 错误桥 (`error.rs`: `ApiError` newtype 包装 `oc_core::Error`,
+      `impl IntoResponse` 绕过 orphan rule, wire 格式 `{ "error": "..." }`)
+- [x] 文本摘要模块 (`text/`: `POST /api/text/summarize`
+      — 移植 `summarization.js` 正则管道 (TTS/notification/note 三模式)
+      + 手动实现句分割 (JS lookbehind `(?<=[.!?])\s+` → Rust 手动扫描)
+      + U+2026 省略号蒸馏 + 条件 omit originalLength/summaryLength)
+- [x] 工作区目录解析 (`project_dir.rs`: header/query hint → settings.json
+      lastDirectory → activeProjectId → projects[0], `~` 展开, URI 解码)
+- [x] 文件系统模块 15 个路由 (`fs/`: grant/home/mkdir/clone/stat/read/raw/serve/
+      write/delete/rename/reveal/exec/exec-status/list)
+- [x] outside-workspace grant 系统 (`fs/grants.rs`: Map + 10min TTL + scope 检查
+      + canonical path 精确相等, 对齐 `mintOutsideFileGrant`)
+- [x] 工作区边界检查 (`fs/workspace.rs`: `is_path_within_root` + lexical normalize
+      + project dir / user config root 双根检查)
+- [x] 文件操作 (`fs/operations.rs`: 原子写 .tmp→rename, optional stat, 平台 reveal)
+- [x] 命令执行系统 (`fs/exec.rs`: `/bin/sh -c` + 超时 + TTL 30min job 存储
+      + background=true 始终拒绝, windowsHide)
+- [x] 文件服务 (`fs/serve.rs`: 24 扩展名 MIME 表 + RFC 5987 Content-Disposition
+      + Cache-Control: no-store + X-Content-Type-Options: nosniff + 100MiB 上限)
+- [x] `cargo test` 117/117 通过 (新增 65 测试), clippy 0 警告
+
 **阶段 4A — Tauri 桌面壳 (优先, sidecar 过渡)** (进行中):
 - [x] `tauri-cli` 初始化, workspace 集成
 - [x] Tauri 启动加载 UI (dev URL 模式, `cargo tauri dev` 验证 WebView 渲染)
