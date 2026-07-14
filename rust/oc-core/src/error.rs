@@ -6,6 +6,7 @@
 //!   - `Error::BadRequest`   → HTTP 400
 //!   - `Error::Upstream`     → OpenCode 代理上游错误 (透传状态码)
 //!   - `Error::Io`           → 文件系统/进程错误 (通常 500)
+//!   - `Error::Serde`        → 序列化错误 (通常 500)
 
 use thiserror::Error;
 
@@ -30,4 +31,21 @@ pub enum Error {
 
     #[error("serde error: {0}")]
     Serde(#[from] serde_json::Error),
+}
+
+impl Error {
+    /// 返回该错误对应的 HTTP 状态码。
+    pub fn http_status(&self) -> u16 {
+        match self {
+            Error::BadRequest(_) => 400,
+            Error::NotFound(_) => 404,
+            Error::Upstream { status, .. } => *status,
+            Error::Internal(_) | Error::Io(_) | Error::Serde(_) => 500,
+        }
+    }
+
+    /// 返回该错误的 JSON 错误体: `{ "error": "<message>" }`。
+    pub fn to_json(&self) -> serde_json::Value {
+        serde_json::json!({ "error": self.to_string() })
+    }
 }

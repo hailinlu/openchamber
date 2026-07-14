@@ -23,7 +23,7 @@
 ```bash
 cd rust
 cargo check --workspace      # 类型检查 (全部 crate)
-cargo run -p oc-server       # 启动后端 (阶段 0: 仅 /health)
+cargo run -p oc-server       # 启动后端 (阶段 1: OpenCode 代理 + dist 托管 + /health)
 cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web dev server)
 ```
 
@@ -37,6 +37,18 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
       `bun run snapshot:routes` → `rust/oc-server/api-routes-snapshot.json`)
 - [x] 前置解耦: `mintOutsideFileGrant` 走 HTTP `POST /api/fs/grant`
       (Tauri 跨进程调用 sidecar, Electron 保持原 import)
+
+**阶段 1 — 第一个垂直切片 (axum 后端)** (完成):
+- [x] CLI/env 解析 (clap): host/port/api-only/ui-password/dist-dir/opencode 全套 env parity
+- [x] 绑定地址安全检查 (`bind_host.rs`: loopback 检测, 拒绝未认证 LAN)
+- [x] OpenCode 进程管理 (`opencode.rs`: managed spawn + managed password + stdout 就绪行解析 + /global/health 轮询门 + 进程组整杀)
+- [x] OpenCode HTTP 反向代理 (`proxy.rs`: /api/* catch-all, 头过滤, Basic auth 注入, 4min 超时, 流式响应)
+- [x] 状态端点 (`routes.rs`: /health, /api/version, /api/system/info — JSON 与 Node 对齐)
+- [x] 静态 dist 托管 + SPA fallback (`static_files.rs`: ServeDir + index.html fallback)
+- [x] 优雅关闭 (SIGINT/SIGTERM → kill OpenCode 子进程)
+- [x] oc-core: Error http_status()/to_json() helpers
+- [x] oc-opencode-sdk: health() 实现 (GET /global/health + Basic auth)
+- [x] `cargo test` 25/25 通过 (oc-server 22 + oc-opencode-sdk 3), clippy 0 警告
 
 **阶段 4A — Tauri 桌面壳 (优先, sidecar 过渡)** (进行中):
 - [x] `tauri-cli` 初始化, workspace 集成
