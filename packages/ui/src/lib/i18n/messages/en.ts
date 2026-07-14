@@ -1787,6 +1787,8 @@ export const dict = {
   'chat.statusRow.todo.priority.medium': 'Medium priority',
   'chat.statusRow.todo.priority.low': 'Low priority',
   'chat.statusRow.actions.stopGeneratingAria': 'Stop generating',
+  'chat.statusRow.actions.collapseTasksAria': 'Collapse tasks',
+  'chat.statusRow.actions.expandTasksAria': 'Expand tasks',
   'chat.statusRow.tasksTitle': 'Tasks',
   'chat.statusRow.summary.activeLeft': '{active} active · {left} left',
   'chat.statusRow.aborted': 'Aborted',

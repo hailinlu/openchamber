@@ -1753,6 +1753,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.statusRow.todo.priority.medium': '中优先级',
   'chat.statusRow.todo.priority.low': '低优先级',
   'chat.statusRow.actions.stopGeneratingAria': '停止生成',
+  'chat.statusRow.actions.collapseTasksAria': '收起任务列表',
+  'chat.statusRow.actions.expandTasksAria': '展开任务列表',
   'chat.statusRow.tasksTitle': '任务',
   'chat.statusRow.summary.activeLeft': '{active} 个活跃 · 剩余 {left} 个',
   'chat.statusRow.aborted': '已中止',

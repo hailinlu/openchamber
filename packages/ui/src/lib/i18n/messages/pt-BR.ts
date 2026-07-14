@@ -1765,6 +1765,8 @@ export const dict: Record<I18nKey, string> = {
   "chat.statusRow.todo.priority.medium": "Prioridade média",
   "chat.statusRow.todo.priority.low": "Prioridade baixa",
   "chat.statusRow.actions.stopGeneratingAria": "Parar a geração",
+  "chat.statusRow.actions.collapseTasksAria": "Recolher lista de tarefas",
+  "chat.statusRow.actions.expandTasksAria": "Expandir lista de tarefas",
   "chat.statusRow.tasksTitle": "Tarefas",
   "chat.statusRow.summary.activeLeft": "{active} ativas · {left} restantes",
   "chat.statusRow.aborted": "Interrompido",

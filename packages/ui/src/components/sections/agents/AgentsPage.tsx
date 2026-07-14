@@ -25,6 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Icon } from '@/components/icon/Icon';
+import { DEFAULT_AGENT_PROMPT_FRAGMENT } from '@/lib/agentDefaults';
 
 type PermissionAction = 'allow' | 'ask' | 'deny';
 type PermissionRule = { permission: string; pattern: string; action: PermissionAction };
@@ -997,6 +998,9 @@ export const AgentsPage: React.FC = () => {
               rows={8}
               className="w-full font-mono typography-meta min-h-[120px] max-h-[60vh] bg-transparent resize-y"
             />
+            <p className="typography-micro text-muted-foreground/70 px-2 pt-1.5">
+              {DEFAULT_AGENT_PROMPT_FRAGMENT}
+            </p>
           </section>
         </div>
 
@@ -1027,6 +1031,22 @@ export const AgentsPage: React.FC = () => {
                     <div className="flex items-center gap-2">
                       <span className="typography-ui-label text-foreground">{label}</span>
                       <span className="typography-micro text-muted-foreground/70 font-mono hidden sm:inline-block">{permissionName}</span>
+                      {(permissionName === 'todowrite' || permissionName === 'todoread') && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              aria-label="todowrite info"
+                              className="inline-flex h-4 w-4 items-center justify-center rounded text-muted-foreground/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary"
+                            >
+                              <Icon name="information" className="h-3 w-3" aria-hidden="true" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent sideOffset={6} className="max-w-xs">
+                            Set to "deny" to disable the AI's internal todo tracking entirely. Use the System Prompt above for a softer nudge.
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
                     </div>
                     <div className="flex items-center gap-3">
                       {patternRulesCount > 0 ? (

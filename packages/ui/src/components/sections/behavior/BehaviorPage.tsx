@@ -22,6 +22,7 @@ import {
 } from '@/lib/responseStyle';
 import type { DesktopSettings } from '@/lib/desktop';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { DEFAULT_AGENTS_MD_FRAGMENT } from '@/lib/agentDefaults';
 
 const AGENTS_MD_PATH = '~/.config/opencode/AGENTS.md';
 
@@ -138,6 +139,14 @@ export const BehaviorPage: React.FC = () => {
           if (typeof agentsData.content === 'string') {
             nextSettings = { ...nextSettings, prompt: agentsData.content };
           }
+        }
+
+        // Auto-seed: if AGENTS.md is still empty (no settings value, no file
+        // content), pre-fill with the OpenChamber default constraint so a
+        // user who immediately clicks Save ships the rule to disk. Existing
+        // custom content is never touched.
+        if (!nextSettings.prompt.trim()) {
+          nextSettings = { ...nextSettings, prompt: DEFAULT_AGENTS_MD_FRAGMENT };
         }
 
         setPrompt(nextSettings.prompt);

@@ -1783,6 +1783,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.statusRow.todo.priority.medium': '中優先度',
   'chat.statusRow.todo.priority.low': '低優先度',
   'chat.statusRow.actions.stopGeneratingAria': '生成を停止',
+  'chat.statusRow.actions.collapseTasksAria': 'タスクリストを折りたたむ',
+  'chat.statusRow.actions.expandTasksAria': 'タスクリストを展開',
   'chat.statusRow.tasksTitle': 'タスク',
   'chat.statusRow.summary.activeLeft': '{active}アクティブ · {left}残り',
   'chat.statusRow.aborted': '中止されました',

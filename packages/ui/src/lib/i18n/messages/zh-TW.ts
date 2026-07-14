@@ -1757,6 +1757,8 @@ export const dict: Record<I18nKey, string> = {
   'chat.statusRow.todo.priority.medium': '中優先級',
   'chat.statusRow.todo.priority.low': '低優先級',
   'chat.statusRow.actions.stopGeneratingAria': '停止生成',
+  'chat.statusRow.actions.collapseTasksAria': '收合任務列表',
+  'chat.statusRow.actions.expandTasksAria': '展開任務列表',
   'chat.statusRow.tasksTitle': '任務',
   'chat.statusRow.summary.activeLeft': '{active} 個活躍 · 剩餘 {left} 個',
   'chat.statusRow.aborted': '已中止',

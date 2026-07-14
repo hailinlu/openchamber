@@ -374,6 +374,37 @@ export const StatusRow: React.FC<StatusRowProps> = ({
           {abortButton}
           {todoTrigger}
 
+          {/* Collapsed chip — floated at top-right when popover is hidden */}
+          {hasTodoContent && !isExpanded && (
+            <button
+              type="button"
+              onClick={toggleExpanded}
+              style={{
+                top: "calc(var(--oc-header-height, 48px) + 8px)",
+                right: "calc(var(--oc-context-panel-width, 0px) + var(--oc-right-sidebar-width, 0px) + 12px)",
+              }}
+              className={cn(
+                "fixed z-50",
+                "flex items-center gap-1.5 h-[1.6rem] px-2 rounded-xl",
+                "bg-[var(--surface-elevated)] text-[var(--surface-elevated-foreground)]",
+                "shadow-[inset_0_1px_0_0_rgba(255,255,255,0.8),inset_0_0_0_1px_rgba(0,0,0,0.04),0_0_0_1px_rgba(0,0,0,0.10),0_1px_2px_-0.5px_rgba(0,0,0,0.08),0_4px_8px_-2px_rgba(0,0,0,0.08),0_12px_20px_-4px_rgba(0,0,0,0.08)]",
+                "dark:shadow-[inset_0_1px_0_0_rgba(255,255,255,0.12),inset_0_0_0_1px_rgba(255,255,255,0.08),0_0_0_1px_rgba(0,0,0,0.36),0_1px_1px_-0.5px_rgba(0,0,0,0.22),0_3px_3px_-1.5px_rgba(0,0,0,0.20),0_6px_6px_-3px_rgba(0,0,0,0.16)]",
+                "transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:opacity-90",
+                "animate-in fade-in-0 zoom-in-95 duration-150",
+                "typography-ui-label font-medium text-muted-foreground"
+              )}
+              aria-label={t('chat.statusRow.actions.expandTasksAria')}
+              title={t('chat.statusRow.actions.expandTasksAria')}
+            >
+              <Icon name="checkbox-circle" className="h-3.5 w-3.5 text-[var(--status-success)]" aria-hidden="true" />
+              <span>{t('chat.statusRow.tasksTitle')}</span>
+              <span className="typography-meta tabular-nums">
+                {progress.completed}/{progress.total}
+              </span>
+              <Icon name="arrow-down-s" className="h-3.5 w-3.5" aria-hidden="true" />
+            </button>
+          )}
+
           {/* Popover dropdown — floated at top-right of chat area */}
           {isExpanded && hasTodoContent && (
             <div
@@ -399,6 +430,15 @@ export const StatusRow: React.FC<StatusRowProps> = ({
                 <span className="typography-meta tabular-nums">
                   {progress.completed}/{progress.total}
                 </span>
+                <button
+                  type="button"
+                  onClick={toggleExpanded}
+                  className="ml-auto flex items-center justify-center h-[1.2rem] w-[1.2rem] rounded text-muted-foreground transition-opacity hover:opacity-80 focus-visible:outline-none focus-visible:opacity-80"
+                  aria-label={t('chat.statusRow.actions.collapseTasksAria')}
+                  title={t('chat.statusRow.actions.collapseTasksAria')}
+                >
+                  <Icon name="arrow-up-s" className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
               </div>
 
               {/* Todo list */}
