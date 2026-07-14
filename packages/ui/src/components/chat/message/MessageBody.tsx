@@ -1840,8 +1840,9 @@ const AssistantMessageBody = React.memo(({
                 }
 
                 // When the user opts to hide non-edit tool calls, skip everything
-                // except edit-family tools (edit/write/multiedit/apply_patch/...).
-                if (hideNonEditToolCalls && !EDIT_TOOL_NAMES.has(toolName)) {
+                // except edit-family tools and todo tools (todowrite/todoread) so
+                // the progress list stays visible.
+                if (hideNonEditToolCalls && !EDIT_TOOL_NAMES.has(toolName) && toolName !== 'todowrite' && toolName !== 'todoread') {
                     i++;
                     continue;
                 }
