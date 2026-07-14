@@ -2401,14 +2401,19 @@ dependencies = [
 name = "oc-tauri"
 version = "0.0.1"
 dependencies = [
+ "anyhow",
+ "libc",
  "log",
  "oc-core",
+ "reqwest 0.12.28",
  "serde",
  "serde_json",
  "tauri",
  "tauri-build",
  "tauri-plugin-log",
  "tauri-plugin-shell",
+ "tokio",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]

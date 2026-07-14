@@ -38,7 +38,8 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
 
 **阶段 4A — Tauri 桌面壳 (优先, sidecar 过渡)** (进行中):
 - [x] `tauri-cli` 初始化, workspace 集成
-- [ ] Tauri 启动加载 UI (dev URL 模式)
-- [ ] sidecar 管理 (spawn/就绪门/优雅退出)
+- [x] Tauri 启动加载 UI (dev URL 模式, `cargo tauri dev` 验证 WebView 渲染)
+- [x] sidecar 管理 (`sidecar.rs`: `SidecarBuilder`/`SidecarHandle`, 平台整树杀,
+      `/health` 就绪门, `cargo test` 6/6 通过)
 - [ ] IPC 契约对等 (`window.__OPENCHAMBER_DESKTOP__`)
 - [ ] 原生集成迁移 (窗口/托盘/菜单/深链/自动更新/SSH)
