@@ -1842,15 +1842,29 @@ const AssistantMessageBody = React.memo(({
                 // When the user opts to hide non-edit tool calls, skip everything
                 // except edit-family tools (edit/write/multiedit/apply_patch/...).
                 if (hideNonEditToolCalls && !EDIT_TOOL_NAMES.has(toolName)) {
-                    // For todowrite, extract in_progress task descriptions as inline text
-                    // so the user sees what's being worked on without the full block.
+                    // For todowrite/todoread, extract in_progress task descriptions as
+                    // inline text so the user sees what's being worked on without the
+                    // full block. Data lives in part.state.input.todos (JSON string) or
+                    // part.state.output (JSON string).
                     if (toolName === 'todowrite' || toolName === 'todoread') {
-                        const todoInput = part.input as { todos?: Array<{ content: string; status: string }> } | undefined;
-                        const inProgress = todoInput?.todos?.filter((t) => t.status === 'in_progress') ?? [];
+                        const toolState = toolPart.state as { input?: Record<string, unknown>; output?: string } | undefined;
+                        const rawInputTodos = toolState?.input?.todos;
+                        const rawOutput = toolState?.output;
+                        const parseTodoJson = (raw: unknown): Array<Record<string, unknown>> => {
+                            if (Array.isArray(raw)) return raw as Array<Record<string, unknown>>;
+                            if (typeof raw === 'string') {
+                                try { const p = JSON.parse(raw); return Array.isArray(p) ? p : []; } catch { /* not JSON */ }
+                            }
+                            return [];
+                        };
+                        const todos = parseTodoJson(rawInputTodos).length > 0
+                            ? parseTodoJson(rawInputTodos)
+                            : parseTodoJson(rawOutput);
+                        const inProgress = todos.filter((t) => t.status === 'in_progress');
                         if (inProgress.length > 0) {
                             rendered.push(
-                                <div key={`todo-summary-${part.id}`} className="px-1 py-0.5 text-xs text-muted-foreground/70 italic">
-                                    {inProgress.map((t) => t.content).join(' → ')}
+                                <div key={`todo-summary-${part.id}`} className="px-1 py-0.5 text-xs text-muted-foreground/75 italic">
+                                    → {inProgress.map((t) => String(t.content ?? '')).join(' → ')}
                                 </div>
                             );
                         }
