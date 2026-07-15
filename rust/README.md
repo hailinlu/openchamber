@@ -552,3 +552,68 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
 - [x] 应用发现 (`discovery.rs`: host probe /health + /version, pairing candidate)
 - [x] SSH 管理 (`ssh/`: ControlMaster 编排, ~1300 行, 1:1 移植 ssh-manager.mjs)
 - [x] `cargo test` 69/69 通过
+
+**阶段 3d Group 1 — 功能模块: TTS** (完成):
+- [x] TTS 模块 6 个路由 (`tts/`: voice token / speech synthesis / say status/speak / STT transcribe,
+      与 Node `packages/web/server/lib/tts/routes.js` 契约对齐)
+- [x] base URL 规范化 (`tts/base_url.rs`: `normalize_custom_openai_base_url()` 校验 scheme/credentials/localhost/remote,
+      `is_remote_allowed()` env flag, `LOCAL_BASE_URL_HOSTS` 白名单, URL 重建 (去 fragment/query/trailing slash))
+- [x] TTS service (`tts/service.rs`: OpenAI-compatible TTS API caller, `get_openai_api_key()` 多级回退
+      (env → auth.json access/token/string), 语音常量列表, `SpeechOptions` + `generate_speech_stream()` 返回 MP3)
+- [x] STT service (`tts/stt.rs`: OpenAI-compatible `/v1/audio/transcriptions` 调用,
+      手动 multipart/form-data 构造 (不依赖 reqwest multipart), `{text}`/`{transcript}` 双回退)
+- [x] macOS `say` 能力探测 (`tts/capability_runtime.rs`: 参数化 `detect_say_tts_capability_impl(platform, run_cmd)`,
+      `say -v "?"` 输出解析 regex `^(.+?)\s+([a-zA-Z]{2}_[a-zA-Z]{2,3})\s+#`, lazy 缓存)
+- [x] 语音摘要 (`tts/summarize.rs`: `SUMMARIZE_CHAR_LIMIT=2560`, `split_summarize_paragraphs()` 空行/段落分割,
+      `NUM_CONSECUTIVE_BLANK_LINES=2`, `MAX_BULLET_POINTS=6`)
+- [x] 6 个 axum handler (`tts/routes.rs`: `POST /api/voice/token` (stub: 返回空 token) +
+      `POST /api/tts/speak` (MP3 bytes) +
+      `GET /api/tts/status` + `GET /api/tts/say/status` + `POST /api/tts/say/speak` (`say` CLI) +
+      `POST /api/stt/transcribe`)
+- [x] COMPATIBILITY 加 `api.tts.v1`
+- [x] `cargo test` 24 TTS 测试 (base_url 12 + service 8 + capability_runtime 4 + routes 8 + stt 3 + summarize 5),
+      所有 TTS 测试通过
+
+**阶段 3d Group 2 — 功能模块: Quota** (完成):
+- [x] Quota 模块 7 个路由 (`quota/`: provider 列表 / credential 管理 / quota 查询,
+      与 Node `packages/web/server/lib/quota/routes.js` 契约对齐)
+- [x] Provider 抽象 (`quota/providers/mod.rs`: 17 provider 实现 dispatch,
+      统一 `fetch_quota()` 签名 `(credentials, settings, http_client) → Result<QuotaResult, String>`,
+      各 provider 适配各自 API 差异 (auth 格式 / 用量字段 / 重置周期))
+- [x] Credential 管理 (`quota/credentials/`: managed credentials store + 4 标准 provider 认证,
+      `$DATA_DIR/anti-captcha-credentials.json` mode 0o600 原子写, GET 脱敏返回值)
+- [x] Utils (`quota/utils/`: auth 读取 + timestamp/transformers + formatters)
+- [x] 7 个 axum handler (`quota/routes.rs`: provider 列表 + credential CRUD + validate + import + quota 查询)
+- [x] COMPATIBILITY 加 `api.quota.v1`
+
+**阶段 3d Group 3 — 功能模块: Scheduled Tasks** (完成):
+- [x] Scheduled Tasks 模块 5+1 路由 (`scheduled_tasks/`: projects CRUD + task run + global status + SSE,
+      与 Node `packages/web/server/lib/scheduled-tasks/routes.js` 契约对齐)
+- [x] 调度引擎 (`scheduled_tasks/schedule.rs`: `compute_next_run_at` cron/daily/weekly/once 4 模式,
+      `parse_scheduled_command_prompt`, `format_scheduled_session_title`, `parse_time_parts`)
+- [x] Task 执行 (`scheduled_tasks/execution.rs`: `run_task_with_watchdog` 超时 + OpenCode prompt_async,
+      `select_session` 协议, `MAX_TASK_TITLE_LENGTH`, `COMPACT_SUMMARY_SNIPPET_LIMIT`,
+      `emit_called_on_status_change` 回调 + broadcast)
+- [x] 项目配置 (`scheduled_tasks/project_config.rs`: projects JSON 文件读写, upsert/list/get/delete-by-id)
+- [x] 运行时 (`scheduled_tasks/runtime.rs`: `ScheduledTasksRuntime` 全局定时器 + 状态线程安全,
+      启动时对所有项目添加定时任务, `run_now`/`get_status`)
+- [x] COMPATIBILITY 加 `api.scheduled-tasks.v1`
+
+**阶段 3d Group 4 — 功能模块: Skills Catalog** (完成):
+- [x] Skills Catalog 模块 12 个路由 (`skills_catalog/`: 技能发现 / 来源扫描 / 安装 / CRUD / 文件管理,
+      与 Node `packages/web/server/lib/opencode/skill-routes.js` 契约对齐)
+- [x] Git 源解析 (`skills_catalog/source.rs`: SSH/HTTPS/shorthand 三种格式, `parse_skill_repo_source`,
+      `is_clawdhub_source`)
+- [x] Git 执行 (`skills_catalog/git.rs`: `GitRunner` trait + `DefaultGitRunner` (system git),
+      `looks_like_auth_error`, `assert_git_available`)
+- [x] 扫描 (`skills_catalog/scan.rs`: `scan_skills_repository` 浅克隆→稀疏检出→SKILL.md 发现,
+      `is_valid_skill_name` 校验, frontmatter 解析, TTL 缓存)
+- [x] 安装 (`skills_catalog/install.rs`: `install_skills_from_repository` 克隆→稀疏检出→复制到目标目录,
+      冲突检测/解决策略, `get_target_skill_dir` scope/source → 目录映射)
+- [x] 本地技能文件 (`skills_catalog/skills.rs`: Skill filesystem CRUD, `discover_skills`, `get_skill_sources`,
+      supporting file 操作 (含 path traversal 防护))
+- [x] 内存 TTL 缓存 (`skills_catalog/cache.rs`: `HashMap<Mutex>` + 30min TTL, `get_cached_scan`/`set_cached_scan`/`clear_cache`)
+- [x] 12 个 axum handler (`skills_catalog/routes.rs`: list/catalog/source/scan/install/
+      get/create/update/delete + file read/write/delete)
+- [x] COMPATIBILITY 加 `api.skills-catalog.v1`
+- [x] 所有测试通过 (skills_catalog 14 + 全量 778 测试)

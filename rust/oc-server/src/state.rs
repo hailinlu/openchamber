@@ -27,6 +27,8 @@ use crate::realtime::global_hub::GlobalHub;
 use crate::session_assist::SessionAssistRuntime;
 use crate::session_goal::SessionGoalRuntime;
 use crate::small_model::SmallModelService;
+use crate::tts::capability_runtime::{detect_say_tts_capability, SayTtsCapability};
+use crate::tts::service::TtsService;
 use crate::tunnels::managed_config::ManagedConfigRuntime;
 use crate::tunnels::service::{TunnelRuntimeState, TunnelService};
 use crate::tunnels::tunnel_auth::TunnelAuth;
@@ -180,6 +182,25 @@ pub struct AppState {
     pub session_assist: Arc<SessionAssistRuntime>,
     /// Session-goal 运行时 (持久化目标 + audit + auto-continuation)。
     pub session_goal: Arc<SessionGoalRuntime>,
+
+    // -----------------------------------------------------------------------
+    // Scheduled-tasks 模块 (阶段 3c group 4)
+    // -----------------------------------------------------------------------
+    /// Scheduled-tasks 配置 runtime (per-project JSON 持久化)。
+    pub scheduled_tasks_config: Arc<crate::scheduled_tasks::ProjectConfigRuntime>,
+    /// Scheduled-tasks 状态机 (timer 队列 + 并发限制)。
+    pub scheduled_tasks_runtime: Arc<crate::scheduled_tasks::ScheduledTasksRuntime>,
+    /// SSE 客户端池 (`/api/openchamber/events` 注册)。
+    pub open_chamber_event_clients: Arc<crate::scheduled_tasks::routes::OpenChamberEventClients>,
+
+    // -----------------------------------------------------------------------
+    // TTS 模块 (Text-to-Speech / Speech-to-Text)
+    // -----------------------------------------------------------------------
+    /// TTS 服务单例 (OpenAI TTS, stateless wrapper)。
+    pub tts_service: Arc<TtsService>,
+    /// macOS `say` 命令能力缓存 (startup 时探测一次, 路由 GET 返回该值)。
+    /// 默认值为 `SayTtsCapability::not_initialized()`, 经探测后覆盖。
+    pub say_tts_capability: Arc<tokio::sync::RwLock<SayTtsCapability>>,
 }
 
 impl AppState {
@@ -304,6 +325,21 @@ impl AppState {
             small_model_service: Arc::new(SmallModelService::new()),
             session_assist: Arc::new(SessionAssistRuntime::new()),
             session_goal: Arc::new(SessionGoalRuntime::new()),
+
+            // Scheduled-tasks 模块 (阶段 3c group 4) — config + runtime.
+            scheduled_tasks_config: Arc::new(crate::scheduled_tasks::ProjectConfigRuntime::new(
+                data_dir.join("projects"),
+            )),
+            scheduled_tasks_runtime: crate::scheduled_tasks::build_default_runtime(),
+            open_chamber_event_clients: Arc::new(
+                crate::scheduled_tasks::routes::OpenChamberEventClients::new(),
+            ),
+
+            // TTS 模块 — 初始化为 default; `init_say_tts_capability` 在 startup 后探测真实能力
+            tts_service: Arc::new(TtsService::new()),
+            say_tts_capability: Arc::new(tokio::sync::RwLock::new(
+                SayTtsCapability::not_initialized(),
+            )),
         }
     }
 
@@ -399,5 +435,31 @@ impl AppState {
     /// + session.updated (kickoff path)。
     pub fn init_session_goal(self: &Arc<Self>) {
         self.session_goal.clone().start(self.clone());
+    }
+
+    /// 初始化 scheduled-tasks 运行时 — 立即 fire-and-forget background task,
+    /// runtime.start() 内部触发 `sync_all_projects()`。
+    ///
+    /// 对应 Node `scheduled-tasks/index.js` 在 `start()` 后注入 runtime。
+    /// 应在 `set_opencode_ready(true)` 之后调用。
+    pub fn init_scheduled_tasks(self: &Arc<Self>) {
+        self.scheduled_tasks_runtime.clone().start(self.clone());
+    }
+
+    /// 探测 macOS `say` 能力, 写入 `say_tts_capability` 缓存。
+    ///
+    /// 对应 Node `index.js` 启动时调用 `detectSayTtsCapability(process)` 的结果
+    /// 通过 `registerTtsRoutes(app, { sayTTSCapability })` 注入。Rust 版本在
+    /// `set_opencode_ready(true)` 之后调用一次, 结果对 GET /api/tts/say/status
+    /// 立即可见。
+    pub async fn init_say_tts_capability(self: &Arc<Self>) {
+        let capability = detect_say_tts_capability().await;
+        tracing::info!(
+            "[tts] say capability probed: available={} voices={}",
+            capability.available,
+            capability.voices.len()
+        );
+        let mut guard = self.say_tts_capability.write().await;
+        *guard = capability;
     }
 }

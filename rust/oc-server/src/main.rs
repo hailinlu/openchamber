@@ -32,15 +32,19 @@ mod opencode;
 mod permission_auto_accept;
 mod project_dir;
 mod proxy;
+mod quota;
 mod realtime;
 mod routes;
+mod scheduled_tasks;
 mod session_assist;
 mod session_folders;
 mod session_goal;
+mod skills_catalog;
 mod small_model;
 mod state;
 mod static_files;
 mod text;
+mod tts;
 mod tunnels;
 mod ui_auth;
 
@@ -85,6 +89,12 @@ async fn main() -> anyhow::Result<()> {
 
     // 3e. 初始化 session-goal (持久化目标 + audit + auto-continuation)
     state.init_session_goal();
+
+    // 3f. 探测 macOS `say` 命令能力 (缓存供 GET /api/tts/say/status 即时返回)
+    state.init_say_tts_capability().await;
+
+    // 3g. 初始化 scheduled-tasks 运行时 (timer 调度 + 队列 + 并发控制)
+    state.init_scheduled_tasks();
 
     // 4. 构建路由
     let app = build_router(state.clone(), &config);
@@ -368,6 +378,34 @@ fn build_router(state: Arc<AppState>, config: &Config) -> Router {
             "/api/small-model/generate",
             post(small_model::routes::post_small_model_generate),
         )
+        // TTS 路由 (阶段 3d — voice/token + tts/speak + tts/status + tts/say/* + stt/transcribe)
+        .route("/api/voice/token", post(tts::routes::post_voice_token_response))
+        .route("/api/tts/speak", post(tts::routes::post_tts_speak))
+        .route("/api/tts/status", get(tts::routes::get_tts_status))
+        .route("/api/tts/say/status", get(tts::routes::get_tts_say_status))
+        .route("/api/tts/say/speak", post(tts::routes::post_tts_say_speak))
+        .route("/api/stt/transcribe", post(tts::routes::post_stt_transcribe))
+        // Quota 路由 (阶段 3c group 4 — 7 个端点)
+        .route("/api/quota/providers", get(quota::routes::list_providers))
+        .route("/api/quota/credentials/{provider_id}", get(quota::routes::get_credential_status).put(quota::routes::put_credential))
+        .route("/api/quota/credentials/{provider_id}/validate", post(quota::routes::validate_credential))
+        .route("/api/quota/credentials/{provider_id}/import", post(quota::routes::import_credential))
+        .route("/api/quota/credentials/{provider_id}", delete(quota::routes::delete_credential))
+        .route("/api/quota/{provider_id}", get(quota::routes::fetch_quota))
+        // Scheduled-tasks 路由 (阶段 3c group 4 — 5 + 1 SSE)
+        .route("/api/projects/{project_id}/scheduled-tasks", get(scheduled_tasks::routes::list_scheduled_tasks).put(scheduled_tasks::routes::upsert_scheduled_task))
+        .route("/api/projects/{project_id}/scheduled-tasks/{task_id}", delete(scheduled_tasks::routes::delete_scheduled_task))
+        .route("/api/projects/{project_id}/scheduled-tasks/{task_id}/run", post(scheduled_tasks::routes::run_scheduled_task))
+        .route("/api/openchamber/scheduled-tasks/status", get(scheduled_tasks::routes::scheduled_tasks_status))
+        .route("/api/openchamber/events", get(scheduled_tasks::routes::openchamber_events))
+        // Skills-catalog 路由 (阶段 3c group 4 — 12 个端点)
+        .route("/api/config/skills", get(skills_catalog::routes::list_skills))
+        .route("/api/config/skills/catalog", get(skills_catalog::routes::list_catalog_sources))
+        .route("/api/config/skills/catalog/source", get(skills_catalog::routes::browse_catalog_source))
+        .route("/api/config/skills/scan", post(skills_catalog::routes::scan_repository))
+        .route("/api/config/skills/install", post(skills_catalog::routes::install_skills))
+        .route("/api/config/skills/{name}", get(skills_catalog::routes::get_skill).post(skills_catalog::routes::create_skill).patch(skills_catalog::routes::update_skill).delete(skills_catalog::routes::delete_skill))
+        .route("/api/config/skills/{name}/files/{*file_path}", get(skills_catalog::routes::read_skill_file).put(skills_catalog::routes::write_skill_file).delete(skills_catalog::routes::delete_skill_file))
         // SSE 透传代理 (具体路由, 优先于 catch-all)
         .route("/api/global/event", get(realtime::sse_proxy::sse_proxy_handler))
         .route("/api/event", get(realtime::sse_proxy::sse_proxy_handler))

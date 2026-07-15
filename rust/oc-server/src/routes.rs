@@ -43,6 +43,10 @@ static COMPATIBILITY: Lazy<Value> = Lazy::new(|| {
             "api.small-model.v1",
             "api.session-assist.v1",
             "api.session-goal.v1",
+            "api.quota.v1",
+            "api.tts.v1",
+            "api.scheduled-tasks.v1",
+            "api.skills-catalog.v1",
         ]  
     })
 });
