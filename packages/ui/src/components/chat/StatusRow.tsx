@@ -21,6 +21,10 @@ const STATUS_ROW_CONTAINER_STYLE = { containerType: "inline-size" as const, cont
 /** Custom event dispatched when a user clicks a todo item to navigate to its source message. */
 const CHAT_SCROLL_TO_MESSAGE_EVENT = 'openchamber:chat-scroll-to-message';
 
+/** Normalize todo content for fuzzy matching: strip 【...】 and （...） segments, then trim. */
+const normalizeTodoContentForMatch = (content: string): string =>
+  content.replace(/【[^】]*】/g, '').replace(/（[^）]*）/g, '').trim();
+
 const statusConfig: Record<TodoStatus, { textClassName: string }> = {
   in_progress: {
     textClassName: "text-foreground",
@@ -265,13 +269,19 @@ export const StatusRow: React.FC<StatusRowProps> = ({
           try {
             const parsed = JSON.parse(raw);
             if (Array.isArray(parsed)) {
+              const target = normalizeTodoContentForMatch(clickedTodo.content);
               const match = parsed.find(
-                (t: unknown) =>
-                  typeof t === 'object' && t !== null &&
-                  typeof (t as Record<string, unknown>).content === 'string' &&
-                  (t as Record<string, unknown>).content === clickedTodo.content &&
-                  (!requireInProgress ||
-                    (t as Record<string, unknown>).status === 'in_progress'),
+                (t: unknown) => {
+                  if (typeof t !== 'object' || t === null) return false;
+                  const rec = t as Record<string, unknown>;
+                  if (typeof rec.content !== 'string') return false;
+                  if (requireInProgress && rec.status !== 'in_progress') return false;
+                  if (!target) return false;
+                  const candidate = normalizeTodoContentForMatch(rec.content);
+                  if (!candidate) return false;
+                  // Bidirectional containment after normalization: A includes B or B includes A.
+                  return candidate.includes(target) || target.includes(candidate);
+                },
               );
               if (match) {
                 window.dispatchEvent(new CustomEvent(CHAT_SCROLL_TO_MESSAGE_EVENT, {
