@@ -2,9 +2,9 @@
 <svg width="1024" height="1024" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
   <defs>
     <radialGradient id="winBgGrad" cx="50%" cy="50%" r="70%">
-      <stop offset="0%" stop-color="#0d1f2d" />
-      <stop offset="80%" stop-color="#050b12" />
-      <stop offset="100%" stop-color="#020406" />
+      <stop offset="0%" stop-color="#1a3a4a" />
+      <stop offset="80%" stop-color="#0e2532" />
+      <stop offset="100%" stop-color="#08181f" />
     </radialGradient>
     <linearGradient id="winCoreTop" x1="0%" y1="0%" x2="100%" y2="100%">
       <stop offset="0%" stop-color="#7bf2ff" />
@@ -45,7 +45,7 @@
   </defs>
 
   <!-- Background -->
-  <rect width="600" height="600" fill="url(#winBgGrad)" />
+  <rect width="600" height="600" rx="120" fill="url(#winBgGrad)" />
 
   <!-- Grid lines -->
   <g fill="none" stroke="#00d5ff" stroke-opacity="0.15" stroke-width="1">

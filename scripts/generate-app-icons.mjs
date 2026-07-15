@@ -177,8 +177,9 @@ function makeMaskableSvg(iconSvgBuffer) {
   const svgStr = iconSvgBuffer.toString('utf-8');
   return svgStr
     // Background already fills the canvas; wrap everything else in a scale group
+    // Match the rect regardless of rx attribute (rx may be present for rounded corners)
     .replace(
-      '<rect width="600" height="600" fill="url(#bgGrad)" />',
+      /<rect width="600" height="600"(?: rx="\d+")? fill="url\(#bgGrad\)" \/>/,
       '<rect width="600" height="600" fill="url(#bgGrad)" /><g transform="translate(75, 75) scale(0.75)">'
     )
     .replace('</svg>', '</g></svg>');
