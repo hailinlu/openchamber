@@ -851,7 +851,7 @@ export const useUIStore = create<UIStore>()(
         isRightSidebarOpen: false,
         rightSidebarWidth: RIGHT_SIDEBAR_MIN_WIDTH,
         hasManuallyResizedRightSidebar: false,
-        rightSidebarTab: 'git',
+        rightSidebarTab: 'files',
         contextPanelByDirectory: {},
         isBottomTerminalOpen: false,
         isBottomTerminalExpanded: false,
@@ -2274,7 +2274,7 @@ export const useUIStore = create<UIStore>()(
             typeof state.rightSidebarTab !== 'string'
             || (state.rightSidebarTab !== 'git' && state.rightSidebarTab !== 'files' && state.rightSidebarTab !== 'context')
           ) {
-            state.rightSidebarTab = 'git';
+            state.rightSidebarTab = 'files';
           }
 
           state.contextPanelByDirectory = sanitizeContextPanelByDirectory(state.contextPanelByDirectory);
