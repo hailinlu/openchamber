@@ -3981,7 +3981,7 @@ const handleInvoke = async (browserWindow, command, args = {}) => {
       if (applyUpdate && process.platform === 'darwin' && typeof app.isInApplicationsFolder === 'function') {
         try {
           if (!app.isInApplicationsFolder()) {
-            throw new Error('Desktop update requires OpenChamber.app to be installed in /Applications');
+            throw new Error('Desktop update requires GridForge.app to be installed in /Applications');
           }
         } catch (error) {
           log.warn('[electron] desktop_restart blocked', error);

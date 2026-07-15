@@ -382,7 +382,7 @@ export const createApnsRuntime = (deps) => {
 
   const sendViaRelay = async (deviceTokens, payload, relay) => {
     const tokens = deviceTokens.slice(0, 100);
-    const title = typeof payload?.title === 'string' && payload.title.length > 0 ? payload.title : 'OpenChamber';
+    const title = typeof payload?.title === 'string' && payload.title.length > 0 ? payload.title : 'GridForge';
     const { privateKey, publicJwk } = await getOrCreateRelayKeypair();
     const ts = Date.now();
     // Sign over the same canonical form the relay verifies: ts.sortedTokens.title.

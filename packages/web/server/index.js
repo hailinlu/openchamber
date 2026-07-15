@@ -1418,9 +1418,9 @@ async function main(options = {}) {
     getServerLabel: () => {
       try {
         const name = os.hostname();
-        return typeof name === 'string' && name.trim().length > 0 ? name.trim() : 'OpenChamber';
+        return typeof name === 'string' && name.trim().length > 0 ? name.trim() : 'GridForge';
       } catch {
-        return 'OpenChamber';
+        return 'GridForge';
       }
     },
     readSettingsFromDiskMigrated,
