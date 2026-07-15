@@ -88,6 +88,34 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
       + Cache-Control: no-store + X-Content-Type-Options: nosniff + 100MiB 上限)
 - [x] `cargo test` 117/117 通过 (新增 65 测试), clippy 0 警告
 
+**阶段 3a (后半) — 功能模块: git** (完成):
+- [x] Git 模块 68 个路由 (`git/`: 通过 `tokio::process::Command` spawn `git` CLI 二进制,
+      不使用 `simple-git` 或 `git2`)
+- [x] `GitRunner` 核心抽象 (`git/runner.rs`: 二进制解析 (Windows 探测) +
+      `SSH_AUTH_SOCK` 探测 (`~/.gnupg/S.gpg-agent.ssh` → `gpgconf`) +
+      `run()`/`run_or_throw()` + `windowsHide` + 20MB stdout 缓冲)
+- [x] 纯解析函数 (`git/parsing.rs`: porcelain v1 status + numstat + log `\x1e`/`\x1f` 分隔 +
+      worktree porcelain + shortstat regex + remotes verbose + name-status + stash list)
+- [x] 仓库上下文 (`git/context.rs`: `RepoContext` (repo root 解析) +
+      `GitFileContext` (路径遍历防护 + repo-relative 路径计算))
+- [x] 身份管理 (`git/identity.rs`: profiles CRUD (`~/.config/openchamber/git-identities.json`) +
+      global identity + current/has-local/set-identity + `~/.git-credentials` 解析)
+- [x] `get_status` 最复杂函数 (`git/status.rs`: numstat 合并 + 新文件行数统计 (200文件/1MB/binary NUL检测) +
+      ahead/behind fallback (origin/HEAD → main → master) + upstream remote 比较 + merge/rebase 检测)
+- [x] Diff 操作 (`git/diff.rs`: get_diff + get_file_diff + get_commit_file_diff + range diff)
+- [x] Log 操作 (`git/log.rs`: `\x1e`/`\x1f` 分隔格式 + shortstat + all mode)
+- [x] Branch 操作 (`git/branch.rs`: list/create/delete/rename/checkout + remote branch filtering)
+- [x] Commit 操作 (`git/commit.rs`: stage/unstage/commit/revert/hunk apply +
+      cherry-pick/revert-commit/reset-to-commit)
+- [x] Remote 操作 (`git/remote.rs`: pull/push/fetch/remotes + push 的 3 层 upstream fallback)
+- [x] Merge/Rebase (`git/merge_rebase.rs`: merge/rebase + abort/continue + conflict 检测)
+- [x] Stash (`git/stash.rs`: list/apply/pop/drop/push + batch file-counts)
+- [x] Worktree (`git/worktree.rs`: list/create/remove/validate/preview +
+      bootstrap status (stub) + canonicalize + primary-root/toplevel 解析)
+- [x] Integrate (`git/integrate.rs`: plan/run/abort/continue + conflict-details + cherry-pick-status)
+- [x] OpenCode DB sync stub (`syncSandboxesToOpenCodeDb` — 阶段 4B 进程内嵌时实现)
+- [x] `cargo test` 150/150 通过 (新增 33 测试), clippy 0 警告
+
 **阶段 4A — Tauri 桌面壳 (优先, sidecar 过渡)** (进行中):
 - [x] `tauri-cli` 初始化, workspace 集成
 - [x] Tauri 启动加载 UI (dev URL 模式, `cargo tauri dev` 验证 WebView 渲染)

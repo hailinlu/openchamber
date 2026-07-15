@@ -14,14 +14,16 @@
 //!   - WS 目录事件桥 (/api/event/ws) — 每连接独享 reader
 //!   - 文本摘要 (/api/text/summarize)
 //!   - 文件系统路由 (/api/fs/*) — 15 个端点
+//!   - Git 路由 (/api/git/*) — 68 个端点 (spawn `git` CLI)
 //!
 //! 后续阶段:
-//!   - 阶段 3b: git / github / tunnels / ui-auth / terminal / ...
+//!   - 阶段 3b: github / tunnels / ui-auth / terminal / ...
 
 mod bind_host;
 mod config;
 mod error;
 mod fs;
+mod git;
 mod opencode;
 mod project_dir;
 mod proxy;
@@ -34,7 +36,7 @@ mod text;
 use std::sync::Arc;
 
 use anyhow::Context;
-use axum::routing::{any, get, post};
+use axum::routing::{any, delete, get, post, put};
 use axum::Router;
 use tracing_subscriber::EnvFilter;
 
@@ -121,6 +123,68 @@ fn build_router(state: Arc<AppState>, config: &Config) -> Router {
         .route("/api/fs/exec", post(fs::routes::exec))
         .route("/api/fs/exec/{job_id}", get(fs::routes::exec_status))
         .route("/api/fs/list", get(fs::routes::list))
+        // Git 路由 (阶段 3a 后半, 68 个端点)
+        .route("/api/git/identities", get(git::routes::list_identities).post(git::routes::create_identity))
+        .route("/api/git/identities/{id}", put(git::routes::update_identity).delete(git::routes::delete_identity))
+        .route("/api/git/global-identity", get(git::routes::global_identity))
+        .route("/api/git/discover-credentials", get(git::routes::discover_credentials))
+        .route("/api/git/current-identity", get(git::routes::current_identity))
+        .route("/api/git/has-local-identity", get(git::routes::has_local_identity))
+        .route("/api/git/set-identity", post(git::routes::set_identity))
+        .route("/api/git/check", get(git::routes::check))
+        .route("/api/git/remote-url", get(git::routes::remote_url))
+        .route("/api/git/primary-root", get(git::routes::primary_root))
+        .route("/api/git/toplevel", get(git::routes::toplevel))
+        .route("/api/git/status", get(git::routes::status))
+        .route("/api/git/diff", get(git::routes::diff))
+        .route("/api/git/file-diff", get(git::routes::file_diff))
+        .route("/api/git/revert", post(git::routes::revert_file))
+        .route("/api/git/stage", post(git::routes::stage))
+        .route("/api/git/unstage", post(git::routes::unstage))
+        .route("/api/git/apply-hunk", post(git::routes::apply_hunk))
+        .route("/api/git/commit", post(git::routes::commit))
+        .route("/api/git/commit-summaries", post(git::routes::commit_summaries))
+        .route("/api/git/log", get(git::routes::log))
+        .route("/api/git/commit-files", get(git::routes::commit_files))
+        .route("/api/git/commit-file-diff", get(git::routes::commit_file_diff))
+        .route("/api/git/checkout-commit", post(git::routes::checkout_commit))
+        .route("/api/git/cherry-pick", post(git::routes::cherry_pick))
+        .route("/api/git/revert-commit", post(git::routes::revert_commit))
+        .route("/api/git/reset-to-commit", post(git::routes::reset_to_commit))
+        .route("/api/git/branches", get(git::routes::list_branches).post(git::routes::create_branch).delete(git::routes::delete_branch))
+        .route("/api/git/branches/rename", put(git::routes::rename_branch))
+        .route("/api/git/remote-branches", delete(git::routes::delete_remote_branch))
+        .route("/api/git/checkout", post(git::routes::checkout))
+        .route("/api/git/pull", post(git::routes::pull))
+        .route("/api/git/push", post(git::routes::push))
+        .route("/api/git/fetch", post(git::routes::fetch))
+        .route("/api/git/remotes", get(git::routes::list_remotes).delete(git::routes::remove_remote))
+        .route("/api/git/merge", post(git::routes::merge))
+        .route("/api/git/merge/abort", post(git::routes::abort_merge))
+        .route("/api/git/merge/continue", post(git::routes::continue_merge))
+        .route("/api/git/rebase", post(git::routes::rebase))
+        .route("/api/git/rebase/abort", post(git::routes::abort_rebase))
+        .route("/api/git/rebase/continue", post(git::routes::continue_rebase))
+        .route("/api/git/conflict-details", get(git::routes::conflict_details))
+        .route("/api/git/stashes", get(git::routes::list_stashes))
+        .route("/api/git/stashes/file-counts", post(git::routes::stash_file_counts))
+        .route("/api/git/stash", post(git::routes::stash_push))
+        .route("/api/git/stash/apply", post(git::routes::stash_apply))
+        .route("/api/git/stash/pop", post(git::routes::stash_pop))
+        .route("/api/git/stash/drop", post(git::routes::stash_drop))
+        .route("/api/git/worktrees", get(git::routes::list_worktrees).post(git::routes::create_worktree).delete(git::routes::remove_worktree))
+        .route("/api/git/worktrees/validate", post(git::routes::validate_worktree))
+        .route("/api/git/worktrees/preview", post(git::routes::preview_worktree))
+        .route("/api/git/worktrees/bootstrap-status", get(git::routes::worktree_bootstrap_status))
+        .route("/api/git/worktree-type", get(git::routes::worktree_type))
+        .route("/api/git/validate-directory", post(git::routes::validate_directory))
+        .route("/api/git/canonicalize-worktree-state", post(git::routes::canonicalize_worktree_state))
+        .route("/api/git/integrate/plan", post(git::routes::integrate_plan))
+        .route("/api/git/integrate/conflict-details", post(git::routes::integrate_conflict_details))
+        .route("/api/git/integrate/cherry-pick-status", post(git::routes::integrate_cherry_pick_status))
+        .route("/api/git/integrate/run", post(git::routes::integrate_run))
+        .route("/api/git/integrate/abort", post(git::routes::integrate_abort))
+        .route("/api/git/integrate/continue", post(git::routes::integrate_continue))
         // SSE 透传代理 (具体路由, 优先于 catch-all)
         .route("/api/global/event", get(realtime::sse_proxy::sse_proxy_handler))
         .route("/api/event", get(realtime::sse_proxy::sse_proxy_handler))

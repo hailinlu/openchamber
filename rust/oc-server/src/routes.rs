@@ -31,6 +31,7 @@ static COMPATIBILITY: Lazy<Value> = Lazy::new(|| {
             "terminal.websocket.v1",
             "api.fs.v1",
             "api.text.v1",
+            "api.git.v1",
         ]
     })
 });
