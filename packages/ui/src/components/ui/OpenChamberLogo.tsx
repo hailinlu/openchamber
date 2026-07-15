@@ -1,20 +1,5 @@
-import React, { useMemo } from 'react';
-import { useOptionalThemeSystem } from '@/contexts/useThemeSystem';
+import React from 'react';
 import { useI18n } from '@/lib/i18n';
-
-const LEFT_FACE_CELL_OPACITIES = [
-  0.2, 0.45, 0.15, 0.55,
-  0.35, 0.1, 0.5, 0.25,
-  0.4, 0.3, 0.45, 0.15,
-  0.55, 0.2, 0.35, 0.1,
-];
-
-const RIGHT_FACE_CELL_OPACITIES = [
-  0.3, 0.15, 0.45, 0.25,
-  0.5, 0.35, 0.1, 0.4,
-  0.2, 0.55, 0.3, 0.15,
-  0.45, 0.25, 0.4, 0.2,
-];
 
 interface OpenChamberLogoProps {
   className?: string;
@@ -23,61 +8,10 @@ interface OpenChamberLogoProps {
   isAnimated?: boolean;
 }
 
-// Generate grid cells for a face (4x4 grid)
-// Returns array of parallelogram paths in isometric projection
-const generateFaceGrid = (
-  topLeft: { x: number; y: number },
-  topRight: { x: number; y: number },
-  bottomRight: { x: number; y: number },
-  bottomLeft: { x: number; y: number },
-  gridSize: number = 4
-) => {
-  const cells: Array<{ path: string; row: number; col: number }> = [];
-  
-  for (let row = 0; row < gridSize; row++) {
-    for (let col = 0; col < gridSize; col++) {
-      // Interpolate corners for this cell
-      const t1 = col / gridSize;
-      const t2 = (col + 1) / gridSize;
-      const s1 = row / gridSize;
-      const s2 = (row + 1) / gridSize;
-      
-      // Bilinear interpolation for each corner of the cell
-      const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-      const bilinear = (tl: number, tr: number, br: number, bl: number, t: number, s: number) => {
-        const top = lerp(tl, tr, t);
-        const bottom = lerp(bl, br, t);
-        return lerp(top, bottom, s);
-      };
-      
-      const p1 = {
-        x: bilinear(topLeft.x, topRight.x, bottomRight.x, bottomLeft.x, t1, s1),
-        y: bilinear(topLeft.y, topRight.y, bottomRight.y, bottomLeft.y, t1, s1),
-      };
-      const p2 = {
-        x: bilinear(topLeft.x, topRight.x, bottomRight.x, bottomLeft.x, t2, s1),
-        y: bilinear(topLeft.y, topRight.y, bottomRight.y, bottomLeft.y, t2, s1),
-      };
-      const p3 = {
-        x: bilinear(topLeft.x, topRight.x, bottomRight.x, bottomLeft.x, t2, s2),
-        y: bilinear(topLeft.y, topRight.y, bottomRight.y, bottomLeft.y, t2, s2),
-      };
-      const p4 = {
-        x: bilinear(topLeft.x, topRight.x, bottomRight.x, bottomLeft.x, t1, s2),
-        y: bilinear(topLeft.y, topRight.y, bottomRight.y, bottomLeft.y, t1, s2),
-      };
-      
-      cells.push({
-        path: `M${p1.x} ${p1.y} L${p2.x} ${p2.y} L${p3.x} ${p3.y} L${p4.x} ${p4.y} Z`,
-        row,
-        col,
-      });
-    }
-  }
-  
-  return cells;
-};
-
+/**
+ * OpenChamber logo — dark-tech isometric 3D core with orbital rings and lightning bolt.
+ * Design originally provided at 600×600, scaled down to 100×100 viewBox.
+ */
 export const OpenChamberLogo: React.FC<OpenChamberLogoProps> = ({
   className = '',
   width = 70,
@@ -85,103 +19,7 @@ export const OpenChamberLogo: React.FC<OpenChamberLogoProps> = ({
   isAnimated = false,
 }) => {
   const { t } = useI18n();
-  const themeContext = useOptionalThemeSystem();
-
-  let isDark = true;
-  if (themeContext) {
-    isDark = themeContext.currentTheme.metadata.variant !== 'light';
-  } else if (typeof window !== 'undefined') {
-    isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  }
-
-  const strokeColor = useMemo(() => {
-    if (themeContext) {
-      return themeContext.currentTheme.colors.surface.foreground;
-    }
-    if (typeof window !== 'undefined') {
-      const fromVars = getComputedStyle(document.documentElement).getPropertyValue('--splash-stroke').trim();
-      if (fromVars) {
-        return fromVars;
-      }
-    }
-    return isDark ? 'white' : 'black';
-  }, [themeContext, isDark]);
-
-  const supportsColorMix = useMemo(() => {
-    if (typeof window === 'undefined' || typeof CSS === 'undefined' || typeof CSS.supports !== 'function') {
-      return false;
-    }
-    return CSS.supports('color', 'color-mix(in srgb, white 50%, transparent)');
-  }, []);
-
-  const fillColor = useMemo(() => {
-    if (themeContext) {
-      if (supportsColorMix) {
-        return `color-mix(in srgb, ${strokeColor} 15%, transparent)`;
-      }
-      return isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
-    }
-    if (typeof window !== 'undefined') {
-      const fromVars = getComputedStyle(document.documentElement).getPropertyValue('--splash-face-fill').trim();
-      if (fromVars) {
-        return fromVars;
-      }
-    }
-    return isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)';
-  }, [themeContext, supportsColorMix, strokeColor, isDark]);
-
-  const cellHighlightColor = useMemo(() => {
-    if (themeContext) {
-      if (supportsColorMix) {
-        return `color-mix(in srgb, ${strokeColor} 35%, transparent)`;
-      }
-      return isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)';
-    }
-    if (typeof window !== 'undefined') {
-      const fromVars = getComputedStyle(document.documentElement).getPropertyValue('--splash-cell-fill').trim();
-      if (fromVars) {
-        return fromVars;
-      }
-    }
-    return isDark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.4)';
-  }, [themeContext, supportsColorMix, strokeColor, isDark]);
-
-  const logoFillColor = strokeColor;
-
-
-
-  // Isometric cube geometry (mathematically correct)
-  // For true isometric: horizontal edges at ±30° from horizontal
-  // cos(30°) ≈ 0.866, sin(30°) = 0.5
-  // Cube edge length = 46, center at (50, 52) - larger cube, slightly lower
-  const edge = 48;
-  const cos30 = 0.866;
-  const sin30 = 0.5;
-  const centerY = 50;
-  
-  // Key points of the isometric cube
-  const top = { x: 50, y: centerY - edge };                           // top vertex
-  const left = { x: 50 - edge * cos30, y: centerY - edge * sin30 };   // top-left
-  const right = { x: 50 + edge * cos30, y: centerY - edge * sin30 };  // top-right  
-  const center = { x: 50, y: centerY };                                // center (front vertex of top face)
-  const bottomLeft = { x: 50 - edge * cos30, y: centerY + edge * sin30 };  // bottom-left
-  const bottomRight = { x: 50 + edge * cos30, y: centerY + edge * sin30 }; // bottom-right
-  const bottom = { x: 50, y: centerY + edge };                         // bottom vertex
-
-  // Isometric transformation matrix for top face
-  // Maps a flat square to the isometric rhombus (top face)
-  // Center of top face rhombus: average of top, left, center, right vertices
-  // topFaceCenter.x = (top.x + left.x + center.x + right.x) / 4 = 50
-  // topFaceCenter.y = (top.y + left.y + center.y + right.y) / 4
-  const topFaceCenterY = (top.y + left.y + center.y + right.y) / 4;
-  const isoMatrix = `matrix(0.866, 0.5, -0.866, 0.5, 50, ${topFaceCenterY})`;
-
-  // Generate grid cells for both faces
-  // Left face: center -> left -> bottomLeft -> bottom
-  const leftFaceCells = generateFaceGrid(left, center, bottom, bottomLeft);
-  
-  // Right face: center -> right -> bottomRight -> bottom  
-  const rightFaceCells = generateFaceGrid(center, right, bottomRight, bottom);
+  const uid = React.useId();
 
   return (
     <svg
@@ -195,81 +33,118 @@ export const OpenChamberLogo: React.FC<OpenChamberLogoProps> = ({
       aria-label={t('openChamberLogo.aria.logo')}
     >
       {isAnimated ? (
-        <style>{`@keyframes oc-logo-glow{0%,100%{filter:drop-shadow(0 0 0 transparent)}50%{filter:drop-shadow(0 0 4px var(--oc-glow-color))}}.oc-logo-glow{animation:oc-logo-glow 1.8s ease-in-out infinite}@media (prefers-reduced-motion:reduce){.oc-logo-glow{animation:none}}`}</style>
+        <style>{`@keyframes oc-glow-${uid}{0%,100%{opacity:1}50%{opacity:0.6}}.oc-glow{animation:oc-glow-${uid} 1.8s ease-in-out infinite}@media (prefers-reduced-motion:reduce){.oc-glow{animation:none}}`}</style>
       ) : null}
-      {/* Left face - base fill */}
-      <path
-        d={`M${center.x} ${center.y} L${left.x} ${left.y} L${bottomLeft.x} ${bottomLeft.y} L${bottom.x} ${bottom.y} Z`}
-        fill={fillColor}
-        stroke={strokeColor}
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      
-      {/* Left face - grid cells with varying opacity */}
-      {leftFaceCells.map((cell, i) => (
-        <path
-          key={`left-${i}`}
-          d={cell.path}
-          fill={cellHighlightColor}
-          opacity={LEFT_FACE_CELL_OPACITIES[cell.row * 4 + (3 - cell.col)] ?? 0.35}
-        />
-      ))}
-      
-      {/* Right face - base fill */}
-      <path
-        d={`M${center.x} ${center.y} L${right.x} ${right.y} L${bottomRight.x} ${bottomRight.y} L${bottom.x} ${bottom.y} Z`}
-        fill={fillColor}
-        stroke={strokeColor}
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      
-      {/* Right face - grid cells with varying opacity */}
-      {rightFaceCells.map((cell, i) => (
-        <path
-          key={`right-${i}`}
-          d={cell.path}
-          fill={cellHighlightColor}
-          opacity={RIGHT_FACE_CELL_OPACITIES[cell.row * 4 + cell.col] ?? 0.35}
-        />
-      ))}
-      
-      {/* Top face - open (no fill), only stroke */}
-      <path
-        d={`M${top.x} ${top.y} L${left.x} ${left.y} L${center.x} ${center.y} L${right.x} ${right.y} Z`}
-        fill="none"
-        stroke={strokeColor}
-        strokeWidth="2"
-        strokeLinejoin="round"
-      />
-      
-      {/* OpenCode logo on top face */}
-      <g
-        opacity={1}
-        className={isAnimated ? 'oc-logo-glow' : undefined}
-        style={isAnimated ? ({ '--oc-glow-color': strokeColor } as React.CSSProperties) : undefined}
-      >
-        {/*
-          Isometric transform for top face:
-          OpenCode logo (32x40 viewBox) centered and projected to isometric plane
-        */}
-        <g transform={`${isoMatrix} scale(0.75)`}>
-          {/* OpenCode logo - outer frame with inner square */}
-          {/* Outer frame (centered at origin, original: 0,0 to 32,40) */}
-          <path
-            fillRule="evenodd"
-            clipRule="evenodd"
-            d="M-16 -20 L16 -20 L16 20 L-16 20 Z M-8 -12 L-8 12 L8 12 L8 -12 Z"
-            fill={logoFillColor}
-          />
-          {/* Inner square */}
-          <path
-            d="M-8 -4 L8 -4 L8 12 L-8 12 Z"
-            fill={logoFillColor}
-            fillOpacity="0.4"
-          />
+      <defs>
+        <linearGradient id={`${uid}-coreTop`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#7bf2ff" />
+          <stop offset="100%" stopColor="#29cce8" />
+        </linearGradient>
+        <linearGradient id={`${uid}-coreLeft`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#0f8ba4" />
+          <stop offset="100%" stopColor="#064d5f" />
+        </linearGradient>
+        <linearGradient id={`${uid}-coreRight`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#14aac7" />
+          <stop offset="100%" stopColor="#08748a" />
+        </linearGradient>
+        <linearGradient id={`${uid}-ring`} x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stopColor="#bfe6ff" stopOpacity="0.9" />
+          <stop offset="50%" stopColor="#33e0ff" stopOpacity="0.7" />
+          <stop offset="100%" stopColor="#006685" stopOpacity="0.9" />
+        </linearGradient>
+        <filter id={`${uid}-shadow`} x="-30%" y="-30%" width="160%" height="160%">
+          <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor="#000000" floodOpacity="0.8" />
+          <feDropShadow dx="0" dy="1" stdDeviation="1" floodColor="#1bb9d4" floodOpacity="0.2" />
+        </filter>
+        <filter id={`${uid}-glow`} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="2" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+        <filter id={`${uid}-glowStrong`} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="3" result="blur" />
+          <feMerge>
+            <feMergeNode in="blur" />
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
+          </feMerge>
+        </filter>
+      </defs>
+
+      {/* Grid lines */}
+      <g fill="none" stroke="#00d5ff" strokeOpacity="0.15" strokeWidth="0.5">
+        <circle cx="50" cy="50" r="40" strokeDasharray="0.7 1.3" />
+        <circle cx="50" cy="50" r="37" strokeDasharray="2 2" />
+        <path d="M 50 10 L 50 90 M 10 50 L 90 50" strokeWidth="0.8" strokeDasharray="0.2 1.7" />
+        <path d="M 20 20 L 80 80" strokeDasharray="3 7" />
+        <path d="M 80 20 L 20 80" strokeDasharray="3 7" />
+      </g>
+
+      {/* 3D Isometric Core */}
+      <g filter={`url(#${uid}-shadow)`}>
+        {/* Base platform */}
+        <polygon points="50,30 70,40 50,50 30,40" fill="#042b36" />
+        <polygon points="30,40 50,50 50,70 30,60" fill="#021e25" />
+        <polygon points="50,50 70,40 70,60 50,70" fill="#032630" />
+
+        {/* Top face */}
+        <polygon points="50,35 64,42 50,49 36,42" fill={`url(#${uid}-coreTop)`} stroke="#a1f5ff" strokeWidth="0.5" strokeOpacity="0.5" />
+        {/* Left face */}
+        <polygon points="36,42 50,49 50,62 36,55" fill={`url(#${uid}-coreLeft)`} />
+        {/* Right face */}
+        <polygon points="50,49 64,42 64,55 50,62" fill={`url(#${uid}-coreRight)`} />
+
+        {/* Surface grooves */}
+        <polygon points="50,38 57,41 50,44 43,41" fill="#0d5869" fillOpacity="0.6" stroke="#00c3ff" strokeWidth="0.3" />
+        <polygon points="43,41 50,44 50,50 43,47" fill="#07323e" fillOpacity="0.8" />
+        <polygon points="50,44 57,41 57,47 50,50" fill="#0a4856" fillOpacity="0.8" />
+      </g>
+
+      {/* Orbital Rings */}
+      <g filter={`url(#${uid}-shadow)`}>
+        <ellipse cx="50" cy="50" rx="25" ry="9" fill="none" stroke={`url(#${uid}-ring)`} strokeWidth="1.5" strokeDasharray="4 2 1 2" transform="rotate(-30 50 50)" />
+        <ellipse cx="50" cy="50" rx="25" ry="9" fill="none" stroke="#FFFFFF" strokeOpacity="0.8" strokeWidth="0.5" strokeDasharray="3 3" transform="rotate(-30 50 50)" />
+        <ellipse cx="50" cy="50" rx="28" ry="10" fill="none" stroke={`url(#${uid}-ring)`} strokeWidth="1" strokeDasharray="2 2" transform="rotate(40 50 50)" />
+
+        {/* Node dots */}
+        <g filter={`url(#${uid}-glow)`}>
+          <circle cx="50" cy="28" r="1" fill="#d8fcff" />
+          <circle cx="72" cy="43" r="1" fill="#19d4ff" />
+          <circle cx="47" cy="75" r="1.2" fill="#ffffff" />
+          <circle cx="28" cy="57" r="1" fill="#1ad4ff" />
         </g>
+      </g>
+
+      {/* Lightning Bolt */}
+      {isAnimated ? (
+        <g className="oc-glow">
+          <g filter={`url(#${uid}-glowStrong)`}>
+            <polygon points="50,33 54,45 52,45 53,58 48,51 50,51 49,33" fill="none" stroke="#ffffff" strokeWidth="0.8" />
+          </g>
+          <g filter={`url(#${uid}-glow)`}>
+            <polygon points="50,33 54,45 52,45 53,58 48,51 50,51 49,33" fill="#ffffff" />
+            <polygon points="50,35 52,44 51,44 52,53 48,49 50,49 50,35" fill="#bbf9ff" />
+          </g>
+        </g>
+      ) : (
+        <>
+          <g filter={`url(#${uid}-glowStrong)`}>
+            <polygon points="50,33 54,45 52,45 53,58 48,51 50,51 49,33" fill="none" stroke="#ffffff" strokeWidth="0.8" />
+          </g>
+          <g filter={`url(#${uid}-glow)`}>
+            <polygon points="50,33 54,45 52,45 53,58 48,51 50,51 49,33" fill="#ffffff" />
+            <polygon points="50,35 52,44 51,44 52,53 48,49 50,49 50,35" fill="#bbf9ff" />
+          </g>
+        </>
+      )}
+
+      {/* Text */}
+      <g fill="#57828f" fontFamily="'Montserrat','Segoe UI',sans-serif" fontWeight="900" letterSpacing="1.7">
+        <text x="50" y="88" fontSize="3" textAnchor="middle" fill="#1cc4e0" fillOpacity="0.7">AUTOMATED GRID</text>
+        <text x="50" y="93" fontSize="1.7" textAnchor="middle" fill="#ffffff" fillOpacity="0.2" letterSpacing="0.7">HUMANLESS OPERATIONS</text>
       </g>
     </svg>
   );

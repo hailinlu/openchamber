@@ -1,16 +1,109 @@
-<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
-  <!-- OpenChamber logo - simplified, no background (for dark backgrounds) -->
-  <g transform="translate(256, 256) scale(4)">
-    <!-- Left face - simplified, no grid cells -->
-    <path d="M0 0 L-41.568 -24 L-41.568 24 L0 48 Z" fill="white" fill-opacity="0.2" stroke="white" stroke-width="3" stroke-linejoin="round"/>
-    <!-- Right face - simplified, no grid cells -->
-    <path d="M0 0 L41.568 -24 L41.568 24 L0 48 Z" fill="white" fill-opacity="0.35" stroke="white" stroke-width="3" stroke-linejoin="round"/>
-    <!-- Top face - open -->
-    <path d="M0 -48 L-41.568 -24 L0 0 L41.568 -24 Z" fill="none" stroke="white" stroke-width="3" stroke-linejoin="round"/>
-    <!-- OpenCode logo on top face -->
-    <g transform="matrix(0.866, 0.5, -0.866, 0.5, 0, -24) scale(0.75)">
-      <path fill-rule="evenodd" clip-rule="evenodd" d="M-16 -20 L16 -20 L16 20 L-16 20 Z M-8 -12 L-8 12 L8 12 L8 -12 Z" fill="white"/>
-      <path d="M-8 -4 L8 -4 L8 12 L-8 12 Z" fill="white" fill-opacity="0.4"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="1024" height="1024" viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="70%">
+      <stop offset="0%" stop-color="#0d1f2d" />
+      <stop offset="80%" stop-color="#050b12" />
+      <stop offset="100%" stop-color="#020406" />
+    </radialGradient>
+    <linearGradient id="coreTop" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7bf2ff" />
+      <stop offset="100%" stop-color="#29cce8" />
+    </linearGradient>
+    <linearGradient id="coreLeft" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f8ba4" />
+      <stop offset="100%" stop-color="#064d5f" />
+    </linearGradient>
+    <linearGradient id="coreRight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#14aac7" />
+      <stop offset="100%" stop-color="#08748a" />
+    </linearGradient>
+    <linearGradient id="ringGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#bfe6ff" stop-opacity="0.9" />
+      <stop offset="50%" stop-color="#33e0ff" stop-opacity="0.7" />
+      <stop offset="100%" stop-color="#006685" stop-opacity="0.9" />
+    </linearGradient>
+    <filter id="floatShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="20" stdDeviation="20" flood-color="#000000" flood-opacity="0.8" />
+      <feDropShadow dx="0" dy="5" stdDeviation="5" flood-color="#1bb9d4" flood-opacity="0.2" />
+    </filter>
+    <filter id="glowLight" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="12" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="glowStrong" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="600" height="600" fill="url(#bgGrad)" />
+
+  <!-- Grid lines -->
+  <g fill="none" stroke="#00d5ff" stroke-opacity="0.15" stroke-width="1">
+    <circle cx="300" cy="300" r="240" stroke-dasharray="4 8" />
+    <circle cx="300" cy="300" r="220" stroke-dasharray="12 12" />
+    <path d="M 300 60 L 300 540 M 60 300 L 540 300" stroke-width="2" stroke-dasharray="1 10" />
+    <path d="M 120 120 L 480 480" stroke-dasharray="20 40" />
+    <path d="M 480 120 L 120 480" stroke-dasharray="20 40" />
+  </g>
+
+  <!-- 3D Isometric Core -->
+  <g filter="url(#floatShadow)">
+    <!-- Base platform -->
+    <polygon points="300,180 420,240 300,300 180,240" fill="#042b36" />
+    <polygon points="180,240 300,300 300,420 180,360" fill="#021e25" />
+    <polygon points="300,300 420,240 420,360 300,420" fill="#032630" />
+
+    <!-- Top face -->
+    <polygon points="300,210 385,252 300,294 215,252" fill="url(#coreTop)" stroke="#a1f5ff" stroke-width="1.5" stroke-opacity="0.5" />
+    <!-- Left face -->
+    <polygon points="215,252 300,294 300,369 215,327" fill="url(#coreLeft)" />
+    <!-- Right face -->
+    <polygon points="300,294 385,252 385,327 300,369" fill="url(#coreRight)" />
+
+    <!-- Surface grooves -->
+    <polygon points="300,225 340,245 300,265 260,245" fill="#0d5869" fill-opacity="0.6" stroke="#00c3ff" stroke-width="0.5" />
+    <polygon points="260,245 300,265 300,300 260,280" fill="#07323e" fill-opacity="0.8" />
+    <polygon points="300,265 340,245 340,280 300,300" fill="#0a4856" fill-opacity="0.8" />
+  </g>
+
+  <!-- Orbital Rings -->
+  <g filter="url(#floatShadow)">
+    <ellipse cx="300" cy="300" rx="150" ry="55" fill="none" stroke="url(#ringGrad)" stroke-width="8" stroke-dasharray="25 10 5 10" transform="rotate(-30 300 300)" />
+    <ellipse cx="300" cy="300" rx="150" ry="55" fill="none" stroke="#FFFFFF" stroke-opacity="0.8" stroke-width="2" stroke-dasharray="15 20" transform="rotate(-30 300 300)" />
+    <ellipse cx="300" cy="300" rx="170" ry="60" fill="none" stroke="url(#ringGrad)" stroke-width="4" stroke-dasharray="8 12" transform="rotate(40 300 300)" />
+
+    <!-- Node dots -->
+    <g filter="url(#glowLight)">
+      <circle cx="300" cy="170" r="6" fill="#d8fcff" />
+      <circle cx="430" cy="260" r="5" fill="#19d4ff" />
+      <circle cx="280" cy="450" r="7" fill="#ffffff" />
+      <circle cx="170" cy="340" r="5" fill="#1ad4ff" />
     </g>
+  </g>
+
+  <!-- Lightning Bolt Glow -->
+  <g filter="url(#glowStrong)">
+    <polygon points="300,195 325,270 310,270 320,345 285,305 300,305 295,195" fill="none" stroke="#ffffff" stroke-width="3" />
+  </g>
+  <!-- Lightning Bolt Core -->
+  <g filter="url(#glowLight)">
+    <polygon points="300,195 325,270 310,270 320,345 285,305 300,305 295,195" fill="#ffffff" />
+    <polygon points="300,210 313,265 305,265 310,320 290,295 300,295 298,210" fill="#bbf9ff" />
+  </g>
+
+  <!-- Text -->
+  <g fill="#57828f" font-family="'Montserrat', 'Segoe UI', sans-serif" font-weight="900" letter-spacing="10">
+    <text x="300" y="530" font-size="18" text-anchor="middle" fill="#1cc4e0" fill-opacity="0.7">AUTOMATED GRID</text>
+    <text x="300" y="555" font-size="10" text-anchor="middle" fill="#ffffff" fill-opacity="0.2" letter-spacing="4">HUMANLESS OPERATIONS</text>
   </g>
 </svg>

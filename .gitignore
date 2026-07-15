@@ -68,3 +68,6 @@ workspaces/
 *.pid
 .worktrees/
 test-results/
+rust/
+.zcode/
+.codegraph/

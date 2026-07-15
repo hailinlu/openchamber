@@ -224,7 +224,7 @@ export const registerPwaManifestRoute = (app, dependencies) => {
       display: 'standalone',
       display_override: ['window-controls-overlay'],
       background_color: '#151313',
-      theme_color: '#edb449',
+      theme_color: '#2dd4bf',
       ...(manifestOrientation ? { orientation: manifestOrientation } : {}),
       icons: [
         { src: '/pwa-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
