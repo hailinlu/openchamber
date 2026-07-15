@@ -37,6 +37,7 @@ web-push = { workspace = true }
 h2 = { workspace = true }
 pem = { workspace = true }
 serde_yaml = { workspace = true }
+jsonc-parser = { workspace = true }
 # url crate (webauthn-rs 传递依赖, 显式引用)
 url = "2"
 rand = { workspace = true }

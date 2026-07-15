@@ -296,6 +296,151 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
 - [x] 新增依赖 `p256` (+pkcs8 feature) / `web-push` / `h2` (workspace + oc-server)
 - [x] `cargo test` 389/389 通过 (新增 83 测试), clippy 0 警告
 
+**阶段 3c Group 1 — 功能模块: permission-auto-accept + session-folders + magic-prompts** (完成):
+- [x] permission-auto-accept 模块 2 个路由 (`permission_auto_accept.rs`: 移植 `runtime.js` —
+      `Policy { sessions: HashMap<String, bool> }` 持久化到 `settings.json` 的 `permissionAutoAccept` key,
+      复用 `github::settings::read_settings`/`write_settings`,
+      session lineage 向上遍历 parentID 链找最近显式策略 (缺失 parentID 时 GET `/session/{id}` 补全,
+      缓存 10000 上限 LRU),
+      `process_permission` 去重 (in_flight HashMap) + retry 延迟序列 `[0, 250, 1000ms]` +
+      POST `/permission/{id}/reply {reply:"once"}` (404 → 视为已处理) +
+      `reconcile_pending` 收集 pending → 对 auto-accept session 自动 reply,
+      OpenCode API 调用使用 reqwest `.query(&[("directory", dir)])` (不引入 urlencoding crate))
+- [x] GlobalHub 集成 (`permission_auto_accept::start`: 订阅 `global_hub.subscribe_event()` —
+      `session.created`/`session.updated` → rememberSession (lineage 缓存) +
+      `permission.asked` → processPermission (spawn fire-and-forget task) +
+      订阅 `global_hub.subscribe_status()` — `connect` → reconcilePending;
+      策略变更广播 `openchamber:permission-auto-accept.updated` SSE 事件
+      通过 `emitter.broadcast_ui_notification`)
+- [x] session-folders 模块 2 个路由 (`session_folders.rs`: 最简单模块 —
+      `$DATA_DIR/sessions-directories.json` JSON 文件原子读写,
+      GET 默认空文件返回 `{version:1, foldersMap:{}, collapsedFolderIds:[], updatedAt:0}`,
+      POST 4MB 上限 + body 校验 (must be object) + `.tmp → rename` 原子写模式,
+      `{pid}-{millis}-{random}` 唯一临时路径, 失败时清理 tmp)
+- [x] magic-prompts 模块 4 个路由 (`magic_prompts.rs`: `$DATA_DIR/magic-prompts.json` 文件结构
+      `{version:1, overrides:{[id]:text}}` + `FILE_VERSION = 1` + `MAX_PROMPT_TEXT_LENGTH = 200_000` +
+      `MagicPromptRuntime` 持有 `Mutex<()>` write_lock 串行化 read-modify-write (同 push_store/apns_store 模式),
+      `PROMPT_ID_PATTERN` 正则 `^[a-z0-9._-]{1,160}`,
+      `is_visible_prompt_id()` 检测 `.visible` 后缀 (不允许空文本),
+      handlers: `get_magic_prompts` (GET) + `put_magic_prompt/{id}` (PUT) +
+      `delete_magic_prompt/{id}` (DELETE) + `delete_all_magic_prompts` (DELETE root))
+- [x] 复用现有模式 (`github::settings::read_settings/write_settings` policy 持久化 +
+      `github::settings::data_dir()` 文件路径解析 +
+      原子写 `.tmp → rename` + `Mutex<()>` write_lock +
+      `GlobalHub::subscribe_event/subscribe_status` 订阅 +
+      `emitter.broadcast_ui_notification` UI 事件广播 +
+      `init_permission_auto_accept(self: &Arc<Self>)` 延迟初始化, 同 `init_notification_trigger`)
+- [x] AppState 扩展 (`state.rs`: `permission_auto_accept: Arc<PermissionAutoAcceptRuntime>` +
+      `init_permission_auto_accept()` 在 `set_opencode_ready` 后调用, 启动后台 fanout task)
+- [x] 路由注册 (`main.rs`: 8 路由在 notifications 之后、SSE proxy 之前 + trigger init)
+- [x] COMPATIBILITY 加 `api.permission-auto-accept.v1` + `api.session-folders.v1` + `api.magic-prompts.v1`
+- [x] `cargo test` 413/413 通过 (新增 24 测试: permission_auto_accept 13 + magic_prompts 8 + session_folders 3), clippy 0 警告
+
+**阶段 3c Group 2 — 功能模块: opencode + small-model** (完成):
+- [x] opencode 子模块重组 (`opencode/`: 替换原 `opencode.rs` 单文件为 `opencode/mod.rs` 4 子模块 —
+      `paths.rs` + `auth.rs` + `config.rs` + `models_metadata.rs`,
+      与 Node `opencode/paths.js` + `auth.js` + `shared.js` + `models-metadata.js` 1:1 对齐)
+- [x] paths (`opencode/paths.rs`: HOME_DIR_NAME + OPENCODE_DATA_DIR_NAME + AUTH_FILE_NAME +
+      CONFIG_DIR_NAME + CONFIG_FILE_NAME + CUSTOM_CONFIG_FILE_NAME + AGENT/COMMAND/SKILL_DIR_NAME,
+      `home_dir()` 复用 `crate::git::paths::home_dir()`,
+      `opencode_data_dir()` + `auth_file()` + `config_file()` + `custom_config_file()` + `agent/command/skill_dir()`)
+- [x] auth (`opencode/auth.rs`: `AuthError` 枚举 (Io/Parse/Json/Write) +
+      `read_auth_file()` / `write_auth_file()` (原子写 `.tmp{pid}-{ts}-{rand} → rename`) +
+      `write_auth_file_at()` / `get_provider_auth()` / `set_provider_auth()` / `remove_provider_auth()` /
+      `list_provider_auths()`,
+      备份模式 `.{name}.openchamber.backup` (与 Node `auth.js:32` 对齐),
+      写入后 `chmod 0o600` (Unix only, 与 Node `shared.js#writeConfig` 对齐))
+- [x] config (`opencode/config.rs`: 全套 `shared.js` (536 行) 端口 —
+      SCOPE 常量 (Agent/Command/Skill) + `ensure_dirs()` 创建 3 种类型所有 scope 目录 +
+      `MdFile` (markdown 元数据 + optional frontmatter) + `parse_md_file()` / `write_md_file()`
+      (保留空行, 过滤 null frontmatter) +
+      `ConfigError` + `read_config_file()` 用 `jsonc-parser v0.33` `parse_to_serde_value` +
+      `ParseOptions::default()` (注释 + 尾逗号) +
+      `merge_configs()` 递归 deep merge + 数组覆盖不合并 + `null` 覆盖 (`null` 字段胜出) +
+      `ConfigLayers` (`{user_config, project_config, custom_config, paths}`) +
+      `read_config_layers()` 3-layer merge (project + user + custom) +
+      `get_config_for_path()` ancestor merge (向上遍历 worktree 链) +
+      `write_config()` 原子写 + 备份 +
+      `get_ancestors()` / `find_worktree_root()` 沿 `.git`/`worktree` 向上查找 +
+      `is_prompt_file_reference()` 匹配 `(?i)^{file:NAME}` 模式 +
+      `resolve_prompt_file_path()` tilde 展开 + 路径在 config 目录内 +
+      `write_prompt_file()` 写入到 `<config-dir>/prompts/{name}.md` +
+      `Skill` + `list_skills()` + `walk_skill_md_files()` 仅保留 `SKILL.md` (不递归 subdir) +
+      `resolve_skill_search_directories()` 3 层目录解析 (project + global + custom) +
+      `SkillSupportingFile` + `list_skill_supporting_files()` /
+      `read/write/delete_skill_supporting_file()` + `walk_supporting()` +
+      `assert_path_within_skill_dir()` 路径遍历防护 (canonicalize + canonical 起点比较))
+- [x] models_metadata (`opencode/models_metadata.rs`: `ModelsMetadata` struct +
+      `MODELS_DEV_API_URL = "https://models.dev/api.json"` +
+      `GlobalState` 用 `tokio::sync::OnceCell<Result<...>>` + 单独 `started_at` TTL/timeout +
+      `fetch_catalog()` http GET + JSON parse (4MB 上限) +
+      `try_cache()` TTL 命中逻辑 +
+      `get_models_metadata()` 入口 (cache hit → return cache, miss → spawn inflight dedup via
+      `Arc<tokio::sync::OnceCell<Result<Value, Error>>>` + `Mutex<Option<Arc<InflightHandle>>>`,
+      fetch 失败 + 有 cache → stale fallback `{metadata, fromCache:true, stale:true}`,
+      fetch 失败 + 无 cache → 错误传播,
+      测试用 `tokio::net::TcpListener` mock HTTP server))
+- [x] small-model 模块 5 个文件 (`small_model/`: resolve + call + index + routes + mod 骨架,
+      与 Node `small-model/` (1307 行) 1:1 对齐)
+- [x] resolve (`small_model/resolve.rs`: 常量 `FAMILY_PRIORITY` + `COPILOT_UTILITY_MODELS` +
+      `OPENAI_OAUTH_SMALL_MODEL`, `ModelRef` / `ResolvedModel` / `ResolveArgs` 全部 camelCase + skip_if_Option,
+      `parse_model_ref()` (provider/model 分割, basename 修剪, validate 非空) +
+      `get_auth_entry_for_provider()` (TypeScript 已无 api_key 也算 authenticated) +
+      `is_usable_auth_entry()` (空字符串/空白为 false) +
+      `pick_by_family()` (按 FAMILY_PRIORITY 顺序扫) +
+      `pick_within_provider()` (按 cost/family 启发式) +
+      `is_authenticated()` (从 auth.json 找 provider, 列表遍历) +
+      `resolve_small_model()` 完整决策链
+      1. `preferred_model_id` 显式 → 直接用
+      2. `preferred_provider_id` + `restrict_to_preferred_provider=true` → 该 provider 第一个可用
+      3. `preferred_provider_id` → 该 provider 内按 family priority + is_authenticated 过滤
+      4. fallback → 扫全局 catalog 找最小可用)
+- [x] call (`small_model/call.rs`: 常量 `REQUEST_TIMEOUT_MS = 60_000` +
+      `DEFAULT_MAX_OUTPUT_TOKENS = 4_000` + `USER_AGENT` + `CODEX_TOKEN_URL` +
+      `CODEX_RESPONSES_URL`,
+      JWT 解码 `decode_jwt_claims()` + `extract_chatgpt_account_id()`,
+      `read_provider_config()` 从 opencode config 读 provider config (apiKey/baseURL) +
+      `call_small_model()` dispatcher 按 provider 类型分发 (openai-compatible / anthropic / google /
+      openai-codex-SSE), 4 个内部实现不流式, timeout 60s,
+      OAuth single-flight refresh 占位 (`Lazy<Option<String>>` + 注释指向 future group))
+- [x] index (`small_model/index.rs`: 常量 `DEFAULT_CONTEXT_TOKENS = 64_000` +
+      `OUTPUT_RESERVE_TOKENS = 4_000`, `GenerateArgs` + `DescribeArgs` + `GenerateResult`
+      (含 `#[serde(rename = "inputTruncated", skip_serializing_if = "Option::is_none")]`),
+      `SmallModelError` 含 `status_code` 字段,
+      `clamp_prompt_to_model_limit()` 4 chars/token 启发式 + `truncated` 标记,
+      `generate_small_model_text()` public API + `describe_small_model()` + `list_authenticated_providers()`)
+- [x] routes (`small_model/routes.rs`: `SmallModelQuery` (directory/providerID/modelID) +
+      `SmallModelGenerateBody` (prompt/system/maxOutputTokens/model/directory/preferredProviderID/
+      preferredModelID/restrictToPreferredProvider),
+      2 个 axum handler —
+      `GET  /api/small-model` → `{available, model, authenticatedProviders}` +
+      `POST /api/small-model/generate` → `{text, providerID, modelID, source, inputTruncated?}`)
+- [x] 复用现有模式 (`github::settings::read_settings` 读取 small-model 覆盖 +
+      `crate::opencode::auth` 读 provider auth +
+      `crate::opencode::config` 读 provider 配置 +
+      `crate::git::paths::home_dir` 复用 +
+      `crate::opencode::models_metadata` 复用 +
+      `serde_json::Value` 作为中间类型与 JS 行为对齐)
+- [x] AppState 扩展 (`state.rs`: `small_model_service: Arc<SmallModelService>` unit struct —
+      当前 stateless (所有调用走 module-level static + 临时 fetch),
+      字段标记 `#[allow(dead_code)]` 后续 group 添加 per-session 缓存或后端路由选择)
+- [x] 路由注册 (`main.rs`: 2 路由在 magic-prompts 之后、SSE proxy 之前:
+      `GET  /api/small-model` (axum `get`) +
+      `POST /api/small-model/generate` (axum `post`))
+- [x] COMPATIBILITY 加 `api.small-model.v1`
+- [x] 新增依赖 `serde_yaml = "0.9"` (workspace + oc-server, 给 opencode config YAML 文件备用) +
+      `jsonc-parser = { version = "0.33", features = ["serde"] }` (workspace + oc-server,
+      给 opencode config JSONC 解析)
+- [x] 测试串行化 (`auth.rs` 测试 `pub(crate) static TEST_LOCK` + `HomeGuard`/`set_temp_home()` `pub(crate)`,
+      `config.rs` 测试通过 `use crate::opencode::auth::tests as auth_tests` 共享同一把锁,
+      跨模块 HOME env 串行化避免并行 test 跑时污染;
+      `models_metadata.rs` 测试用 `tokio::sync::Mutex` 跨 await 安全序列化全局 STATE,
+      所有 `assert_eq!(x, true/false)` 重写为 `assert!(x)` / `assert!(!x)` 避免 `clippy::bool_assert_comparison`)
+- [x] `cargo test` 461/461 通过 (新增 53 测试:
+      opencode::auth 6 + opencode::config 22 + opencode::models_metadata 3 +
+      small_model::resolve 8 + small_model::call 4 + small_model::index 5,
+      计划目标 38 → 超出 39% 因为额外加了 jwt/call/edge case 覆盖), clippy 0 警告
+
 **阶段 4A — Tauri 桌面壳 (优先, sidecar 过渡)** (进行中):
 - [x] `tauri-cli` 初始化, workspace 集成
 - [x] Tauri 启动加载 UI (dev URL 模式, `cargo tauri dev` 验证 WebView 渲染)

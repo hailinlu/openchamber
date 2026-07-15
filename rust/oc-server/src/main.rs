@@ -26,12 +26,16 @@ mod error;
 mod fs;
 mod git;
 mod github;
+mod magic_prompts;
 mod notifications;
 mod opencode;
+mod permission_auto_accept;
 mod project_dir;
 mod proxy;
 mod realtime;
 mod routes;
+mod session_folders;
+mod small_model;
 mod state;
 mod static_files;
 mod text;
@@ -70,6 +74,9 @@ async fn main() -> anyhow::Result<()> {
 
     // 3b. 初始化 notification trigger fanout (订阅 GlobalHub 事件)
     state.init_notification_trigger();
+
+    // 3c. 初始化 permission-auto-accept (订阅 GlobalHub 事件/状态)
+    state.init_permission_auto_accept();
 
     // 4. 构建路由
     let app = build_router(state.clone(), &config);
@@ -314,6 +321,38 @@ fn build_router(state: Arc<AppState>, config: &Config) -> Router {
         .route("/api/sessions/{id}/unview", post(notifications::routes::session_unview))
         .route("/api/sessions/{id}/message-sent", post(notifications::routes::session_message_sent))
         .route("/api/notifications/auto-accept", post(notifications::routes::auto_accept))
+        // permission-auto-accept (阶段 3c group 1)
+        .route(
+            "/api/permission-auto-accept",
+            get(permission_auto_accept::get_permission_auto_accept),
+        )
+        .route(
+            "/api/permission-auto-accept/sessions/{sessionId}",
+            put(permission_auto_accept::put_session_policy),
+        )
+        // session-folders (阶段 3c group 1)
+        .route(
+            "/api/session-folders",
+            get(session_folders::get_session_folders).post(session_folders::post_session_folders),
+        )
+        // magic-prompts (阶段 3c group 1)
+        .route(
+            "/api/magic-prompts",
+            get(magic_prompts::get_magic_prompts).delete(magic_prompts::delete_all_magic_prompts),
+        )
+        .route(
+            "/api/magic-prompts/{id}",
+            put(magic_prompts::put_magic_prompt).delete(magic_prompts::delete_magic_prompt),
+        )
+        // small-model (阶段 3c group 2)
+        .route(
+            "/api/small-model",
+            get(small_model::routes::get_small_model),
+        )
+        .route(
+            "/api/small-model/generate",
+            post(small_model::routes::post_small_model_generate),
+        )
         // SSE 透传代理 (具体路由, 优先于 catch-all)
         .route("/api/global/event", get(realtime::sse_proxy::sse_proxy_handler))
         .route("/api/event", get(realtime::sse_proxy::sse_proxy_handler))

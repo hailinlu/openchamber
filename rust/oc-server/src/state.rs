@@ -22,7 +22,9 @@ use crate::notifications::push_store::PushStore;
 use crate::notifications::session_state::SessionStateRuntime;
 use crate::notifications::template::NotificationTemplateRuntime;
 use crate::notifications::trigger::NotificationTrigger;
+use crate::permission_auto_accept::PermissionAutoAcceptRuntime;
 use crate::realtime::global_hub::GlobalHub;
+use crate::small_model::SmallModelService;
 use crate::tunnels::managed_config::ManagedConfigRuntime;
 use crate::tunnels::service::{TunnelRuntimeState, TunnelService};
 use crate::tunnels::tunnel_auth::TunnelAuth;
@@ -154,6 +156,20 @@ pub struct AppState {
     /// Notification trigger fanout (从 GlobalHub 订阅事件, 触发推送)。
     /// 延迟初始化: 需要 `Arc<AppState>` 构建后才能创建 trigger (trigger 的方法接收 `self: Arc<Self>`)。
     pub notification_trigger: Arc<tokio::sync::OnceCell<Arc<NotificationTrigger>>>,
+
+    // -----------------------------------------------------------------------
+    // Permission auto-accept 模块 (阶段 3c group 1)
+    // -----------------------------------------------------------------------
+    /// Permission auto-accept 运行时 (策略持久化 + session lineage + auto-reply)。
+    pub permission_auto_accept: Arc<PermissionAutoAcceptRuntime>,
+
+    // -----------------------------------------------------------------------
+    // Small-model 模块 (阶段 3c group 2)
+    // -----------------------------------------------------------------------
+    /// Small-model 服务占位 (stateless, 供路由调用 resolve/index/call 模块)。
+    /// 当前未被直接读取 — 用 unit struct + Arc 为后续 group 留 per-session 缓存空间。
+    #[allow(dead_code)]
+    pub small_model_service: Arc<SmallModelService>,
 }
 
 impl AppState {
@@ -274,6 +290,8 @@ impl AppState {
             push_send,
             apns_send,
             notification_trigger: Arc::new(tokio::sync::OnceCell::new()),
+            permission_auto_accept: Arc::new(PermissionAutoAcceptRuntime::new()),
+            small_model_service: Arc::new(SmallModelService::new()),
         }
     }
 
@@ -337,5 +355,19 @@ impl AppState {
         });
 
         trigger
+    }
+
+    /// 初始化 permission-auto-accept 运行时, 启动 GlobalHub 事件/状态消费 task。
+    ///
+    /// 对应 Node `permissionAutoAcceptRuntime.start()`。
+    /// 在 `set_opencode_ready(true)` 后调用。
+    pub fn init_permission_auto_accept(self: &Arc<Self>) {
+        self.permission_auto_accept
+            .clone()
+            .start(
+                &self.global_hub,
+                &self.opencode_base_url,
+                &self.opencode_auth_header,
+            );
     }
 }

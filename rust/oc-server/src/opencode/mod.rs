@@ -15,6 +15,11 @@
 //! 外部模式: 当 OPENCODE_HOST/OPENCODE_SKIP_START 设置时, 不 spawn,
 //! 直接用外部 URL + 用户提供的密码。
 
+pub mod auth;
+pub mod config;
+pub mod models_metadata;
+pub mod paths;
+
 use std::process::Stdio;
 use std::time::Duration;
 

@@ -37,7 +37,11 @@ static COMPATIBILITY: Lazy<Value> = Lazy::new(|| {
             "api.ui-auth.v1",
             "api.client-auth.v1",
             "api.notifications.v1",
-        ]
+            "api.permission-auto-accept.v1",
+            "api.session-folders.v1",
+            "api.magic-prompts.v1",
+            "api.small-model.v1",
+        ]  
     })
 });
 
