@@ -34,7 +34,9 @@ mod project_dir;
 mod proxy;
 mod realtime;
 mod routes;
+mod session_assist;
 mod session_folders;
+mod session_goal;
 mod small_model;
 mod state;
 mod static_files;
@@ -77,6 +79,12 @@ async fn main() -> anyhow::Result<()> {
 
     // 3c. 初始化 permission-auto-accept (订阅 GlobalHub 事件/状态)
     state.init_permission_auto_accept();
+
+    // 3d. 初始化 session-assist (busy→idle 后 60s 静默期生成 recap + suggestion)
+    state.init_session_assist();
+
+    // 3e. 初始化 session-goal (持久化目标 + audit + auto-continuation)
+    state.init_session_goal();
 
     // 4. 构建路由
     let app = build_router(state.clone(), &config);
@@ -343,6 +351,13 @@ fn build_router(state: Arc<AppState>, config: &Config) -> Router {
         .route(
             "/api/magic-prompts/{id}",
             put(magic_prompts::put_magic_prompt).delete(magic_prompts::delete_magic_prompt),
+        )
+        // session-goal (阶段 3c group 3) — file-backed objective CRUD
+        .route(
+            "/api/goals/objective/{session_id}",
+            put(session_goal::routes::put_objective)
+                .get(session_goal::routes::get_objective)
+                .delete(session_goal::routes::delete_objective),
         )
         // small-model (阶段 3c group 2)
         .route(

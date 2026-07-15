@@ -19,6 +19,7 @@ pub mod auth;
 pub mod config;
 pub mod models_metadata;
 pub mod paths;
+pub mod session_client;
 
 use std::process::Stdio;
 use std::time::Duration;

@@ -441,6 +441,98 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
       small_model::resolve 8 + small_model::call 4 + small_model::index 5,
       计划目标 38 → 超出 39% 因为额外加了 jwt/call/edge case 覆盖), clippy 0 警告
 
+**阶段 3c Group 3 — 功能模块: session-assist + session-goal** (完成):
+- [x] `session_assist` 子模块 (busy→idle 后 60s 静默期生成 recap + suggestion,
+      写入 `metadata.openchamber.assist`)
+  - [x] `session_assist/metadata.rs`: `AssistMetadata` (`recap`/`suggestion`/`forMessageID`/`generatedAt`)
+        camelCase, `RECAP_CHAR_LIMIT=320` + `SUGGESTION_CHAR_LIMIT=500` clamp,
+        `merge_assist_into_openchamber()` 保留其他 openchamber 子字段
+  - [x] `session_assist/mod.rs`: `SessionAssistRuntime` (`timers: Mutex<HashMap<JoinHandle>>` +
+        `inflight: HashSet` + `stopped: AtomicBool`), 全局 `Weak<AppState>` 注入,
+        `start()` 启动 GlobalHub consumer, `process_payload()` 事件分发
+        (`session.status:idle` → arm 60s, 其他 → clear, user 消息 createdAt ≥ armedAt → clear),
+        `arm_timer` 取消旧 handle + `tokio::spawn(sleep → generate)`,
+        `generate_assist` 单飞 (`inflight` HashSet) + sub-agent skip (`parentID` truthy) +
+        settings 开关 (`sessionRecapEnabled`/`sessionSuggestionEnabled` 默认 true) +
+        tail-moved-on 检查 (re-fetch + 比 `lastAssistantInfo.id`) +
+        strict-JSON system prompt (`build_assist_system_prompt`,
+        按 `(recap, suggestion)` 4 种组合输出 shape + 示例 1 + 示例 2) +
+        `parse_generate_response` trailing JSON 提取 + 字段长度 clamp +
+        Cyrillic/CJK/Devanagari/Arabic 脚本语言清洗 (防 small-model 偏离对话语言)
+- [x] `session_goal` 子模块 (持久化目标 + audit verdict + auto-continuation,
+      终结时广播 `openchamber:session-goal.settled` SSE)
+  - [x] `session_goal/objectives.rs`: `GOAL_OBJECTIVE_CHAR_LIMIT=5000`,
+        `goals_dir()` + `write_objective` + `read_objective` + `delete_objective` +
+        `is_session_goal_enabled()`, path 校验 (URL-safe token 4-128 chars),
+        缺失文件 404, `tokio::fs` + 进程级 env (与 Node 一致)
+  - [x] `session_goal/audit.rs`: `Verdict` enum (Continue/Complete/Blocked) + `as_str`/`parse`,
+        `build_audit_system_prompt()` 严格 JSON `{"verdict", "note"}` 指令 + `note ≤ 200 字符`,
+        `extract_json_object()` fence stripping + tail `{...}` 扫描,
+        `script_mismatch` Cyrillic/CJK/Devanagari/Arabic 检测 (与 session-assist 共用),
+        `parse_audit_outcome()` 解析 + fallback
+  - [x] `session_goal/continuation.rs`: `MAX_AUTO_TURNS=20`,
+        `escape_xml_text()` (`&` → `&amp;`, `<` → `&lt;`, `>` → `&gt;`),
+        `GoalSnapshot { objective, tokens_used, token_budget, turns_used }`,
+        `build_continuation_prompt()` 渲染 objective + budget + 状态提示
+  - [x] `session_goal/metadata.rs`: `GoalStatus` enum + `GOAL_STATUSES` 常量 slice,
+        `GoalMetadata` 17 字段 camelCase (含 `tokenBudget: Option<u64>`),
+        `parse_goal_metadata()` `Number.isFinite > 0` + floor 逻辑,
+        `merge_goal_into_session_metadata()` + `goal_to_value()` + `is_active()`
+  - [x] `session_goal/persistence.rs`: `read_session_openchamber_metadata()` GET →
+        提取 `metadata.openchamber` namespace, `patch_session_openchamber_metadata()`
+        GET → merge → PATCH (保留 dismissals/review 等其他子字段),
+        纯 helper `merge_key_into_openchamber` + `merge_map_into_openchamber` 供
+        session-assist 复用
+  - [x] `session_goal/mod.rs`: `SessionGoalRuntime` (`timers` + `inflight` + `stopped`),
+        常量 `IDLE_QUIET_MS=15_000` + `KICKOFF_QUIET_MS=3_000` +
+        `RESUME_KICKOFF_MS=250` + `BLOCKED_STREAK_LIMIT=3` + `AUDIT_FAIL_LIMIT=2`,
+        事件分发 (idle → arm, aborted assistant → `pause_after_abort`,
+        session.updated → kickoff/resume kickoff),
+        `tick` 完整状态机 (单飞 → 终态判定 → 抓 transcript → audit → 决策:
+        complete / blocked × N / audit fail × N / 构造 continuation → POST
+        `/session/{id}/prompt_async`),
+        token accounting (segmented snapshot with `summary:true` 段落分片,
+        维护 `tokensBaseline` + `tokensCommitted` + `tokensUsed`,
+        `account_tokens` 边界 ≤ goal.created_at 排除 post-goal 旧消息),
+        `settle_goal` 终结时持久化 status + 广播 SSE
+  - [x] `session_goal/routes.rs`: 3 axum handler (`PUT`/`GET`/`DELETE`
+        `/api/goals/objective/{session_id}`, `State<Arc<AppState>>` + `ApiResult<Json<Value>>`,
+        GET 缺失返回 404 + `{error}`, DELETE best-effort 容错)
+- [x] `opencode/session_client.rs`: `OpenCodeClient` struct (5 方法 —
+      `fetch_session` / `fetch_session_messages` / `patch_session_metadata` /
+      `prompt_async` / `create_session`, 10s timeout, `Result<Option<Value>, ApiError>`
+      GET 形态 + `Result<(), ApiError>` 写形态, 与 `permission_auto_accept::fetch_session_info` 复用模式),
+      `build(state: &AppState)` constructor (`reqwest::Client` + `base_url` + `auth_header`
+      复用 AppState), mock HTTP 测试用 `tokio::net::TcpListener`,
+      供 G4 (scheduled-tasks) + G5 (skills-catalog) 复用
+- [x] AppState 扩展 (`state.rs`: `session_assist: Arc<SessionAssistRuntime>` +
+      `session_goal: Arc<SessionGoalRuntime>`, `init_session_assist()` +
+      `init_session_goal()` 在 `set_opencode_ready` 后调用启动 GlobalHub consumer)
+- [x] 路由注册 (`main.rs`: `/api/goals/objective/{session_id}` axum chained
+      `put(get/delete)` 在 magic-prompts 之后、SSE proxy 之前,
+      `session_assist` + `session_goal` 无新 HTTP 路由 — 状态走 `metadata.openchamber.{assist,goal}`)
+- [x] 错误桥修复 (`error.rs`: `ApiError` derive `Debug` + 手写 `Display` 让
+      `tracing::warn!`/`format!` 可用 + `From<oc_core::Error>` 保留)
+- [x] 复用现有模式 (Arc<Runtime> + start() GlobalHub consumer 复用
+      `permission_auto_accept` + `notifications/trigger`,
+      单飞 `Mutex<HashSet<String>>` 复用 `permission_auto_accept`,
+      防抖 timer 复用 `notifications/trigger`,
+      `crate::small_model::index::generate_small_model_text` 给两个 runtime 调 audit/recap,
+      `crate::github::settings::read_settings` 读启用开关,
+      `crate::github::settings::data_dir()` 给 objectives 文件目录,
+      `crate::notifications::emitter::broadcast_ui_notification` 给 goal 终结通知,
+      `state.{opencode_base_url, opencode_auth_header, http_client}` 给 session_client,
+      `auth::TEST_LOCK` 跨模块串行化 HOME/OPENCHAMBER_DATA_DIR env 污染防护)
+- [x] COMPATIBILITY 加 `api.session-assist.v1` + `api.session-goal.v1`
+- [x] 测试串行化 (`session_goal/objectives.rs` 测试 `with_temp_data_dir` 复用
+      `auth::TEST_LOCK`, 与 `config::with_temp_home` 共享同一把锁,
+      跨模块 env 污染防护, `await_holding_lock` 抑制因锁需跨越 async 测试体)
+- [x] `cargo test` 547/547 通过 (新增 86 测试:
+      opencode::session_client 11 + session_assist::metadata 6 + session_assist::mod 13 +
+      session_goal::objectives 10 + session_goal::audit 9 + session_goal::continuation 6 +
+      session_goal::metadata 11 + session_goal::persistence 5 + session_goal::mod 15),
+      clippy 0 警告 (3 处 `#[allow(clippy::too_many_arguments)]` 因状态机参数聚合是合理的)
+
 **阶段 4A — Tauri 桌面壳 (优先, sidecar 过渡)** (进行中):
 - [x] `tauri-cli` 初始化, workspace 集成
 - [x] Tauri 启动加载 UI (dev URL 模式, `cargo tauri dev` 验证 WebView 渲染)

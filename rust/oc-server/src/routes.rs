@@ -41,6 +41,8 @@ static COMPATIBILITY: Lazy<Value> = Lazy::new(|| {
             "api.session-folders.v1",
             "api.magic-prompts.v1",
             "api.small-model.v1",
+            "api.session-assist.v1",
+            "api.session-goal.v1",
         ]  
     })
 });

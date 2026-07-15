@@ -24,6 +24,8 @@ use crate::notifications::template::NotificationTemplateRuntime;
 use crate::notifications::trigger::NotificationTrigger;
 use crate::permission_auto_accept::PermissionAutoAcceptRuntime;
 use crate::realtime::global_hub::GlobalHub;
+use crate::session_assist::SessionAssistRuntime;
+use crate::session_goal::SessionGoalRuntime;
 use crate::small_model::SmallModelService;
 use crate::tunnels::managed_config::ManagedConfigRuntime;
 use crate::tunnels::service::{TunnelRuntimeState, TunnelService};
@@ -170,6 +172,14 @@ pub struct AppState {
     /// 当前未被直接读取 — 用 unit struct + Arc 为后续 group 留 per-session 缓存空间。
     #[allow(dead_code)]
     pub small_model_service: Arc<SmallModelService>,
+
+    // -----------------------------------------------------------------------
+    // Session-assist + Session-goal 模块 (阶段 3c group 3)
+    // -----------------------------------------------------------------------
+    /// Session-assist 运行时 (busy→idle 后 60s 静默期生成 recap + suggestion)。
+    pub session_assist: Arc<SessionAssistRuntime>,
+    /// Session-goal 运行时 (持久化目标 + audit + auto-continuation)。
+    pub session_goal: Arc<SessionGoalRuntime>,
 }
 
 impl AppState {
@@ -292,6 +302,8 @@ impl AppState {
             notification_trigger: Arc::new(tokio::sync::OnceCell::new()),
             permission_auto_accept: Arc::new(PermissionAutoAcceptRuntime::new()),
             small_model_service: Arc::new(SmallModelService::new()),
+            session_assist: Arc::new(SessionAssistRuntime::new()),
+            session_goal: Arc::new(SessionGoalRuntime::new()),
         }
     }
 
@@ -369,5 +381,23 @@ impl AppState {
                 &self.opencode_base_url,
                 &self.opencode_auth_header,
             );
+    }
+
+    /// 初始化 session-assist 运行时, 启动 GlobalHub 事件消费 task。
+    ///
+    /// 对应 Node `createSessionAssistRuntime` 的隐式启动 (Node 端由 index.js 在
+    /// `start()` 后注入)。session-assist 监听 session.status (idle → 60s 静默期)
+    /// + message.updated user (tail-moved-on 检查)。
+    pub fn init_session_assist(self: &Arc<Self>) {
+        self.session_assist.clone().start(self.clone());
+    }
+
+    /// 初始化 session-goal 运行时, 启动 GlobalHub 事件消费 task。
+    ///
+    /// 对应 Node `createSessionGoalRuntime` 的隐式启动。session-goal 监听
+    /// session.status (idle → 15s tick) + message.updated assistant (abort pause)
+    /// + session.updated (kickoff path)。
+    pub fn init_session_goal(self: &Arc<Self>) {
+        self.session_goal.clone().start(self.clone());
     }
 }
