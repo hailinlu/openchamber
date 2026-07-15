@@ -2002,7 +2002,11 @@ export const Header: React.FC<HeaderProps> = ({
     return <React.Fragment key={tab.id}>{tabButton}</React.Fragment>;
   };
 
-  const desktopChangesPanelAction = !isVSCode ? (
+  // Set to true to hide the Changes panel and Open browser toolbar buttons.
+  const HIDE_CHANGES_PANEL = true;
+  const HIDE_BROWSER_PANEL = true;
+
+  const desktopChangesPanelAction = !HIDE_CHANGES_PANEL ? (
     <Tooltip>
       <TooltipTrigger asChild>
         <button
@@ -2086,7 +2090,7 @@ export const Header: React.FC<HeaderProps> = ({
         onClick={toggleBottomTerminal}
         Icon={'terminal-box'}
       />
-      {!isMobile ? (
+      {!isMobile && !HIDE_BROWSER_PANEL ? (
         <HeaderIconActionButton
           title={t('contextPanel.browser.open')}
           ariaLabel={t('contextPanel.browser.open')}
