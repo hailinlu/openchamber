@@ -445,7 +445,7 @@ const InlineDiffViewer = React.memo<InlineDiffViewerProps>(({
   }
 
   return (
-    <div className="w-full" style={{ contain: 'layout' }}>
+    <div className="w-full">
       <PierreDiffViewer
         original={diff.original}
         modified={diff.modified}
@@ -862,8 +862,8 @@ const MultiFileDiffEntry = React.memo<MultiFileDiffEntryProps>(({
                     </div>
                 </div>
             </div>
-            {isExpanded && (
-                <div className="relative bg-background overflow-hidden">
+	            {isExpanded && (
+	                <div className="relative bg-background">
                     {!isMounted && !diffLoadError ? (
                         <div className="h-40 border border-border/40 bg-background/40" />
                     ) : null}

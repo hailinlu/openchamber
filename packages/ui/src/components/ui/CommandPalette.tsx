@@ -12,6 +12,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -27,6 +28,7 @@ import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
 import { getContextFileOpenFailureMessage, validateContextFileOpen } from '@/lib/contextFileOpenGuard';
 import { toast } from '@/components/ui';
+import { Button } from '@/components/ui/button';
 import { FileTypeIcon } from '@/components/icons/FileTypeIcon';
 import type { Session } from '@opencode-ai/sdk/v2';
 import { createWorktreeSession } from '@/lib/worktreeSessionCreator';
@@ -320,6 +322,7 @@ export const CommandPalette: React.FC = () => {
   // ---------------------------------------------------------------------------
   const [fileResults, setFileResults] = React.useState<FileHit[]>([]);
   const [fileResultsKey, setFileResultsKey] = React.useState('');
+  const [largeFileConfirm, setLargeFileConfirm] = React.useState<{ path: string; lineCount: number } | null>(null);
 
   const fileSearchKey = buildCommandPaletteFileSearchKey(currentRoot, trimmedQuery);
 
@@ -448,6 +451,10 @@ export const CommandPalette: React.FC = () => {
       if (!currentRoot) return;
       const validation = await validateContextFileOpen(filesApi, filePath);
       if (!validation.ok) {
+        if (validation.reason === 'too-large' && validation.lineCount) {
+          setLargeFileConfirm({ path: filePath, lineCount: validation.lineCount });
+          return;
+        }
         toast.error(getContextFileOpenFailureMessage(validation.reason));
         return;
       }
@@ -456,6 +463,14 @@ export const CommandPalette: React.FC = () => {
     },
     [currentRoot, filesApi, openContextFile, close],
   );
+
+  const handleConfirmLargeFile = React.useCallback(() => {
+    if (!currentRoot || !largeFileConfirm) return;
+    const path = largeFileConfirm.path;
+    setLargeFileConfirm(null);
+    openContextFile(currentRoot, path);
+    close();
+  }, [currentRoot, largeFileConfirm, openContextFile, close]);
 
   const handleOpenProject = React.useCallback(
     (projectId: string, projectPath: string) => {
@@ -471,8 +486,9 @@ export const CommandPalette: React.FC = () => {
     [shortcutOverrides],
   );
 
-  return (
-    <Dialog open={isCommandPaletteOpen} onOpenChange={setCommandPaletteOpen}>
+	  return (
+	    <>
+	    <Dialog open={isCommandPaletteOpen} onOpenChange={setCommandPaletteOpen}>
       <DialogHeader className="sr-only">
         <DialogTitle>{t('commandPalette.title')}</DialogTitle>
         <DialogDescription>{t('commandPalette.description')}</DialogDescription>
@@ -603,6 +619,27 @@ export const CommandPalette: React.FC = () => {
           </CommandList>
         </Command>
       </DialogContent>
-    </Dialog>
-  );
+	    </Dialog>
+
+      {/* Large file confirmation dialog */}
+      <Dialog open={largeFileConfirm !== null} onOpenChange={(open) => { if (!open) setLargeFileConfirm(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('contextFileOpen.confirm.title')}</DialogTitle>
+            <DialogDescription>
+              {largeFileConfirm && t('contextFileOpen.confirm.description', { count: largeFileConfirm.lineCount.toLocaleString() })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLargeFileConfirm(null)}>
+              {t('sidebarFilesTree.dialog.cancel')}
+            </Button>
+            <Button variant="default" onClick={handleConfirmLargeFile}>
+              {t('contextFileOpen.confirm.openAnyway')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+	      </Dialog>
+	    </>
+	  );
 };

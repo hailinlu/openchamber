@@ -11,7 +11,7 @@ export type ContextFileOpenFailureReason = 'too-large' | 'missing' | 'unreadable
 
 export type ContextFileOpenValidationResult =
   | { ok: true }
-  | { ok: false; reason: ContextFileOpenFailureReason };
+  | { ok: false; reason: ContextFileOpenFailureReason; content?: string; lineCount?: number };
 
 const classifyReadError = (error: unknown): ContextFileOpenFailureReason => {
   const message = error instanceof Error ? error.message : String(error ?? '');
@@ -54,7 +54,7 @@ export const validateContextFileOpen = async (files: FilesAPI, path: string): Pr
     const content = await readFileContent(files, path);
     const lineCount = countLinesWithLimit(content, MAX_OPEN_FILE_LINES);
     if (lineCount > MAX_OPEN_FILE_LINES) {
-      return { ok: false, reason: 'too-large' };
+      return { ok: false, reason: 'too-large', content, lineCount };
     }
 
     return { ok: true };
