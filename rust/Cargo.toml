@@ -48,6 +48,17 @@ clap = { version = "4", features = ["derive", "env"] }
 base64 = "0.22"
 # 密码学 (bootstrap token 哈希)
 sha2 = "0.10"
+# 密码学 (scrypt 密码哈希)
+scrypt = "0.11"
+# 密码学 (HMAC-SHA256 password binding)
+hmac = "0.12"
+# JWT 签发/验证 (HS256 session token)
+jsonwebtoken = "9"
+# WebAuthn 服务端 (passkey 注册/认证)
+webauthn-rs = "0.5"
+webauthn-rs-proto = "0.5"
+# URL 解析 (webauthn-rs 传递依赖)
+url = "2"
 # 随机数
 rand = "0.8"
 # UUID (grant token 等)

@@ -9,6 +9,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::config::Config;
+use crate::client_auth::pairing::ClientPairingRuntime;
+use crate::client_auth::remote_clients::RemoteClientAuthRuntime;
 use crate::fs::exec::ExecJobStore;
 use crate::fs::grants::GrantStore;
 use crate::github::rate_limit::RateLimitState;
@@ -16,6 +18,7 @@ use crate::realtime::global_hub::GlobalHub;
 use crate::tunnels::managed_config::ManagedConfigRuntime;
 use crate::tunnels::service::{TunnelRuntimeState, TunnelService};
 use crate::tunnels::tunnel_auth::TunnelAuth;
+use crate::ui_auth::UiAuth;
 
 /// PR status 缓存最大条目数。
 const PR_STATUS_CACHE_MAX: usize = 200;
@@ -116,6 +119,12 @@ pub struct AppState {
     pub tunnel_service: Arc<TunnelService>,
     /// 获取活动端口的回调 (供隧道启动用)。
     pub get_active_port: Arc<dyn Fn() -> Option<u16> + Send + Sync>,
+    /// UI 认证控制器 (password session / JWT / rate-limit / URL-token / passkeys)。
+    pub ui_auth: Arc<UiAuth>,
+    /// Remote client 认证 (trusted-device bearer token 存储, 无密码模式为 None)。
+    pub remote_client_auth: Option<Arc<RemoteClientAuthRuntime>>,
+    /// Pairing session runtime (无密码模式为 None)。
+    pub client_pairing: Option<Arc<ClientPairingRuntime>>,
 }
 
 impl AppState {
@@ -154,6 +163,43 @@ impl AppState {
         // 隧道 runtime state (共享: tunnel_runtime + tunnel_service)
         let tunnel_runtime = Arc::new(TunnelRuntimeState::new());
 
+        // UI auth + client auth
+        let normalized_password = config
+            .ui_password
+            .as_deref()
+            .map(crate::ui_auth::types::normalize_password)
+            .unwrap_or("");
+        let require_client_auth = config.require_client_auth;
+
+        let (ui_auth, remote_client_auth, client_pairing) = if !normalized_password.is_empty() {
+            // enabled controller
+            let jwt_secret = crate::ui_auth::jwt_secret::get_or_create_jwt_secret();
+            let remote_rt = Arc::new(RemoteClientAuthRuntime::new());
+            let pairing_rt = Arc::new(ClientPairingRuntime::new(remote_rt.clone()));
+            let ui = crate::ui_auth::UiAuth::new_enabled(
+                normalized_password,
+                jwt_secret,
+                Some(remote_rt.clone()),
+            );
+            (
+                Arc::new(ui),
+                Some(remote_rt),
+                Some(pairing_rt),
+            )
+        } else {
+            // disabled controller
+            let remote_rt = if require_client_auth {
+                Some(Arc::new(RemoteClientAuthRuntime::new()))
+            } else {
+                None
+            };
+            let pairing_rt = remote_rt
+                .as_ref()
+                .map(|rt| Arc::new(ClientPairingRuntime::new(rt.clone())));
+            let ui = crate::ui_auth::UiAuth::new_disabled(remote_rt.clone(), require_client_auth);
+            (Arc::new(ui), remote_rt, pairing_rt)
+        };
+
         Self {
             config,
             version: env!("CARGO_PKG_VERSION"),
@@ -173,6 +219,9 @@ impl AppState {
             managed_config: Arc::new(ManagedConfigRuntime::new()),
             tunnel_service: Arc::new(TunnelService::new(tunnel_runtime)),
             get_active_port: Arc::new(|| None),
+            ui_auth,
+            remote_client_auth,
+            client_pairing,
         }
     }
 

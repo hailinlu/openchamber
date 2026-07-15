@@ -75,6 +75,10 @@ pub struct Config {
     /// 用户提供的 OpenCode 服务器密码 (不生成 managed password)。
     #[arg(long, env = "OPENCODE_SERVER_PASSWORD")]
     pub opencode_password: Option<String>,
+
+    /// 要求 client 认证 (无密码模式下的增强门)。
+    #[arg(long, env = "OPENCHAMBER_REQUIRE_CLIENT_AUTH")]
+    pub require_client_auth: bool,
 }
 
 impl Config {

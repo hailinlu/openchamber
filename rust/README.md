@@ -183,6 +183,54 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
 - [x] 新增依赖 `sha2 = "0.10"` (workspace + oc-server)
 - [x] `cargo test` 248/248 通过 (新增 49 测试), clippy 0 警告
 
+**阶段 3b Group 3 — 功能模块: ui-auth + client-auth** (完成):
+- [x] ui-auth 模块 11 个路由 (`ui_auth/`: 密码会话 / JWT / 限速 / URL-token 范围 /
+      WebAuthn passkey, 与 Node `ui-auth.js` + `ui-passkeys.js` 契约对齐)
+- [x] 常量 + UiAuth 控制器 (`ui_auth/mod.rs`: session/URL-token/rate-limit/challenge TTL 常量 +
+      `UiAuth` 结构持有 password_hasher/session_manager/rate_limiter/url_token_store/passkeys/client_auth +
+      `reset_auth()` 轮换 JWT secret + 清空 passkeys + 清空 URL tokens +
+      `compute_password_binding()` HMAC-SHA256(jwt_secret, password) → hex +
+      私有 `generate_random_hex()` / `hex_encode()` (不引入 hex crate))
+- [x] Cookie + URL-token 路径 + normalizers (`ui_auth/types.rs`: `parse_cookies()` (手动 `;` 分割 + percent_decode) +
+      `build_cookie()` (SameSite=Strict; HttpOnly; Path=/ 格式精确匹配 Node) +
+      `get_bearer_token()` regex + `normalize_password()` (trim only) +
+      `is_url_auth_readable_http_path()` / `is_url_auth_websocket_path()` / `can_use_url_auth_token_for_request()` +
+      `get_client_ip()` (x-forwarded-for + strip `::ffff:`) + `is_secure_request()` + `get_rate_limit_key()`)
+- [x] JWT secret 文件管理 (`ui_auth/jwt_secret.rs`: `$DATA_DIR/jwt-secret` hex string mode 0o600 +
+      env `OPENCODE_JWT_SECRET` 覆盖 + `get_or_create_jwt_secret()` + `persist_jwt_secret()`)
+- [x] scrypt 密码哈希 (`ui_auth/password.rs`: `PasswordHasher` (SaltString::generate + Scrypt.hash_password) +
+      `verify()` (PasswordHash::new + Scrypt.verify_password) — 进程级 salt, 非持久化)
+- [x] 登录限速器 (`ui_auth/rate_limit.rs`: per-IP sliding window (5min/10次, 15min 锁定) +
+      no-IP fallback (3次) + `check()`/`record_failure()`/`clear()`/`cleanup()`)
+- [x] URL auth token store (`ui_auth/url_token.rs`: `oc_url_` 前缀 + 24 字节 base64url, 60s TTL,
+      `issue()`/`authenticate()`/`sweep()`/`clear()`)
+- [x] Session JWT + cookie (`ui_auth/session.rs`: HS256 `{type:"ui-session",exp,iat}` +
+      `issue_session(trust_device)` (12h/7d TTL) + `is_session_valid()` + `build_session_cookie()`/`build_clear_cookie()` +
+      `update_secret()` 支持轮换 + 私有 `url_encode()` (encodeURIComponent 等价))
+- [x] WebAuthn passkey store (`ui_auth/passkeys.rs`: `$DATA_DIR/ui-passkeys.json` (version/userId/passwordBinding/passkeys) +
+      `webauthn-rs` `start_passkey_registration`/`finish_passkey_registration`/`start_passkey_authentication`/`finish_passkey_authentication` +
+      per-(rp_id, origin) Webauthn 实例 + passwordBinding 不匹配时清空所有 passkeys + 重生成 user_id +
+      `PasskeyError` 枚举 + 注册/认证 challenge in-memory store)
+- [x] 11 个 ui-auth axum handler (`ui_auth/routes.rs`: session status/create + url-token + passkey status/auth-options/auth-verify/register-options/register-verify +
+      passkey list/revoke + auth reset — tunnel scope 门 + rate-limit + 手动 Cookie 插入)
+- [x] client-auth 模块 10 个路由 (`client_auth/`: trusted-device bearer token + Pairing v2 会话,
+      与 Node `client-auth/remote-clients.js` + `pairing.js` 契约对齐)
+- [x] 常量 (`client_auth/mod.rs`: TOKEN_PREFIX `oc_client_` + PAIRING_ID_PREFIX `pair_` + SECRET_BYTES/TOKEN_BYTES)
+- [x] remote client token store (`client_auth/remote_clients.rs`: `$DATA_DIR/remote-clients.json` +
+      `oc_client_` 前缀 + 32 字节 base64url + SHA-256 hex hash 存储 + constant-time 比较 (XOR-OR accumulate) +
+      `create_client()` (生成 token + hash + dedupe + persist) + `authenticate_bearer_token()` (前缀检查 + hash 比较 + 过期 + 节流 lastUsedAt 60s) +
+      `list_clients()`/`revoke_client()`/`revoke_all_clients()`/`has_active_relay_clients()`)
+- [x] pairing session store + redeem (`client_auth/pairing.rs`: `$DATA_DIR/client-pairing-sessions.json` +
+      `pair_` 前缀 + 32 字节 base64url secret + SHA-256 hex hash + `redeem_session()` 所有失败返回同一 generic error (无 oracle 泄漏) +
+      createClient 失败不消费 session + `create_session()`/`list_pending()`/`cancel_session()`/`sweep()`)
+- [x] 10 个 client-auth axum handler (`client_auth/routes.rs`: clients list/create/revoke/revoke-all +
+      pairing sessions create/list/cancel/redeem + connection/candidates + transports —
+      transport candidates (routes 5-7) 返回空/默认值 (relay+LAN 未迁移))
+- [x] AppState 扩展 (`state.rs`: `ui_auth` + `remote_client_auth` + `client_pairing`)
+- [x] COMPATIBILITY 加 `api.ui-auth.v1` + `api.client-auth.v1`
+- [x] 新增依赖 `scrypt`/`hmac`/`jsonwebtoken`/`webauthn-rs`/`webauthn-rs-proto`/`url` (workspace + oc-server)
+- [x] `cargo test` 306/306 通过 (新增 57 测试), clippy 0 警告
+
 **阶段 4A — Tauri 桌面壳 (优先, sidecar 过渡)** (进行中):
 - [x] `tauri-cli` 初始化, workspace 集成
 - [x] Tauri 启动加载 UI (dev URL 模式, `cargo tauri dev` 验证 WebView 渲染)

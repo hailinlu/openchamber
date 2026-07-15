@@ -20,6 +20,7 @@
 //!   - 阶段 3b: github / tunnels / ui-auth / terminal / ...
 
 mod bind_host;
+mod client_auth;
 mod config;
 mod error;
 mod fs;
@@ -34,6 +35,7 @@ mod state;
 mod static_files;
 mod text;
 mod tunnels;
+mod ui_auth;
 
 use std::sync::Arc;
 
@@ -234,6 +236,64 @@ fn build_router(state: Arc<AppState>, config: &Config) -> Router {
             post(tunnels::routes::tunnel_stop),
         )
         .route("/connect", get(tunnels::routes::connect))
+        // UI auth 路由 (阶段 3b group 3, 11 个端点)
+        .route(
+            "/auth/session",
+            get(ui_auth::routes::auth_session_status).post(ui_auth::routes::auth_session_create),
+        )
+        .route("/auth/url-token", post(ui_auth::routes::auth_url_token))
+        .route("/auth/passkey/status", get(ui_auth::routes::passkey_status))
+        .route(
+            "/auth/passkey/authenticate/options",
+            post(ui_auth::routes::passkey_auth_options),
+        )
+        .route(
+            "/auth/passkey/authenticate/verify",
+            post(ui_auth::routes::passkey_auth_verify),
+        )
+        .route(
+            "/auth/passkey/register/options",
+            post(ui_auth::routes::passkey_register_options),
+        )
+        .route(
+            "/auth/passkey/register/verify",
+            post(ui_auth::routes::passkey_register_verify),
+        )
+        .route("/api/passkeys", get(ui_auth::routes::passkey_list))
+        .route("/api/passkeys/{id}", delete(ui_auth::routes::passkey_revoke))
+        .route("/api/auth/reset", post(ui_auth::routes::auth_reset))
+        // Client auth 路由 (阶段 3b group 3, 10 个端点)
+        .route(
+            "/api/client-auth/clients",
+            get(client_auth::routes::list_clients)
+                .post(client_auth::routes::create_client)
+                .delete(client_auth::routes::revoke_all_clients),
+        )
+        .route(
+            "/api/client-auth/clients/{id}",
+            delete(client_auth::routes::revoke_client),
+        )
+        .route(
+            "/api/client-auth/pairing/sessions",
+            post(client_auth::routes::create_pairing_session)
+                .get(client_auth::routes::list_pairing_sessions),
+        )
+        .route(
+            "/api/client-auth/pairing/sessions/{id}",
+            delete(client_auth::routes::cancel_pairing_session),
+        )
+        .route(
+            "/api/client-auth/pairing/redeem",
+            post(client_auth::routes::redeem_pairing),
+        )
+        .route(
+            "/api/client-auth/pairing/transports",
+            get(client_auth::routes::pairing_transports),
+        )
+        .route(
+            "/api/client-auth/connection/candidates",
+            get(client_auth::routes::connection_candidates),
+        )
         // SSE 透传代理 (具体路由, 优先于 catch-all)
         .route("/api/global/event", get(realtime::sse_proxy::sse_proxy_handler))
         .route("/api/event", get(realtime::sse_proxy::sse_proxy_handler))
