@@ -116,6 +116,32 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
 - [x] OpenCode DB sync stub (`syncSandboxesToOpenCodeDb` — 阶段 4B 进程内嵌时实现)
 - [x] `cargo test` 150/150 通过 (新增 33 测试), clippy 0 警告
 
+**阶段 3b Group 1 — 功能模块: github** (完成):
+- [x] GitHub 模块 18 个路由 (`github/`: 直接 `reqwest` 调用 GitHub REST/GraphQL API,
+      不引入 `octocrab`; 复用 git 模块的 `get_remotes`/`get_remote_url`/`get_status`)
+- [x] `GitHubClient` REST 封装 (`github/client.rs`: `reqwest::Client` 8s 超时 +
+      Bearer auth + 23 个 REST 方法 (repos/pulls/issues/checks/actions/search/users) +
+      1 个 GraphQL 方法 (POST /graphql) + `GitHubApiError` 携带 status/headers/body)
+- [x] OAuth device flow (`github/device_flow.rs`: 2 个 form-encoded POST,
+      GitHub 对 pending 状态返回 HTTP 200 + `{error: 'authorization_pending'}`)
+- [x] auth 存储 (`github/auth.rs`: `$DATA_DIR/github-auth.json` JSON 数组 mode 0o600 原子写 +
+      `resolve_account_id` 4 级回退 (explicit→login→id→token prefix) +
+      `normalize_auth_list` 恰好一个 current + gh-CLI token 缓存 30s TTL)
+- [x] settings (`github/settings.rs`: client-id/scope 解析 (env→settings→default) +
+      gh-CLI enable/disable)
+- [x] rate-limit cooldown 门 (`github/rate_limit.rs`: `min(retryAfter ?? 60s, 15min)` +
+      429/403+remaining:0/403+retry-after/403+message 检测)
+- [x] repo URL 解析 (`github/repo.rs`: SSH/HTTPS/SSH-protocol 三种格式 +
+      嵌入式 URL parser (不引入 `url` crate))
+- [x] fork 检测 (`github/fork_detection.rs`: `resolve_repo_network` (origin + parent + source) +
+      repo 元数据缓存 5min TTL / 200 max / LRU eviction)
+- [x] PR status 解析 (`github/pr_status.rs`: 最复杂算法 — remote 排序 [explicit/tracking/origin/upstream/rest] +
+      repo network 展开 (parent/source) + `SourceMatcher` repo key + owner key 排序 +
+      search API fallback + search-disabled 缓存 5min retry)
+- [x] 18 个 axum handler (`github/routes.rs`: auth 6 + user 1 + PR 5 + repo 2 + issue 3 + pull context 2 +
+      PR status 缓存 90s TTL / 200 max / 只缓存 connected:true / 12s 超时)
+- [x] `cargo test` 199/199 通过 (新增 49 测试), clippy 0 警告
+
 **阶段 4A — Tauri 桌面壳 (优先, sidecar 过渡)** (进行中):
 - [x] `tauri-cli` 初始化, workspace 集成
 - [x] Tauri 启动加载 UI (dev URL 模式, `cargo tauri dev` 验证 WebView 渲染)

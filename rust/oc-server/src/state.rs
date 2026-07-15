@@ -2,15 +2,76 @@
 //!
 //! 通过 `Arc<AppState>` 在 axum handler 间共享。
 
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use crate::config::Config;
 use crate::fs::exec::ExecJobStore;
 use crate::fs::grants::GrantStore;
+use crate::github::rate_limit::RateLimitState;
 use crate::realtime::global_hub::GlobalHub;
+
+/// PR status 缓存最大条目数。
+const PR_STATUS_CACHE_MAX: usize = 200;
+
+/// PR status 缓存条目 (github 模块)。
+pub struct PrStatusCacheEntry {
+    pub data: serde_json::Value,
+    pub fetched_at: Instant,
+}
+
+/// PR status 缓存 (github 模块)。
+pub struct PrStatusCache {
+    entries: std::sync::Mutex<HashMap<String, PrStatusCacheEntry>>,
+    max_entries: usize,
+}
+
+impl PrStatusCache {
+    pub fn new(max_entries: usize) -> Self {
+        Self {
+            entries: std::sync::Mutex::new(HashMap::new()),
+            max_entries,
+        }
+    }
+
+    pub fn get(&self, key: &str) -> Option<PrStatusCacheEntry> {
+        let entries = self.entries.lock().unwrap();
+        entries.get(key).cloned()
+    }
+
+    pub fn insert(&self, key: String, data: serde_json::Value) {
+        let mut entries = self.entries.lock().unwrap();
+        if entries.len() >= self.max_entries && !entries.contains_key(&key) {
+            // evict 最旧
+            if let Some((oldest_key, _)) = entries
+                .iter()
+                .min_by_key(|(_, entry)| entry.fetched_at)
+                .map(|(k, v)| (k.clone(), v.fetched_at))
+            {
+                entries.remove(&oldest_key);
+            }
+        }
+        entries.insert(
+            key,
+            PrStatusCacheEntry {
+                data,
+                fetched_at: Instant::now(),
+            },
+        );
+    }
+}
+
+impl Clone for PrStatusCacheEntry {
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+            fetched_at: self.fetched_at,
+        }
+    }
+}
 
 /// 应用全局状态。
 ///
@@ -38,6 +99,10 @@ pub struct AppState {
     pub exec_job_store: Arc<ExecJobStore>,
     /// settings.json 路径 (工作区目录解析用)。
     pub settings_path: PathBuf,
+    /// GitHub PR status 缓存。
+    pub github_pr_status_cache: Arc<PrStatusCache>,
+    /// GitHub rate-limit 状态。
+    pub github_rate_limit: Arc<RateLimitState>,
 }
 
 impl AppState {
@@ -85,6 +150,8 @@ impl AppState {
             grant_store,
             exec_job_store,
             settings_path,
+            github_pr_status_cache: Arc::new(PrStatusCache::new(PR_STATUS_CACHE_MAX)),
+            github_rate_limit: Arc::new(RateLimitState::new()),
         }
     }
 

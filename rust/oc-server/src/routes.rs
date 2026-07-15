@@ -32,6 +32,7 @@ static COMPATIBILITY: Lazy<Value> = Lazy::new(|| {
             "api.fs.v1",
             "api.text.v1",
             "api.git.v1",
+            "api.github.v1",
         ]
     })
 });

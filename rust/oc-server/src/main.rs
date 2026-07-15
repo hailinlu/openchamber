@@ -24,6 +24,7 @@ mod config;
 mod error;
 mod fs;
 mod git;
+mod github;
 mod opencode;
 mod project_dir;
 mod proxy;
@@ -185,6 +186,26 @@ fn build_router(state: Arc<AppState>, config: &Config) -> Router {
         .route("/api/git/integrate/run", post(git::routes::integrate_run))
         .route("/api/git/integrate/abort", post(git::routes::integrate_abort))
         .route("/api/git/integrate/continue", post(git::routes::integrate_continue))
+        // GitHub 路由 (阶段 3b group 1, 18 个端点)
+        .route("/api/github/auth/status", get(github::routes::auth_status))
+        .route("/api/github/auth/gh-cli", post(github::routes::auth_gh_cli))
+        .route("/api/github/auth/start", post(github::routes::auth_start))
+        .route("/api/github/auth/complete", post(github::routes::auth_complete))
+        .route("/api/github/auth/activate", post(github::routes::auth_activate))
+        .route("/api/github/auth", delete(github::routes::auth_delete))
+        .route("/api/github/me", get(github::routes::me))
+        .route("/api/github/pr/status", get(github::routes::pr_status))
+        .route("/api/github/pr/create", post(github::routes::pr_create))
+        .route("/api/github/pr/update", post(github::routes::pr_update))
+        .route("/api/github/pr/merge", post(github::routes::pr_merge))
+        .route("/api/github/pr/ready", post(github::routes::pr_ready))
+        .route("/api/github/repo/upstream", get(github::routes::repo_upstream))
+        .route("/api/github/repo/branches", get(github::routes::repo_branches))
+        .route("/api/github/issues/list", get(github::routes::issues_list))
+        .route("/api/github/issues/get", get(github::routes::issues_get))
+        .route("/api/github/issues/comments", get(github::routes::issues_comments))
+        .route("/api/github/pulls/list", get(github::routes::pulls_list))
+        .route("/api/github/pulls/context", get(github::routes::pulls_context))
         // SSE 透传代理 (具体路由, 优先于 catch-all)
         .route("/api/global/event", get(realtime::sse_proxy::sse_proxy_handler))
         .route("/api/event", get(realtime::sse_proxy::sse_proxy_handler))
