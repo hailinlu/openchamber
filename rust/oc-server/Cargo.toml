@@ -31,6 +31,11 @@ hmac = { workspace = true }
 jsonwebtoken = { workspace = true }
 webauthn-rs = { workspace = true }
 webauthn-rs-proto = { workspace = true }
+# notifications 模块
+p256 = { workspace = true }
+web-push = { workspace = true }
+h2 = { workspace = true }
+pem = { workspace = true }
 serde_yaml = { workspace = true }
 # url crate (webauthn-rs 传递依赖, 显式引用)
 url = "2"

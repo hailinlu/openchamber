@@ -231,6 +231,71 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
 - [x] 新增依赖 `scrypt`/`hmac`/`jsonwebtoken`/`webauthn-rs`/`webauthn-rs-proto`/`url` (workspace + oc-server)
 - [x] `cargo test` 306/306 通过 (新增 57 测试), clippy 0 警告
 
+**阶段 3b Group 4 — 功能模块: notifications** (完成):
+- [x] notifications 模块 18 个路由 (`notifications/`: web-push / APNs / SSE 通知流 /
+      session activity / attention / view tracking, 与 Node `notifications/routes.js` 契约对齐)
+- [x] 常量 (`notifications/mod.rs`: SSE 心跳 20s / 消息截断 250 / 可见性 TTL 30s /
+      push/apns 文件 version / APNs JWT TTL 50min / cooldown 5s / debounce 500ms /
+      relay URL / APNs production+sandbox host + `now_millis()` helper)
+- [x] 文本规范化 (`notifications/message.rs`: markdown→plain text 正则剥离 (fenced/inline code,
+      list markers, headings, bold/italic, links) + 空白折叠 + truncate + `...`)
+- [x] 解析器 + normalizers (`notifications/types.rs`: `parse_push_subscribe_body()` /
+      `parse_push_unsubscribe_body()` / `extract_session_id_from_payload()` /
+      `extract_directory_from_payload()` / `format_mode()` / `format_model_id()` /
+      `format_project_label()` / `normalize_pem()` + `get_parent_id()`)
+- [x] session 状态机 (`notifications/session_state.rs`: 纯内存 Mutex<HashMap> —
+      activity phase (idle/busy/cooldown) + session status + attention state +
+      viewed-by-clients tracking + needsAttention 推导 (busy/retry→idle + 有用户消息 + 无客户端查看) +
+      mark viewed/unviewed/message-sent 广播 `openchamber:session-status` SSE)
+- [x] web-push 订阅持久化 (`notifications/push_store.rs`: `$DATA_DIR/push-subscriptions.json` v1 +
+      `Mutex<()>` write lock 串行化 read-modify-write + 去重 (endpoint) + MAX_SUBS_PER_SESSION 10 +
+      in-memory 可见性 Map (TTL 30s) + `is_ui_visible()`/`is_any_ui_visible()`/`is_any_interactive_client_visible()`)
+- [x] APNs token 持久化 (`notifications/apns_store.rs`: `$DATA_DIR/apns-tokens.json` v1 +
+      同 write lock 模式 + 去重 (deviceToken) + platform 归一化 (非 android→ios) +
+      `remove_token_from_all_sessions()`)
+- [x] relay 签名身份 (`notifications/relay_key.rs`: `settings.relaySigningKey = {privateJwk, publicJwk}` +
+      ECDSA P-256 `SigningKey` / `VerifyingKey` (p256 crate) +
+      `canonical_public_jwk_string()` + `derive_server_id()` (base64url(SHA-256(canonical JWK))) +
+      `sign_relay_message()` IEEE-P1363 base64url + `get_or_create_relay_keypair()` + 跨 Node/Rust 兼容)
+- [x] APNs 发送 (`notifications/apns_send.rs`: **relay 模式** (默认) POST tokens + generic text 到 relay URL +
+      签名 POST body (tokens/title/body/badge/collapseId/env/data/publicKeyJwk/ts/sig) +
+      响应 `results[].drop` → 删 token + **direct 模式** (fallback) ES256 JWT 签名 +
+      HTTP/2 (h2 crate, tokio-rustls 不在 → DEGRADED warn no-op) +
+      410/dead-reason → 删 token + `send_apns_to_all_ui_sessions()` fanout)
+- [x] web-push 发送 (`notifications/push_send.rs`: `web-push` crate v0.11 + `p256` (VAPID 密钥生成) +
+      `get_or_create_vapid_keys()` (settings 持久化, p256 32-byte scalar → base64url) +
+      `ensure_push_initialized()` per-call VAPID + `send_push_to_subscription()` (410/404→删) +
+      `send_push_to_all_ui_sessions()` 去重 endpoint + 可见性门控)
+- [x] 模板变量解析 (`notifications/template.rs`: `resolve_notification_template()` `{key}` 插值 +
+      `build_template_variables()` 解析 project_name/worktree/branch/session_name/agent_name/model_name +
+      git branch (`tokio::process::Command` spawn `git`, 3s 超时) +
+      `extract_text_from_parts()` / `extract_last_message_text()` / `fetch_last_assistant_message_text()` (reqwest GET OpenCode API) +
+      session info 缓存 (TTL 60s))
+- [x] SSE emitter (`notifications/emitter.rs`: `broadcast::Sender<SseMessage>` SSE 客户端池 +
+      `write_sse_event()` `"data: {json}\n\n"` 到所有客户端 + `emit_desktop_notification()` callback 或 stdout fallback +
+      `broadcast_ui_notification()` 包装为 `{type:"openchamber:notification", properties:{...}}` + SSE 广播 +
+      `subscribe_sse()` SSE stream handler 用)
+- [x] trigger fanout orchestrator (`notifications/trigger.rs`: 最复杂模块, 移植 `runtime.js` 完整逻辑 —
+      cooldown 5s (last_ready/last_error) + question debounce 500ms + permission debounce 500ms +
+      auto-accept suppression + subtask suppression + goal suppression + window-focus gate +
+      `session.idle`/`session.error` → 重写为 `message.updated` (non-recursive `process_payload`) +
+      `message.updated` ready/error notification + `question.asked` debounce spawn +
+      `permission.asked`/`permission.replied` debounce spawn +
+      `Arc<NotificationTrigger>` + `tokio::spawn` debounce timers +
+      `fanout_push()` web-push (full templated payload, visibility-gated) + APNs (generic payload, interactive-client-gated) +
+      channel 失败不阻塞 (fire-and-forget) + `to_apns_generic_payload()` APNS_TITLE_BY_TYPE)
+- [x] 18 个 axum handler (`notifications/routes.rs`: push vapid-key/subscribe (POST+DELETE)/apns-token (POST+DELETE)/visibility (POST+GET) +
+      SSE notification stream (20s 心跳, `futures_util::stream::select` 合并 notification broadcast + heartbeat) +
+      session-activity/snapshot/status (all+single)/attention (all+single) +
+      view/unview/message-sent + auto-accept mirror)
+- [x] AppState 扩展 (`state.rs`: `push_store` + `apns_store` + `emitter` + `session_state` + `notification_template` +
+      `push_send` + `apns_send` + `notification_trigger` (OnceCell deferred init pattern) +
+      `init_notification_trigger()` 订阅 `global_hub.subscribe_event()` 后台消费 task)
+- [x] 路由注册 (`main.rs`: 18 路由在 client-auth 之后、SSE proxy 之前 + trigger init after `set_opencode_ready`)
+- [x] COMPATIBILITY 加 `api.notifications.v1`
+- [x] 新增依赖 `p256` (+pkcs8 feature) / `web-push` / `h2` (workspace + oc-server)
+- [x] `cargo test` 389/389 通过 (新增 83 测试), clippy 0 警告
+
 **阶段 4A — Tauri 桌面壳 (优先, sidecar 过渡)** (进行中):
 - [x] `tauri-cli` 初始化, workspace 集成
 - [x] Tauri 启动加载 UI (dev URL 模式, `cargo tauri dev` 验证 WebView 渲染)

@@ -26,6 +26,7 @@ mod error;
 mod fs;
 mod git;
 mod github;
+mod notifications;
 mod opencode;
 mod project_dir;
 mod proxy;
@@ -66,6 +67,9 @@ async fn main() -> anyhow::Result<()> {
     // 3. 构建 AppState
     let state = Arc::new(AppState::new(config.clone(), oc_base_url, oc_auth));
     state.set_opencode_ready(true);
+
+    // 3b. 初始化 notification trigger fanout (订阅 GlobalHub 事件)
+    state.init_notification_trigger();
 
     // 4. 构建路由
     let app = build_router(state.clone(), &config);
@@ -294,6 +298,22 @@ fn build_router(state: Arc<AppState>, config: &Config) -> Router {
             "/api/client-auth/connection/candidates",
             get(client_auth::routes::connection_candidates),
         )
+        // Notifications 路由 (阶段 3b group 4, 18 个端点)
+        .route("/api/push/vapid-public-key", get(notifications::routes::vapid_public_key))
+        .route("/api/push/subscribe", post(notifications::routes::push_subscribe).delete(notifications::routes::push_unsubscribe))
+        .route("/api/push/apns-token", post(notifications::routes::apns_token_subscribe).delete(notifications::routes::apns_token_unsubscribe))
+        .route("/api/push/visibility", post(notifications::routes::set_visibility).get(notifications::routes::get_visibility))
+        .route("/api/notifications/stream", get(notifications::routes::notification_stream))
+        .route("/api/session-activity", get(notifications::routes::session_activity))
+        .route("/api/sessions/snapshot", get(notifications::routes::sessions_snapshot))
+        .route("/api/sessions/status", get(notifications::routes::sessions_status))
+        .route("/api/sessions/{id}/status", get(notifications::routes::session_status))
+        .route("/api/sessions/attention", get(notifications::routes::sessions_attention))
+        .route("/api/sessions/{id}/attention", get(notifications::routes::session_attention))
+        .route("/api/sessions/{id}/view", post(notifications::routes::session_view))
+        .route("/api/sessions/{id}/unview", post(notifications::routes::session_unview))
+        .route("/api/sessions/{id}/message-sent", post(notifications::routes::session_message_sent))
+        .route("/api/notifications/auto-accept", post(notifications::routes::auto_accept))
         // SSE 透传代理 (具体路由, 优先于 catch-all)
         .route("/api/global/event", get(realtime::sse_proxy::sse_proxy_handler))
         .route("/api/event", get(realtime::sse_proxy::sse_proxy_handler))

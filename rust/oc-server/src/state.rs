@@ -14,6 +14,14 @@ use crate::client_auth::remote_clients::RemoteClientAuthRuntime;
 use crate::fs::exec::ExecJobStore;
 use crate::fs::grants::GrantStore;
 use crate::github::rate_limit::RateLimitState;
+use crate::notifications::apns_send::ApnsSendRuntime;
+use crate::notifications::apns_store::ApnsStore;
+use crate::notifications::emitter::NotificationEmitter;
+use crate::notifications::push_send::PushSendRuntime;
+use crate::notifications::push_store::PushStore;
+use crate::notifications::session_state::SessionStateRuntime;
+use crate::notifications::template::NotificationTemplateRuntime;
+use crate::notifications::trigger::NotificationTrigger;
 use crate::realtime::global_hub::GlobalHub;
 use crate::tunnels::managed_config::ManagedConfigRuntime;
 use crate::tunnels::service::{TunnelRuntimeState, TunnelService};
@@ -125,6 +133,27 @@ pub struct AppState {
     pub remote_client_auth: Option<Arc<RemoteClientAuthRuntime>>,
     /// Pairing session runtime (无密码模式为 None)。
     pub client_pairing: Option<Arc<ClientPairingRuntime>>,
+
+    // -----------------------------------------------------------------------
+    // Notifications 模块 (阶段 3b group 4)
+    // -----------------------------------------------------------------------
+    /// Web-push 订阅持久化 + 可见性 Map。
+    pub push_store: Arc<PushStore>,
+    /// APNs token 持久化。
+    pub apns_store: Arc<ApnsStore>,
+    /// SSE 通知 emitter (broadcast + desktop notify)。
+    pub emitter: Arc<NotificationEmitter>,
+    /// Session 状态运行时 (activity/status/attention)。
+    pub session_state: Arc<SessionStateRuntime>,
+    /// 通知模板运行时 (变量解析 + git branch)。
+    pub notification_template: Arc<NotificationTemplateRuntime>,
+    /// Web-push 发送运行时。
+    pub push_send: Arc<PushSendRuntime>,
+    /// APNs 发送运行时 (relay + direct)。
+    pub apns_send: Arc<ApnsSendRuntime>,
+    /// Notification trigger fanout (从 GlobalHub 订阅事件, 触发推送)。
+    /// 延迟初始化: 需要 `Arc<AppState>` 构建后才能创建 trigger (trigger 的方法接收 `self: Arc<Self>`)。
+    pub notification_trigger: Arc<tokio::sync::OnceCell<Arc<NotificationTrigger>>>,
 }
 
 impl AppState {
@@ -200,12 +229,27 @@ impl AppState {
             (Arc::new(ui), remote_rt, pairing_rt)
         };
 
+        // -----------------------------------------------------------------------
+        // Notifications 模块 (阶段 3b group 4)
+        // -----------------------------------------------------------------------
+        let push_store = Arc::new(PushStore::new(data_dir.join("push-subscriptions.json")));
+        let apns_store = Arc::new(ApnsStore::new(data_dir.join("apns-tokens.json")));
+        let emitter = Arc::new(NotificationEmitter::new());
+        let session_state = Arc::new(SessionStateRuntime::new());
+        let notification_template =
+            Arc::new(NotificationTemplateRuntime::new(http_client.clone()));
+        let push_send = Arc::new(PushSendRuntime::new(push_store.clone(), http_client.clone()));
+        let apns_send = Arc::new(ApnsSendRuntime::new(
+            apns_store.clone(),
+            http_client.clone(),
+        ));
+
         Self {
             config,
             version: env!("CARGO_PKG_VERSION"),
             started_at: chrono::Utc::now().to_rfc3339(),
-            opencode_base_url,
-            opencode_auth_header,
+            opencode_base_url: opencode_base_url.clone(),
+            opencode_auth_header: opencode_auth_header.clone(),
             opencode_ready: Arc::new(AtomicBool::new(false)),
             http_client,
             global_hub,
@@ -222,6 +266,14 @@ impl AppState {
             ui_auth,
             remote_client_auth,
             client_pairing,
+            push_store,
+            apns_store,
+            emitter,
+            session_state,
+            notification_template,
+            push_send,
+            apns_send,
+            notification_trigger: Arc::new(tokio::sync::OnceCell::new()),
         }
     }
 
@@ -229,5 +281,61 @@ impl AppState {
     pub fn set_opencode_ready(&self, ready: bool) {
         self.opencode_ready
             .store(ready, std::sync::atomic::Ordering::Relaxed);
+    }
+
+    /// 初始化 notification trigger fanout, 启动 GlobalHub 事件消费 task。
+    ///
+    /// 必须在 `Arc<AppState>` 构建后调用。创建 `NotificationTrigger` 并订阅
+    /// GlobalHub 事件流, 对每个事件调用 `maybe_send_push_for_trigger` +
+    /// `session_state.process_sse_payload`。
+    ///
+    /// 幂等: 重复调用安全。
+    pub fn init_notification_trigger(self: &Arc<Self>) -> Arc<NotificationTrigger> {
+        let trigger = Arc::new(NotificationTrigger::new(
+            self.push_store.clone(),
+            self.emitter.clone(),
+            self.notification_template.clone(),
+            self.push_send.clone(),
+            self.apns_send.clone(),
+            self.session_state.clone(),
+            self.opencode_base_url.clone(),
+            self.opencode_auth_header.clone(),
+        ));
+
+        // 注册到 OnceCell (首次调用设置; 后续调用忽略)
+        let _ = self.notification_trigger.set(trigger.clone());
+
+        // 启动后台 GlobalHub 消费 task
+        let trigger_clone = trigger.clone();
+        let session_state = self.session_state.clone();
+        let mut rx = self.global_hub.subscribe_event();
+        tokio::spawn(async move {
+            tracing::info!("[notifications] trigger fanout consumer started");
+            loop {
+                match rx.recv().await {
+                    Ok(event) => {
+                        // 更新 session state (session.status → activity phase + status map)
+                        session_state.process_sse_payload(&event.payload);
+
+                        // trigger fanout (clone Arc, fire-and-forget)
+                        let trigger = trigger_clone.clone();
+                        let payload = event.payload.clone();
+                        tokio::spawn(async move {
+                            trigger.maybe_send_push_for_trigger(payload).await;
+                        });
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!(skipped = n, "[notifications] trigger consumer lagged");
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        tracing::info!("[notifications] trigger consumer stopped (hub closed)");
+                        break;
+                    }
+                }
+            }
+        });
+
+        trigger
     }
 }
