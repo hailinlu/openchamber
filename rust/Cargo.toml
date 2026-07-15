@@ -46,6 +46,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 clap = { version = "4", features = ["derive", "env"] }
 # 编解码
 base64 = "0.22"
+# 密码学 (bootstrap token 哈希)
+sha2 = "0.10"
 # 随机数
 rand = "0.8"
 # UUID (grant token 等)

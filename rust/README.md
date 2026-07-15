@@ -142,6 +142,47 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
       PR status 缓存 90s TTL / 200 max / 只缓存 connected:true / 12s 超时)
 - [x] `cargo test` 199/199 通过 (新增 49 测试), clippy 0 警告
 
+**阶段 3b Group 2 — 功能模块: tunnels** (完成):
+- [x] Tunnels 模块 8 个路由 (`tunnels/`: cloudflare + ngrok 隧道子进程编排,
+      与 Node `packages/web/server/lib/tunnels/` + `cloudflare-tunnel.js` + `ngrok-tunnel.js` 契约对齐)
+- [x] 常量 + normalizers (`tunnels/types.rs`: provider/mode/intent/hostname/TTL/configPath 归一化 +
+      `TunnelServiceError` (http_status: missing_dependency→400, validation/provider/mode→422, else→500) +
+      `is_path_within_directory` 路径安全 + `resolve_tunnel_config_path` (~展开 + home 边界) +
+      `extract_hostname` 嵌入式 URL parser (不引入 `url` crate))
+- [x] 跨平台可执行文件搜索 (`tunnels/executable_search.rs`: PATH 搜索 + Windows PATHEXT +
+      WindowsApps 目录 + `resolve_executable_launch_target` (绝对路径解析 + Windows Store alias fallback))
+- [x] 安装命令元数据 (`tunnels/install_help.rs`: darwin/win32/linux 三平台 + brew/winget/scoop/direct)
+- [x] managed remote tunnel token 持久化 (`tunnels/managed_config.rs`:
+      `$DATA_DIR/cloudflare-managed-remote-tunnels.json` v1 format + tokio Mutex 串行化 +
+      旧文件 `cloudflare-named-tunnels.json` 迁移 + upsert/resolve)
+- [x] 隧道认证控制器 (`tunnels/tunnel_auth.rs`: 全内存 Mutex 保护 —
+      bootstrap token (32B base64url, SHA-256 hash 存储, 单次使用, TTL) +
+      session (cookie → SessionRecord, TTL, revoke) +
+      rate-limit (per-IP 5min/20次 + 10min lockout, no-IP fallback 5次) +
+      timing-safe hash 比较 (XOR-OR accumulate) + `classify_request_scope` (tunnel/local/unknown-public) +
+      手动 Cookie 解析/构建 (不引入 cookie crate) + 私有 hex encode (不引入 hex crate))
+- [x] TTL 常量 + normalizers (`tunnels/mod.rs`: bootstrap 30min default / 1min~24h clamp (null透传) +
+      session 8h default / 5min~30d clamp (null→default))
+- [x] provider 抽象 (`tunnels/providers/mod.rs`: 模块级 async 函数 + match dispatch
+      (不引入 `async_trait`); `TunnelController` 持有 `tokio::process::Child` + cleanup)
+- [x] cloudflare provider (`tunnels/providers/cloudflare.rs`: 3 模式 (quick/managed-remote/managed-local) +
+      `cloudflared` 子进程 spawn + READY_LOG_PATTERNS/FATAL_LOG_PATTERNS 日志就绪检测 +
+      6s liveness fallback + 20s hard timeout (tokio::select!) +
+      `inspect_managed_local_config` YAML 解析 (serde_yaml) + API reachability check)
+- [x] ngrok provider (`tunnels/providers/ngrok.rs`: quick 模式 only +
+      `ngrok http --log=stdout --log-format=json` 子进程 spawn +
+      双通道 URL 提取 (stdout JSON + 250ms 轮询 localhost:4040 API) +
+      `extract_ngrok_public_url_from_text` (JSON + regex) + `summarize_ngrok_output` error level)
+- [x] TunnelService 编排 (`tunnels/service.rs`: Mutex-locked start (防并发孤儿进程) +
+      stop / check_availability / get_public_url / get_provider_metadata +
+      resolve_active_mode/provider + 共享 `TunnelRuntimeState`)
+- [x] 8 个 axum handler (`tunnels/routes.rs`: check + doctor (GET+POST) + providers + status +
+      managed-remote-token (PUT) + start + stop + `/connect` (bootstrap token→session 交换 + 302 redirect))
+- [x] AppState 扩展 (`state.rs`: `tunnel_auth` + `tunnel_runtime` + `managed_config` + `tunnel_service` + `get_active_port`)
+- [x] COMPATIBILITY 加 `api.tunnels.v1`
+- [x] 新增依赖 `sha2 = "0.10"` (workspace + oc-server)
+- [x] `cargo test` 248/248 通过 (新增 49 测试), clippy 0 警告
+
 **阶段 4A — Tauri 桌面壳 (优先, sidecar 过渡)** (进行中):
 - [x] `tauri-cli` 初始化, workspace 集成
 - [x] Tauri 启动加载 UI (dev URL 模式, `cargo tauri dev` 验证 WebView 渲染)

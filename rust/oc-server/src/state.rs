@@ -13,6 +13,9 @@ use crate::fs::exec::ExecJobStore;
 use crate::fs::grants::GrantStore;
 use crate::github::rate_limit::RateLimitState;
 use crate::realtime::global_hub::GlobalHub;
+use crate::tunnels::managed_config::ManagedConfigRuntime;
+use crate::tunnels::service::{TunnelRuntimeState, TunnelService};
+use crate::tunnels::tunnel_auth::TunnelAuth;
 
 /// PR status 缓存最大条目数。
 const PR_STATUS_CACHE_MAX: usize = 200;
@@ -103,6 +106,16 @@ pub struct AppState {
     pub github_pr_status_cache: Arc<PrStatusCache>,
     /// GitHub rate-limit 状态。
     pub github_rate_limit: Arc<RateLimitState>,
+    /// 隧道 auth/session 控制器 (全内存)。
+    pub tunnel_auth: Arc<TunnelAuth>,
+    /// 隧道运行时状态 (active controller + runtime hostname/token)。
+    pub tunnel_runtime: Arc<TunnelRuntimeState>,
+    /// 隧道 managed config 持久化。
+    pub managed_config: Arc<ManagedConfigRuntime>,
+    /// 隧道服务编排。
+    pub tunnel_service: Arc<TunnelService>,
+    /// 获取活动端口的回调 (供隧道启动用)。
+    pub get_active_port: Arc<dyn Fn() -> Option<u16> + Send + Sync>,
 }
 
 impl AppState {
@@ -138,6 +151,9 @@ impl AppState {
             });
         let settings_path = data_dir.join("settings.json");
 
+        // 隧道 runtime state (共享: tunnel_runtime + tunnel_service)
+        let tunnel_runtime = Arc::new(TunnelRuntimeState::new());
+
         Self {
             config,
             version: env!("CARGO_PKG_VERSION"),
@@ -152,6 +168,11 @@ impl AppState {
             settings_path,
             github_pr_status_cache: Arc::new(PrStatusCache::new(PR_STATUS_CACHE_MAX)),
             github_rate_limit: Arc::new(RateLimitState::new()),
+            tunnel_auth: Arc::new(TunnelAuth::new()),
+            tunnel_runtime: tunnel_runtime.clone(),
+            managed_config: Arc::new(ManagedConfigRuntime::new()),
+            tunnel_service: Arc::new(TunnelService::new(tunnel_runtime)),
+            get_active_port: Arc::new(|| None),
         }
     }
 

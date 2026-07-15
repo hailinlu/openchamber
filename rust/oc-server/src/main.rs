@@ -33,6 +33,7 @@ mod routes;
 mod state;
 mod static_files;
 mod text;
+mod tunnels;
 
 use std::sync::Arc;
 
@@ -206,6 +207,33 @@ fn build_router(state: Arc<AppState>, config: &Config) -> Router {
         .route("/api/github/issues/comments", get(github::routes::issues_comments))
         .route("/api/github/pulls/list", get(github::routes::pulls_list))
         .route("/api/github/pulls/context", get(github::routes::pulls_context))
+        // Tunnels 路由 (阶段 3b group 2, 8 个端点)
+        .route("/api/openchamber/tunnel/check", get(tunnels::routes::tunnel_check))
+        .route(
+            "/api/openchamber/tunnel/doctor",
+            post(tunnels::routes::tunnel_doctor).get(tunnels::routes::tunnel_doctor),
+        )
+        .route(
+            "/api/openchamber/tunnel/providers",
+            get(tunnels::routes::tunnel_providers),
+        )
+        .route(
+            "/api/openchamber/tunnel/status",
+            get(tunnels::routes::tunnel_status),
+        )
+        .route(
+            "/api/openchamber/tunnel/managed-remote-token",
+            put(tunnels::routes::tunnel_managed_remote_token),
+        )
+        .route(
+            "/api/openchamber/tunnel/start",
+            post(tunnels::routes::tunnel_start),
+        )
+        .route(
+            "/api/openchamber/tunnel/stop",
+            post(tunnels::routes::tunnel_stop),
+        )
+        .route("/connect", get(tunnels::routes::connect))
         // SSE 透传代理 (具体路由, 优先于 catch-all)
         .route("/api/global/event", get(realtime::sse_proxy::sse_proxy_handler))
         .route("/api/event", get(realtime::sse_proxy::sse_proxy_handler))
