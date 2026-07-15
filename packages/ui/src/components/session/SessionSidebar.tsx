@@ -1720,6 +1720,8 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
         onOpenShareOpinion={handleOpenShareOpinionDialog}
         showRuntimeButtons={!isVSCode}
         showUpdateButton={showSidebarUpdateButton}
+        showAboutButton={false}
+        showShareOpinionButton={false}
       />
 
       <ShareOpinionDialog
