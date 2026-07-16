@@ -92,7 +92,6 @@ pub fn get_bearer_token(auth_header: Option<&str>) -> Option<String> {
 /// 从 query string 提取 `oc_url_token`。
 ///
 /// 移植自 `getUrlAuthTokenFromRequest` (ui-auth.js:259-270)。
-#[allow(dead_code)]
 pub fn get_url_auth_token_from_query(query: Option<&str>) -> Option<String> {
     let q = query?;
     // 简单解析 `key=value&key2=value2`
@@ -125,7 +124,6 @@ pub fn is_trusted_device_request(value: &serde_json::Value) -> bool {
 /// URL auth token 可读的 HTTP GET 路径白名单。
 ///
 /// 移植自 `isUrlAuthReadableHttpPath` (ui-auth.js:294-306)。
-#[allow(dead_code)]
 pub fn is_url_auth_readable_http_path(pathname: &str) -> bool {
     pathname == "/api/event"
         || pathname == "/api/global/event"
@@ -143,7 +141,6 @@ pub fn is_url_auth_readable_http_path(pathname: &str) -> bool {
 /// URL auth token 可用的 WebSocket 路径白名单。
 ///
 /// 移植自 `isUrlAuthWebSocketPath` (ui-auth.js:308-315)。
-#[allow(dead_code)]
 pub fn is_url_auth_websocket_path(pathname: &str) -> bool {
     pathname == "/api/event/ws"
         || pathname == "/api/global/event/ws"
@@ -156,7 +153,6 @@ pub fn is_url_auth_websocket_path(pathname: &str) -> bool {
 /// 判断请求是否可以使用 URL auth token。
 ///
 /// 移植自 `canUseUrlAuthTokenForRequest` (ui-auth.js:317-324)。
-#[allow(dead_code)]
 pub fn can_use_url_auth_token_for_request(
     method: &str,
     pathname: &str,

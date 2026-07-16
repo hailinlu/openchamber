@@ -53,7 +53,6 @@ impl UrlTokenStore {
     /// 认证 URL auth token, 返回绑定的 session_token。
     ///
     /// 移植自 `authenticateUrlAuthToken` (ui-auth.js:436-446)。
-    #[allow(dead_code)]
     pub fn authenticate(&self, token: &str) -> Option<String> {
         if !token.starts_with(URL_AUTH_TOKEN_PREFIX) {
             return None;

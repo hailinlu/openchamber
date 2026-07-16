@@ -27,6 +27,7 @@ mod fs;
 mod git;
 mod github;
 mod magic_prompts;
+mod middleware;
 mod notifications;
 mod opencode;
 mod permission_auto_accept;
@@ -415,7 +416,14 @@ fn build_router(state: Arc<AppState>, config: &Config) -> Router {
         // OpenCode 反向代理 (/api/* catch-all)
         // nest 会剥离 /api 前缀, proxy_handler 收到的 path 是去掉 /api 后的部分。
         // 具体路由 (fs/text/SSE/WS/version/system-info) 已在上面注册, axum 优先匹配。
-        .nest("/api", Router::new().fallback(any(proxy::proxy_handler)));
+        .nest("/api", Router::new().fallback(any(proxy::proxy_handler)))
+        // 全局认证中间件 — 覆盖以上所有路由 (含 SSE/WS/proxy catch-all)。
+        // 对齐 Node `app.use('/api', requireApiAuth)` (core-routes.js:997)。
+        // 公开路由 (health/version/auth-session 等) 由中间件内 is_public_path 放行。
+        .layer(axum::middleware::from_fn_with_state(
+            state.clone(),
+            middleware::auth::require_api_auth,
+        ));
 
     // 静态 dist 托管 + SPA fallback
     if config.api_only {

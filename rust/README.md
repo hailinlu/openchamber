@@ -656,3 +656,24 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
 - [x] 新增 `user_config_root()` (`github/settings.rs`): `~/.config/openchamber` (硬编码, 不读 `OPENCHAMBER_DATA_DIR`, 与 Node 一致)
 - [x] 测试隔离修复 (`routes.rs`): `TempDirWithEnv` Drop 守卫, 保持 `OPENCHAMBER_DATA_DIR` 跨测试不污染
 - [x] 所有 scheduled_tasks 测试通过 (89/89); 我改动的文件 cargo clippy 0 warnings
+
+**阶段 3e Group 2 — security 补全: 全局认证门 + 路径边界** (完成):
+
+> 修复 Rust 后端最大安全漏洞: **完全无全局认证中间件** (Node `app.use('/api', requireApiAuth)` 在 Rust 侧缺失)。
+> 另修复 fs/list + fs/serve 缺工作区边界校验。
+
+- [x] **Gap 1 (CRITICAL) — 全局 `/api/*` 认证中间件** (新建 `middleware/auth.rs`):
+      `require_api_auth` 用 `axum::middleware::from_fn_with_state` 挂为顶层 Router layer;
+      对齐 Node `requireApiAuth` (core-routes.js:595-609) 的完整决策链:
+      公开路由白名单 → OPTIONS 豁免 → preview-proxy 旁路 → tunnel scope 分类 →
+      UI auth (session cookie JWT → url_token → bearer → 无密码放行) → 401
+- [x] **Gap 2 (HIGH) — fs/list + fs/serve 工作区边界**:
+      `list` 和 `serve` handler 补 `resolve_workspace_path` 校验;
+      防止认证用户读取工作区外任意文件 (`~/.ssh/id_rsa`, `/etc/passwd` 等)
+- [x] **Gap 3 (HIGH) — WS 端点认证**: 由全局中间件覆盖 upgrade 请求
+      (axum 中间件在 `WebSocketUpgrade` extractor 前运行; url_token 支持 WS 路径白名单)
+- [x] 提升现有 ui_auth helper 为中间件复用: `has_valid_session`, `authenticate_client`,
+      URL-token 白名单函数 (`can_use_url_auth_token_for_request` 等) 去掉 `#[allow(dead_code)]`
+- [x] 公开路由白名单: health/version/system-info/connect/auth-session/passkey-auth/
+      pairing-redeem/OPTIONS (显式匹配, 比 Node 注册顺序更安全)
+- [x] 全量测试通过 (822 passed, 0 failed); 我改动的文件 cargo clippy 0 warnings

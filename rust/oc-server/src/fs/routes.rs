@@ -293,11 +293,20 @@ pub async fn raw(
 
 /// `GET /api/fs/serve/<rest>` — serve 模式 (拒绝 allowOutsideWorkspace)。
 pub async fn serve(
+    State(state): State<Arc<AppState>>,
     AxumPath(rest): AxumPath<String>,
 ) -> ApiResult<Response> {
     // serve 路由拒绝 allowOutsideWorkspace (Node 版本始终 403)
     // path 从 `/<rest>` 解析 (绝对路径)
-    let resolved = PathBuf::from(format!("/{}", rest));
+    let raw_path = format!("/{}", rest);
+    // 补: 工作区边界校验 — 防止读取工作区外任意文件
+    let base_dir = resolve_base_dir(&state).await;
+    let user_root = user_config_root(&state);
+    let resolved = workspace::resolve_workspace_path(
+        &raw_path,
+        &base_dir,
+        user_root.as_deref(),
+    )?;
 
     let data = serve_mod::serve_file(&resolved).await?;
 
@@ -321,19 +330,28 @@ pub async fn serve(
 
 /// `GET /api/fs/list`
 pub async fn list(
-    State(_state): State<Arc<AppState>>,
+    State(state): State<Arc<AppState>>,
     Query(query): Query<ListQuery>,
 ) -> ApiResult<Json<Value>> {
     let path = query.path.as_deref().unwrap_or("~");
     let expanded = crate::project_dir::normalize_directory_path(path);
 
     // 如果展开后仍然为空, 使用 home
-    let target = if expanded.is_empty() {
-        let home = std::env::var("HOME").unwrap_or_else(|_| "/".to_string());
-        PathBuf::from(home)
+    let target_str = if expanded.is_empty() {
+        std::env::var("HOME").unwrap_or_else(|_| "/".to_string())
     } else {
-        PathBuf::from(expanded)
+        expanded
     };
+
+    // 补: 工作区边界校验 — 防止列出工作区外任意目录 (如 /etc, /root)
+    // resolve_workspace_path 接受 base_dir 内或 user_config_root 内的路径
+    let base_dir = resolve_base_dir(&state).await;
+    let user_root = user_config_root(&state);
+    let target = workspace::resolve_workspace_path(
+        &target_str,
+        &base_dir,
+        user_root.as_deref(),
+    )?;
 
     Ok(Json(operations::list(&target).await?))
 }

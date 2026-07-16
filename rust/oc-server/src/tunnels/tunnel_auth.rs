@@ -441,7 +441,6 @@ impl TunnelAuth {
     // ── session 查询 ──
 
     /// 从 cookie value 获取有效 session。
-    #[allow(dead_code)]
     pub fn get_session_from_cookie(&self, cookie_value: &str) -> bool {
         let mut inner = self.inner.lock().unwrap();
         let now = now_ts();
