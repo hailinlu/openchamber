@@ -15,8 +15,8 @@
 
 > `oc-tauri` 的实际 Rust 代码在 `oc-tauri/src-tauri/`(Tauri 标准布局,
 > 由 `tauri-cli init` 生成)。workspace member 指向 `oc-tauri/src-tauri`。
-> **过渡态**(阶段 4A):sidecar spawn 现有 `@openchamber/web` CLI;
-> **最终态**(阶段 4B):进程内嵌 `oc-server`。
+> **默认**(阶段 4B):进程内嵌 `oc-server` (axum, `OcServer::start`);
+> **回退**(`OPENCHAMBER_SIDECAR=1`):sidecar spawn `@openchamber/web` CLI。
 
 ## 构建
 
@@ -533,7 +533,7 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
       session_goal::metadata 11 + session_goal::persistence 5 + session_goal::mod 15),
       clippy 0 警告 (3 处 `#[allow(clippy::too_many_arguments)]` 因状态机参数聚合是合理的)
 
-**阶段 4A — Tauri 桌面壳 (优先, sidecar 过渡)** (进行中):
+**阶段 4A — Tauri 桌面壳 (优先, sidecar 过渡)** (完成):
 - [x] `tauri-cli` 初始化, workspace 集成
 - [x] Tauri 启动加载 UI (dev URL 模式, `cargo tauri dev` 验证 WebView 渲染)
 - [x] sidecar 管理 (`sidecar.rs`: `SidecarBuilder`/`SidecarHandle`, 平台整树杀,
@@ -552,6 +552,18 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
 - [x] 应用发现 (`discovery.rs`: host probe /health + /version, pairing candidate)
 - [x] SSH 管理 (`ssh/`: ControlMaster 编排, ~1300 行, 1:1 移植 ssh-manager.mjs)
 - [x] `cargo test` 69/69 通过
+
+**阶段 4B — 进程内嵌 oc-server (最终态)** (完成):
+- [x] `oc-server` lib 化 (`src/lib.rs`: `OcServer` 句柄封装 `start`/`base_url`/`shutdown`,
+      模块声明 `pub mod` 化, `build_router` 从 main.rs 迁入 lib.rs)
+- [x] `main.rs` 瘦壳化 (~550 行 → ~30 行, 仅 tracing init + Config::load + OcServer::start + ctrl_c + shutdown)
+- [x] 关闭顺序封装 (`OcServer::shutdown`: axum graceful → global_hub.stop → terminal.kill_all → opencode.shutdown)
+- [x] Tauri setup 分叉 (`backend.rs`: `BackendHandle` 枚举统一 InProcess/Sidecar,
+      `use_sidecar()` 读 `OPENCHAMBER_SIDECAR` env 门控; 默认进程内嵌, env=1 回退 sidecar)
+- [x] 状态改名 (`SidecarState`→`BackendState`, `SIDECAR`→`BACKEND`,
+      `sidecar_base_url`→`backend_base_url`, `shutdown_sidecar`→`shutdown_backend`)
+- [x] vibrancy 逻辑提取为 `apply_vibrancy_if_enabled` (两路径共用, DRY)
+- [x] `cargo test -p oc-server` 1123/1123 通过; `cargo test -p oc-tauri` 73/73 通过
 
 **阶段 3d Group 1 — 功能模块: TTS** (完成):
 - [x] TTS 模块 6 个路由 (`tts/`: voice token / speech synthesis / say status/speak / STT transcribe,
