@@ -152,8 +152,8 @@ pub async fn download_and_install(_args: &Value, app: &AppHandle) -> Result<Valu
                 }
             },
             || {
-                // on_before_exit: kill sidecar (与 Electron killSidecar 一致)
-                log::info!("[updater] killing sidecar before install");
+                // on_before_exit: 关闭后端 (进程内嵌或 sidecar, 与 Electron killSidecar 一致)
+                log::info!("[updater] shutting down backend before install");
                 crate::shutdown_backend_public();
             },
         )

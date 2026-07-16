@@ -110,7 +110,7 @@ pub async fn openchamber_dialog_open(
             let grants: Vec<Value> = mint_grants_for_paths(picked).await;
             return Ok(json!(grants));
         } else {
-            return mint_grant_via_sidecar(&picked[0])
+            return mint_grant_via_backend(&picked[0])
                 .await
                 .map(|g| json!(g))
                 .or_else(|_| Ok(json!({ "path": picked[0] })));
@@ -128,7 +128,7 @@ pub async fn openchamber_dialog_open(
 async fn mint_grants_for_paths(paths: Vec<String>) -> Vec<Value> {
     let mut results = Vec::with_capacity(paths.len());
     for p in &paths {
-        let val = mint_grant_via_sidecar(p)
+        let val = mint_grant_via_backend(p)
             .await
             .map(|g| json!(g))
             .unwrap_or_else(|_| json!({ "path": p }));
@@ -155,19 +155,19 @@ pub async fn openchamber_file_grant(
         return Err("filePath is required".into());
     }
 
-    mint_grant_via_sidecar(&file_path)
+    mint_grant_via_backend(&file_path)
         .await
         .map(|g| json!(g))
         .or_else(|_| Ok(json!({ "path": file_path })))
 }
 
-/// 通过 sidecar HTTP 端点 mint outside-workspace file grant。
+/// 通过后端 HTTP 端点 mint outside-workspace file grant。
 ///
-/// 调用 `POST {sidecar_base}/api/fs/grant` → `{ path, outsideFileGrant, expiresAt }`。
-/// sidecar 未启动或 HTTP 失败时返回 Err (调用方决定降级行为)。
-async fn mint_grant_via_sidecar(file_path: &str) -> Result<Value, String> {
+/// 调用 `POST {backend_base}/api/fs/grant` → `{ path, outsideFileGrant, expiresAt }`。
+/// 后端未启动或 HTTP 失败时返回 Err (调用方决定降级行为)。
+async fn mint_grant_via_backend(file_path: &str) -> Result<Value, String> {
     let base_url = crate::backend_base_url()
-        .ok_or_else(|| "sidecar not started".to_string())?;
+        .ok_or_else(|| "backend not started".to_string())?;
 
     let client = reqwest::Client::new();
     let resp = client

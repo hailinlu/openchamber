@@ -227,7 +227,7 @@ fn create_mini_chat_window(app: &AppHandle, label: &str, url: &str) -> Result<()
     let window = builder.build().map_err(|e| e.to_string())?;
 
     // 注入 init_script (与主窗口一致的桥)
-    let ctx = RuntimeContext::from_sidecar_port(get_sidecar_port(app).unwrap_or(0));
+    let ctx = RuntimeContext::from_sidecar_port(get_backend_port(app).unwrap_or(0));
     let init_script = build_init_script(&ctx);
     let _ = window.eval(&init_script);
 
@@ -248,26 +248,26 @@ fn create_mini_chat_window(app: &AppHandle, label: &str, url: &str) -> Result<()
     Ok(())
 }
 
-/// 从全局 SIDECAR 状态获取 port → 构造 origin。
+/// 从全局 backend port 获取 → 构造 origin。
 fn resolve_origin(app: &AppHandle) -> Result<String, String> {
-    let port = get_sidecar_port(app).ok_or("sidecar not ready")?;
+    let port = get_backend_port(app).ok_or("backend not ready")?;
     Ok(format!("http://127.0.0.1:{}", port))
 }
 
-/// 从全局 SIDECAR static 获取 port。
-fn get_sidecar_port(_app: &AppHandle) -> Option<u16> {
-    // 从全局 SIDECAR static 读取 (与 lib.rs 中的 shutdown_sidecar 一致)
-    let guard = SIDECAR_PORT.lock().ok()?;
+/// 从全局 BACKEND_PORT static 获取 port。
+fn get_backend_port(_app: &AppHandle) -> Option<u16> {
+    // 从全局 BACKEND_PORT static 读取 (lib.rs setup 时写入, 进程内嵌和 sidecar 两路径共用)。
+    let guard = BACKEND_PORT.lock().ok()?;
     guard.as_ref().copied()
 }
 
-/// 全局 sidecar port 存储 (lib.rs setup 时写入)。
-/// 用单独的 static 而非直接访问 SIDECAR，因为后者包含非 Send 的 runtime。
-static SIDECAR_PORT: Mutex<Option<u16>> = Mutex::new(None);
+/// 全局 backend port 存储 (lib.rs setup 时写入)。
+/// 用单独的 static 而非直接访问 BACKEND, 因为后者包含非 Send 的 runtime。
+static BACKEND_PORT: Mutex<Option<u16>> = Mutex::new(None);
 
-/// 供 lib.rs 在 setup 时调用，注册 sidecar port。
-pub fn set_sidecar_port(port: u16) {
-    if let Ok(mut guard) = SIDECAR_PORT.lock() {
+/// 供 lib.rs 在 setup 时调用，注册 backend port。
+pub fn set_backend_port(port: u16) {
+    if let Ok(mut guard) = BACKEND_PORT.lock() {
         *guard = Some(port);
     }
 }
