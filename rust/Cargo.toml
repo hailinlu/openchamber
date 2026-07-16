@@ -75,6 +75,10 @@ rand = "0.8"
 uuid = { version = "1", features = ["v4"] }
 # 时间
 chrono = "0.4"
+# 时区数据库 (IANA tz names; 内嵌 tzdata, 不依赖系统)
+chrono-tz = "0.10"
+# cron 表达式解析 + next-run 计算 (scheduled-tasks cron schedule)
+cron = "0.15"
 # 正则
 regex = "1"
 # MIME 推断

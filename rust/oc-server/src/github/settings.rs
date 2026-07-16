@@ -18,6 +18,15 @@ pub fn settings_file() -> PathBuf {
     data_dir().join("settings.json")
 }
 
+/// `~/.config/openchamber` — 对应 Node `OPENCHAMBER_USER_CONFIG_ROOT` (硬编码, 不读 env)。
+///
+/// 与 `data_dir()` 不同: `data_dir` 读 `OPENCHAMBER_DATA_DIR` env;
+/// `user_config_root` 始终是 `~/.config/openchamber`。
+/// projects/ 配置文件存放在这里 (Node `OPENCHAMBER_PROJECTS_CONFIG_DIR`)。
+pub fn user_config_root() -> PathBuf {
+    home_dir().join(".config").join("openchamber")
+}
+
 /// OPENCHAMBER_DATA_DIR 或 ~/.config/openchamber。
 pub fn data_dir() -> PathBuf {
     if let Ok(dir) = std::env::var("OPENCHAMBER_DATA_DIR") {

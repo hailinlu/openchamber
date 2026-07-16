@@ -327,8 +327,9 @@ impl AppState {
             session_goal: Arc::new(SessionGoalRuntime::new()),
 
             // Scheduled-tasks 模块 (阶段 3c group 4) — config + runtime.
+            // 用 user_config_root (与 Node OPENCHAMBER_USER_CONFIG_ROOT 对齐, 不读 OPENCHAMBER_DATA_DIR)。
             scheduled_tasks_config: Arc::new(crate::scheduled_tasks::ProjectConfigRuntime::new(
-                data_dir.join("projects"),
+                crate::github::settings::user_config_root().join("projects"),
             )),
             scheduled_tasks_runtime: crate::scheduled_tasks::build_default_runtime(),
             open_chamber_event_clients: Arc::new(

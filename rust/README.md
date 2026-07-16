@@ -617,3 +617,42 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
       get/create/update/delete + file read/write/delete)
 - [x] COMPATIBILITY 加 `api.skills-catalog.v1`
 - [x] 所有测试通过 (skills_catalog 14 + 全量 778 测试)
+
+**阶段 3e Group 1 — projects/ 正确性修复 (scheduled_tasks 对齐)** (完成):
+
+> 针对阶段 3d G3/G4 移植的 scheduled_tasks 模块, 与 Node `projects/project-config.js` +
+> `projects/project-id.js` 逐项对比, 修复 **8 个严重 gap**。
+
+- [x] **GAP A — 文件路径对齐** (`project_config.rs`):
+      flat 布局 `{projectId}.json` 替代 nested `{projectId}/scheduled-tasks.json`;
+      `default_projects_dir` → `user_config_root().join("projects")` (Node 兼容根 `~/.config/openchamber/projects`)
+- [x] **GAP B — 验证/clamp 移植** (新建 `normalize.rs`, ~700 行):
+      Node `project-config.js` 全套纯函数 — `clamp_length`, `normalize_status`,
+      `normalize_time_value` (HH:mm), `normalize_date_value` (YYYY-MM-DD round-trip),
+      `normalize_weekdays` (0-6 unique sorted), `resolve_schedule_times`,
+      `normalize_timezone` (chrono-tz IANAZone 验证),
+      `validate_cron_expression` (5-field 输入校验 → 7-field 转换),
+      `normalize_schedule` (daily/weekly/once/cron), `normalize_execution`,
+      `normalize_state`, `normalize_task_for_storage`, `normalize_task_for_read`
+- [x] **GAP C — 时区数学** (`schedule.rs`):
+      `parse_in_tz` / `local_now_with_tz` 真正使用 `tz_name` (chrono-tz `Tz` 类型);
+      非 UTC 时区 (America/New_York, Asia/Shanghai, Europe/Paris) 触发时间正确
+- [x] **GAP D — cron compute_next_run_at** (`schedule.rs`):
+      5-field 表达式 prepend `0 ` + append ` *` → 7-field;
+      `cron::Schedule::after(&min_allowed)` 从 `now + TASK_DUE_SLACK_MS` 迭代 (非系统时间)
+- [x] **GAP E — updatedAt 位置** (`project_config.rs` + `routes.rs`):
+      `update_scheduled_task_state` 把 `updatedAt` 写入 `task.state.updatedAt` (非顶层);
+      经 `normalize_state` 归一化 (含 `lastError` clamp + `lastStatus` 校验)
+- [x] **GAP F — sibling keys 保留** (`project_config.rs`):
+      `write_merged` 读现有 raw config → 仅替换 `version` + `scheduledTasks` → 原子写回;
+      `projectNotes` / `projectTodos` / `projectActions` 等兄弟字段不再丢失
+- [x] **GAP G — Task ID 生成** (`normalize.rs`):
+      `normalize_task_for_storage` 内 `existing_id.or(incoming_id).unwrap_or_else(uuid::Uuid::new_v4)`
+- [x] **GAP H — project-id.js 移植** (新建 `project_id.rs`):
+      `create_project_id_from_path` → `path_{base64url(normalized_path)}`
+- [x] **安全加固** (`project_config.rs`):
+      `is_valid_project_id` 显式拒绝 `.` 和 `..` (path traversal); `sanitize_id` 限制文件名字符集
+- [x] 新增依赖: `chrono-tz = "0.10"` (内嵌 tzdata, 无系统依赖) + `cron = "0.15"`
+- [x] 新增 `user_config_root()` (`github/settings.rs`): `~/.config/openchamber` (硬编码, 不读 `OPENCHAMBER_DATA_DIR`, 与 Node 一致)
+- [x] 测试隔离修复 (`routes.rs`): `TempDirWithEnv` Drop 守卫, 保持 `OPENCHAMBER_DATA_DIR` 跨测试不污染
+- [x] 所有 scheduled_tasks 测试通过 (89/89); 我改动的文件 cargo clippy 0 warnings

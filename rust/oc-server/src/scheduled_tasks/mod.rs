@@ -15,7 +15,9 @@
 #![allow(dead_code)] // 部分 helper 由 runtime 间接使用
 
 pub mod execution;
+pub mod normalize;
 pub mod project_config;
+pub mod project_id;
 pub mod routes;
 pub mod runtime;
 pub mod schedule;

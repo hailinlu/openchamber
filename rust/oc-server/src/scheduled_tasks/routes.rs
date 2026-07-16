@@ -87,7 +87,7 @@ fn as_non_empty_string(v: Option<&str>) -> Option<String> {
         .map(String::from)
 }
 
-async fn find_project_by_id(state: &AppState, project_id: &str) -> Option<Value> {
+async fn find_project_by_id(_state: &AppState, project_id: &str) -> Option<Value> {
     let raw = crate::github::settings::read_settings();
     let projects = raw.get("projects").cloned().unwrap_or(Value::Array(vec![]));
     let arr = projects.as_array().cloned().unwrap_or_default();
@@ -151,7 +151,7 @@ pub async fn upsert_scheduled_task(
         .scheduled_tasks_config
         .upsert_scheduled_task(&project_id, task_input.clone())
         .await
-        .map_err(|e| map_upsert_error(e))?;
+        .map_err(map_upsert_error)?;
 
     // 同步 runtime — 清掉旧 timer + 重新调度 next_run_at
     let _ = state
@@ -379,11 +379,13 @@ mod tests {
 
     /// Build an AppState with `OPENCHAMBER_DATA_DIR` pointing at a temp dir,
     /// write a project entry into `settings.json`, return the state.
-    fn state_with_project() -> (Arc<AppState>, tempfile_like::TempDir) {
-        let tmp = tempfile_like::TempDir::new();
-        let prev = std::env::var("OPENCHAMBER_DATA_DIR").ok();
-        std::env::set_var("OPENCHAMBER_DATA_DIR", &tmp.path);
-
+    ///
+    /// 注意: `OPENCHAMBER_DATA_DIR` env var 在测试期间**保持设置** (不立即 restore),
+    /// 因为 `find_project_by_id` 在 handler 调用时才读 settings.json — 如果 env 已
+    /// restore, read_settings 会去读真实 home 的 settings.json 而非 tmp 的。
+    /// 测试间串行执行 (`--test-threads=1`) 避免并发 env 污染。
+    fn state_with_project() -> (Arc<AppState>, TempDirWithEnv) {
+        let tmp = TempDirWithEnv::new();
         let config = Config::try_parse_from(["oc-server"]).unwrap();
         let state = Arc::new(AppState::new(
             config,
@@ -409,13 +411,39 @@ mod tests {
         let st_rt = create_scheduled_tasks_runtime(cfg_rt.clone(), None, None, None);
         let new_state = Arc::new(rebuild_state_with_scheduled(state, cfg_rt, st_rt));
 
-        // restore env on test teardown via Drop guard
-        if let Some(p) = prev {
-            std::env::set_var("OPENCHAMBER_DATA_DIR", p);
-        } else {
-            std::env::remove_var("OPENCHAMBER_DATA_DIR");
-        }
         (new_state, tmp)
+    }
+
+    /// TempDir wrapper that sets `OPENCHAMBER_DATA_DIR` on creation and restores it on Drop.
+    struct TempDirWithEnv {
+        path: std::path::PathBuf,
+        prev_env: Option<String>,
+    }
+
+    impl TempDirWithEnv {
+        fn new() -> Self {
+            let path = std::env::temp_dir().join(format!(
+                "oc-routes-test-{}-{}",
+                std::process::id(),
+                chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+            ));
+            let _ = std::fs::create_dir_all(&path);
+            let prev_env = std::env::var("OPENCHAMBER_DATA_DIR").ok();
+            std::env::set_var("OPENCHAMBER_DATA_DIR", &path);
+            Self { path, prev_env }
+        }
+    }
+
+    impl Drop for TempDirWithEnv {
+        fn drop(&mut self) {
+            // restore env BEFORE removing dir (read_settings may run during handler)
+            if let Some(p) = &self.prev_env {
+                std::env::set_var("OPENCHAMBER_DATA_DIR", p);
+            } else {
+                std::env::remove_var("OPENCHAMBER_DATA_DIR");
+            }
+            let _ = std::fs::remove_dir_all(&self.path);
+        }
     }
 
     fn rebuild_state_with_scheduled(

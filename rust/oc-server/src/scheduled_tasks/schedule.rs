@@ -1,9 +1,14 @@
 //! Schedule parsing + next-run calculation — 移植自 Node
 //! `scheduled-tasks/runtime.js` 中三个纯函数 (`parseScheduledCommandPrompt`,
 //! `computeNextRunAt`, `formatScheduledSessionTitle`)。
+//!
+//! 时区处理用 `chrono-tz` (内嵌 IANA tzdata), 正确支持非 UTC 时区。
 
-use chrono::{DateTime, Datelike, Local, TimeZone, Timelike};
+use chrono::{DateTime, Datelike, TimeZone, Timelike};
 use serde_json::Value;
+
+/// chrono-tz 的时区类型别名。
+type Tz = chrono_tz::Tz;
 
 /// 任务标题最大长度 (suffix ` yyyy-MM-dd HH:mm` 前缀预留 16 chars)。
 pub const TASK_TITLE_MAX_LENGTH: usize = 120;
@@ -67,8 +72,8 @@ pub fn resolve_schedule_times(schedule: &Value) -> Vec<String> {
 pub fn weekday_as_zero_based<Tz: TimeZone>(dt: &DateTime<Tz>) -> i64 {
     // chrono `weekday()`: Mon=1..Sun=7
     // Desired:           Sun=0, Mon=1..Sat=6
-    let wd = dt.weekday().number_from_monday(); // 1..7
-    ((wd + 6) % 7) as i64
+    // wd % 7: Mon=1..Sat=6, Sun=7%7=0 ✓
+    (dt.weekday().number_from_monday() % 7) as i64
 }
 
 /// 解析 `/cmd args` 类型的 slash-command prompt。
@@ -87,8 +92,8 @@ pub fn parse_scheduled_command_prompt(prompt: &str) -> Option<(String, String)> 
     if !trimmed.starts_with('/') {
         return None;
     }
-    let first_line = trimmed.splitn(2, '\n').next().unwrap_or("");
-    let first_line = first_line.splitn(2, '\r').next().unwrap_or("");
+    let first_line = trimmed.split('\n').next().unwrap_or("");
+    let first_line = first_line.split('\r').next().unwrap_or("");
     let mut parts = first_line.split_whitespace();
     let head = parts.next()?;
     let command_name = head.trim_start_matches('/').trim().to_string();
@@ -183,16 +188,34 @@ pub fn compute_next_run_at(task: &Value, now_ms: i64) -> Option<i64> {
         let mo: u32 = parts.next()?.parse().ok()?;
         let d: u32 = parts.next()?.parse().ok()?;
         let zoned = parse_in_tz(y, mo, d, h, m, tz_name)?;
-        let min_allowed = add_ms(&local_now_with_tz_ms(now_ms, tz_name), TASK_DUE_SLACK_MS)?;
+        // min_allowed = now + slack, 在同一时区下计算
+        let now_local = local_now_with_tz(now_ms, tz_name)?;
+        let min_allowed = add_ms(&now_local, TASK_DUE_SLACK_MS)?;
         if zoned.timestamp_millis() <= min_allowed.timestamp_millis() {
             return None;
         }
         Some(zoned.timestamp_millis())
     } else if kind == "cron" {
-        // 无新增依赖: Node 用 cron-parser; 不引入新 crate, 返回 None。
-        // TODO: cron schedule 需要时再加 `cron` crate。
-        let _ = now_ms; // 抑制未使用警告
-        None
+        // Node 用 cron-parser (5-field: 分 时 日 月 周)。
+        // Rust `cron` crate 用 7-field (秒 分 时 日 月 周 年)。
+        // 对齐策略: prepend "0 " (秒=0) + append " *" (年通配) → 7-field。
+        let cron_expr = schedule.get("cron").and_then(Value::as_str)?;
+        let seven_field = format!("0 {cron_expr} *");
+        let cron_sched: cron::Schedule = seven_field.parse().ok()?;
+        let tz = parse_tz(tz_name).unwrap_or(chrono_tz::UTC);
+        let now_dt = local_now_with_tz(now_ms, tz_name).unwrap_or_else(|| {
+            chrono::Utc
+                .timestamp_millis_opt(now_ms)
+                .single()
+                .unwrap_or_else(chrono::Utc::now)
+                .with_timezone(&tz)
+        });
+        let min_allowed = now_dt + chrono::Duration::milliseconds(TASK_DUE_SLACK_MS);
+        // `after()` 从 min_allowed 开始迭代, 找第一个满足 cron schedule 的时间。
+        cron_sched
+            .after(&min_allowed)
+            .next()
+            .map(|dt| dt.timestamp_millis())
     } else {
         None
     }
@@ -206,7 +229,10 @@ pub fn format_scheduled_session_title(task: &Value, now_ms: i64) -> String {
         .and_then(Value::as_str)
         .map(str::trim)
         .filter(|s| !s.is_empty());
-    let dt = local_now_with_tz(now_ms, tz_name).unwrap_or_else(|| Local::now());
+    let dt = local_now_with_tz(now_ms, tz_name).unwrap_or_else(|| {
+        let utc = chrono::Utc.timestamp_millis_opt(now_ms).single().unwrap_or_else(chrono::Utc::now);
+        utc.with_timezone(&chrono_tz::UTC)
+    });
     let stamp = dt.format("%Y-%m-%d %H:%M").to_string();
     let task_name = task
         .get("name")
@@ -227,27 +253,32 @@ pub fn format_scheduled_session_title(task: &Value, now_ms: i64) -> String {
 }
 
 // =========================================================================
-// tz-aware helpers — 全部使用 chrono (已存在依赖)
+// tz-aware helpers — 使用 chrono-tz 正确处理 IANA 时区
 // =========================================================================
 
-fn local_now_with_tz_ms(now_ms: i64, tz_name: Option<&str>) -> DateTime<chrono::Utc> {
-    use chrono::TimeZone;
+/// 解析 IANA 时区名 ("UTC", "America/New_York", "Asia/Shanghai" …) → Tz。
+/// 无效/缺失 → None。
+fn parse_tz(name: Option<&str>) -> Option<Tz> {
+    let n = name?.trim();
+    if n.is_empty() {
+        return None;
+    }
+    n.parse::<Tz>().ok()
+}
+
+/// now_ms → tz-aware DateTime (如果 tz_name 是合法 IANA zone)。
+fn local_now_with_tz(now_ms: i64, tz_name: Option<&str>) -> Option<DateTime<Tz>> {
+    let tz = parse_tz(tz_name)?;
     let secs = now_ms.div_euclid(1000);
     let nsec = (now_ms.rem_euclid(1000) as u32) * 1_000_000;
-    chrono::Utc.timestamp_opt(secs, nsec).single().unwrap_or_else(chrono::Utc::now)
+    let utc = chrono::Utc.timestamp_opt(secs, nsec).single()?;
+    Some(utc.with_timezone(&tz))
 }
 
-fn local_now_with_tz(now_ms: i64, tz_name: Option<&str>) -> Option<DateTime<chrono::Local>> {
-    use chrono::TimeZone;
-    let utc_dt = local_now_with_tz_ms(now_ms, tz_name);
-    Some(utc_dt.with_timezone(&chrono::Local))
-}
-
-fn parse_in_tz(y: i32, mo: u32, d: u32, h: u32, m: u32, _tz_name: Option<&str>) -> Option<DateTime<chrono::Utc>> {
-    use chrono::TimeZone;
-    chrono::Utc
-        .with_ymd_and_hms(y, mo, d, h, m, 0)
-        .single()
+/// 在指定时区解析 y-mo-d h:m:s → tz-aware DateTime。
+fn parse_in_tz(y: i32, mo: u32, d: u32, h: u32, m: u32, tz_name: Option<&str>) -> Option<DateTime<Tz>> {
+    let tz = parse_tz(tz_name).unwrap_or(chrono_tz::UTC);
+    tz.with_ymd_and_hms(y, mo, d, h, m, 0).single()
 }
 
 fn add_ms<Tz: TimeZone>(dt: &DateTime<Tz>, ms: i64) -> Option<DateTime<Tz>> {
@@ -292,11 +323,12 @@ mod tests {
 
     #[test]
     fn weekday_zero_based_mapping() {
+        use chrono::TimeZone;
         // 2025-01-05 = Sunday → weekday 0
-        let dt = Local.with_ymd_and_hms(2025, 1, 5, 12, 0, 0).unwrap();
+        let dt = chrono_tz::UTC.with_ymd_and_hms(2025, 1, 5, 12, 0, 0).unwrap();
         assert_eq!(weekday_as_zero_based(&dt), 0);
         // 2025-01-06 = Monday → 1
-        let dt = Local.with_ymd_and_hms(2025, 1, 6, 12, 0, 0).unwrap();
+        let dt = chrono_tz::UTC.with_ymd_and_hms(2025, 1, 6, 12, 0, 0).unwrap();
         assert_eq!(weekday_as_zero_based(&dt), 1);
     }
 
@@ -433,14 +465,80 @@ mod tests {
     }
 
     #[test]
-    fn compute_cron_returns_none_todo() {
-        // 当前未实现 cron, 直接 None
+    fn compute_cron_next_run() {
+        // */5 分钟, UTC, now=08:00:00 → next=08:05:00
         let now = utc_millis(2025, 1, 1, 8, 0, 0);
         let task = json!({
             "enabled": true,
             "schedule": { "kind": "cron", "cron": "*/5 * * * *", "timezone": "UTC" }
         });
+        let next = compute_next_run_at(&task, now).unwrap();
+        assert_eq!(next, utc_millis(2025, 1, 1, 8, 5, 0));
+    }
+
+    #[test]
+    fn compute_cron_daily_at_9() {
+        // 0 9 * * * = 每天 09:00, now=08:00 → today 09:00
+        let now = utc_millis(2025, 1, 1, 8, 0, 0);
+        let task = json!({
+            "enabled": true,
+            "schedule": { "kind": "cron", "cron": "0 9 * * *", "timezone": "UTC" }
+        });
+        let next = compute_next_run_at(&task, now).unwrap();
+        assert_eq!(next, utc_millis(2025, 1, 1, 9, 0, 0));
+    }
+
+    #[test]
+    fn compute_cron_invalid_returns_none() {
+        let now = utc_millis(2025, 1, 1, 8, 0, 0);
+        let task = json!({
+            "enabled": true,
+            "schedule": { "kind": "cron", "cron": "not valid", "timezone": "UTC" }
+        });
         assert_eq!(compute_next_run_at(&task, now), None);
+    }
+
+    #[test]
+    fn compute_daily_non_utc_timezone() {
+        // America/New_York (UTC-5 in Jan), daily 09:00 EST
+        // now = 2025-01-01 14:00 UTC = 09:00 EST → today 09:00 is < now+5s
+        // → next is tomorrow 09:00 EST = 2025-01-02 14:00 UTC
+        let now = utc_millis(2025, 1, 1, 14, 0, 0);
+        let task = json!({
+            "enabled": true,
+            "schedule": { "kind": "daily", "times": ["09:00"], "timezone": "America/New_York" }
+        });
+        let next = compute_next_run_at(&task, now).unwrap();
+        // 2025-01-02 09:00 EST = 14:00 UTC
+        assert_eq!(next, utc_millis(2025, 1, 2, 14, 0, 0));
+    }
+
+    #[test]
+    fn compute_daily_asia_shanghai_timezone() {
+        // Asia/Shanghai (UTC+8), daily 09:00 CST
+        // now = 2025-01-01 00:00 UTC = 08:00 CST → 09:00 CST same day = 01:00 UTC
+        let now = utc_millis(2025, 1, 1, 0, 0, 0);
+        let task = json!({
+            "enabled": true,
+            "schedule": { "kind": "daily", "times": ["09:00"], "timezone": "Asia/Shanghai" }
+        });
+        let next = compute_next_run_at(&task, now).unwrap();
+        // 2025-01-01 09:00 CST = 01:00 UTC
+        assert_eq!(next, utc_millis(2025, 1, 1, 1, 0, 0));
+    }
+
+    #[test]
+    fn compute_once_non_utc_timezone() {
+        // once 2025-06-15 10:00 Europe/Paris (UTC+2 summer)
+        // = 08:00 UTC; now = 2025-06-15 06:00 UTC → future, returns
+        let now = utc_millis(2025, 6, 15, 6, 0, 0);
+        let task = json!({
+            "enabled": true,
+            "schedule": { "kind": "once", "date": "2025-06-15", "time": "10:00", "timezone": "Europe/Paris" }
+        });
+        let next = compute_next_run_at(&task, now).unwrap();
+        // 10:00 CEST = 08:00 UTC
+        assert_eq!(next, utc_millis(2025, 6, 15, 8, 0, 0));
     }
 
     #[test]
