@@ -25,24 +25,25 @@ mod updater;
 
 use std::sync::Mutex;
 
+use backend::BackendHandle;
 use ipc::globals::{build_init_script, RuntimeContext};
-use sidecar::{SidecarBuilder, SidecarHandle};
+use sidecar::SidecarBuilder;
 use tauri::Manager;
 
-/// 全局 sidecar 句柄 + 它专属的 tokio 运行时。
-struct SidecarState {
-    handle: Option<SidecarHandle>,
+/// 全局后端句柄 + 它专属的 tokio 运行时。
+struct BackendState {
+    handle: Option<BackendHandle>,
     rt: Option<tokio::runtime::Runtime>,
 }
 
-static SIDECAR: Mutex<Option<SidecarState>> = Mutex::new(None);
+static BACKEND: Mutex<Option<BackendState>> = Mutex::new(None);
 
-/// 获取 sidecar base_url (供 IPC 命令 HTTP 调用 sidecar 端点)。
+/// 获取后端 base_url (供 IPC 命令 HTTP 调用后端端点)。
 ///
-/// 返回 `http://127.0.0.1:<port>`，sidecar 未启动时返回 None。
+/// 返回 `http://127.0.0.1:<port>`，后端未启动时返回 None。
 /// 用例: `dialog_cmd::openchamber_file_grant` 调 `POST /api/fs/grant`。
-pub fn sidecar_base_url() -> Option<String> {
-    SIDECAR
+pub fn backend_base_url() -> Option<String> {
+    BACKEND
         .lock()
         .ok()?
         .as_ref()
@@ -76,69 +77,84 @@ pub fn run() {
                 )?;
             }
 
-            // --- 启动 sidecar (仅桌面端) ---
+            // --- 启动后端 (仅桌面端) ---
             #[cfg(desktop)]
             {
                 let rt = tokio::runtime::Builder::new_multi_thread()
                     .enable_all()
                     .build()?;
-                let handle = rt.block_on(async {
-                    SidecarBuilder::new()
-                        .ready_timeout(std::time::Duration::from_secs(45))
-                        .arg("--api-only")
-                        .start()
-                        .await
-                });
-                match handle {
-                    Ok(h) => {
-                        let port = h.port();
-                        log::info!("sidecar ready on port {}", port);
 
-                        // 注册 sidecar port (供 mini_chat 模块构造 origin)
-                        mini_chat::set_sidecar_port(port);
+                if backend::use_sidecar() {
+                    // —— 回退路径: sidecar 子进程 (现状不变) ——
+                    let handle = rt.block_on(async {
+                        SidecarBuilder::new()
+                            .ready_timeout(std::time::Duration::from_secs(45))
+                            .arg("--api-only")
+                            .start()
+                            .await
+                    });
+                    match handle {
+                        Ok(h) => {
+                            let port = h.port();
+                            log::info!("sidecar ready on port {}", port);
+                            mini_chat::set_sidecar_port(port);
 
-                        // --- 注入 init_script (标量全局变量 + IPC 桥) ---
-                        let ctx = RuntimeContext::from_sidecar_port(port);
-                        let init_script = build_init_script(&ctx);
-                        if let Some(window) = app.get_webview_window("main") {
-                            if let Err(e) = window.eval(&init_script) {
-                                log::error!("failed to inject init_script: {}", e);
-                            }
-
-                            // macOS vibrancy: 读 settings 判断是否启用 (默认开)
-                            #[cfg(all(target_os = "macos", feature = "vibrancy"))]
-                            {
-                                let vibrancy_enabled = settings::SettingsStore::get_bool(
-                                    "desktopVibrancy",
-                                    true, // 默认 true (Electron: desktopVibrancy !== false)
-                                );
-                                if vibrancy_enabled {
-                                    use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
-                                    match apply_vibrancy(
-                                        &window,
-                                        NSVisualEffectMaterial::Sidebar,
-                                        Some(NSVisualEffectState::Active),
-                                        None,
-                                    ) {
-                                        Ok(()) => {
-                                            log::info!("[vibrancy] applied sidebar material");
-                                        }
-                                        Err(e) => {
-                                            log::warn!("[vibrancy] failed to apply: {}", e);
-                                        }
-                                    }
+                            let ctx = RuntimeContext::from_sidecar_port(port);
+                            let init_script = build_init_script(&ctx);
+                            if let Some(window) = app.get_webview_window("main") {
+                                if let Err(e) = window.eval(&init_script) {
+                                    log::error!("failed to inject init_script: {}", e);
+                                }
+                                #[cfg(all(target_os = "macos", feature = "vibrancy"))]
+                                {
+                                    apply_vibrancy_if_enabled(&window);
                                 }
                             }
-                        }
 
-                        *SIDECAR.lock().unwrap() = Some(SidecarState {
-                            handle: Some(h),
-                            rt: Some(rt),
-                        });
+                            *BACKEND.lock().unwrap() = Some(BackendState {
+                                handle: Some(BackendHandle::Sidecar(h)),
+                                rt: Some(rt),
+                            });
+                        }
+                        Err(e) => {
+                            log::error!("sidecar startup failed: {:#}", e);
+                            drop(rt);
+                        }
                     }
-                    Err(e) => {
-                        log::error!("sidecar startup failed: {:#}", e);
-                        drop(rt);
+                } else {
+                    // —— 新路径: 进程内嵌入 oc-server ——
+                    let server_result = rt.block_on(async {
+                        let config = oc_server::Config::load()?;
+                        oc_server::OcServer::start(config).await
+                    });
+                    match server_result {
+                        Ok(server) => {
+                            let base_url = server.base_url().to_string();
+                            let port = backend::parse_port(&base_url);
+                            log::info!("oc-server (in-process) ready on port {}", port);
+                            mini_chat::set_sidecar_port(port);
+
+                            let ctx = RuntimeContext::from_sidecar_port(port);
+                            let init_script = build_init_script(&ctx);
+                            if let Some(window) = app.get_webview_window("main") {
+                                if let Err(e) = window.eval(&init_script) {
+                                    log::error!("failed to inject init_script: {}", e);
+                                }
+                                #[cfg(all(target_os = "macos", feature = "vibrancy"))]
+                                {
+                                    apply_vibrancy_if_enabled(&window);
+                                }
+                            }
+
+                            *BACKEND.lock().unwrap() = Some(BackendState {
+                                handle: Some(BackendHandle::InProcess(server)),
+                                rt: Some(rt),
+                            });
+                        }
+                        Err(e) => {
+                            log::error!("oc-server embed startup failed: {:#}", e);
+                            drop(rt);
+                        }
                     }
                 }
             }
@@ -168,10 +184,10 @@ pub fn run() {
             let app = window.app_handle();
 
             match event {
-                // 主窗口关闭时触发 sidecar 清理。
+                // 主窗口关闭时触发后端清理。
                 tauri::WindowEvent::Destroyed => {
                     if app.webview_windows().is_empty() {
-                        shutdown_sidecar();
+                        shutdown_backend();
                     }
                 }
 
@@ -211,23 +227,45 @@ pub fn run() {
                 {
                     ssh::shutdown_all(_app_handle);
                 }
-                shutdown_sidecar();
+                shutdown_backend();
             }
         });
 }
 
-/// 同步清理 sidecar: 从全局状态取出句柄, 在它的运行时上 block_on kill。
-fn shutdown_sidecar() {
-    let mut guard = SIDECAR.lock().unwrap();
+/// macOS vibrancy: 读 settings 判断是否启用 (默认开), 启用则 apply。
+#[cfg(all(target_os = "macos", feature = "vibrancy"))]
+fn apply_vibrancy_if_enabled(window: &tauri::WebviewWindow) {
+    let vibrancy_enabled = settings::SettingsStore::get_bool(
+        "desktopVibrancy",
+        true,
+    );
+    if !vibrancy_enabled {
+        return;
+    }
+    use window_vibrancy::{apply_vibrancy, NSVisualEffectMaterial, NSVisualEffectState};
+    match apply_vibrancy(
+        window,
+        NSVisualEffectMaterial::Sidebar,
+        Some(NSVisualEffectState::Active),
+        None,
+    ) {
+        Ok(()) => log::info!("[vibrancy] applied sidebar material"),
+        Err(e) => log::warn!("[vibrancy] failed to apply: {}", e),
+    }
+}
+
+/// 同步清理后端: 从全局状态取出句柄, 在它的运行时上 block_on shutdown。
+fn shutdown_backend() {
+    let mut guard = BACKEND.lock().unwrap();
     if let Some(mut state) = guard.take() {
-        if let (Some(rt), Some(mut handle)) = (state.rt.take(), state.handle.take()) {
-            let _ = rt.block_on(async { handle.kill().await });
+        if let (Some(rt), Some(handle)) = (state.rt.take(), state.handle.take()) {
+            let _ = rt.block_on(async { handle.shutdown().await; });
         }
         drop(state);
     }
 }
 
-/// 公开的 sidecar 清理入口 (供 updater 模块在 on_before_exit 中调用)。
-pub fn shutdown_sidecar_public() {
-    shutdown_sidecar();
+/// 公开的后端清理入口 (供 updater 模块在 on_before_exit 中调用)。
+pub fn shutdown_backend_public() {
+    shutdown_backend();
 }

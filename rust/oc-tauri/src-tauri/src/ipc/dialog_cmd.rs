@@ -166,7 +166,7 @@ pub async fn openchamber_file_grant(
 /// 调用 `POST {sidecar_base}/api/fs/grant` → `{ path, outsideFileGrant, expiresAt }`。
 /// sidecar 未启动或 HTTP 失败时返回 Err (调用方决定降级行为)。
 async fn mint_grant_via_sidecar(file_path: &str) -> Result<Value, String> {
-    let base_url = crate::sidecar_base_url()
+    let base_url = crate::backend_base_url()
         .ok_or_else(|| "sidecar not started".to_string())?;
 
     let client = reqwest::Client::new();

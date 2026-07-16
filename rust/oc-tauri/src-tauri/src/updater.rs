@@ -154,7 +154,7 @@ pub async fn download_and_install(_args: &Value, app: &AppHandle) -> Result<Valu
             || {
                 // on_before_exit: kill sidecar (与 Electron killSidecar 一致)
                 log::info!("[updater] killing sidecar before install");
-                crate::shutdown_sidecar_public();
+                crate::shutdown_backend_public();
             },
         )
         .await;
@@ -219,11 +219,11 @@ pub async fn restart(_args: &Value, app: &AppHandle) -> Result<Value, String> {
     if has_downloaded_update {
         // 应用更新: restart 会安装并重启
         // kill sidecar (on_before_exit 可能已经做了,但做两次无害)
-        crate::shutdown_sidecar_public();
+        crate::shutdown_backend_public();
         app.restart();
     } else {
         // 普通重启: Tauri 的 restart() 会清理并重新拉起进程
-        crate::shutdown_sidecar_public();
+        crate::shutdown_backend_public();
         app.restart();
     }
 }
