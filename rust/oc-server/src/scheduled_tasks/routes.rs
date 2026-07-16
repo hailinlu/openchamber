@@ -414,33 +414,57 @@ mod tests {
         (new_state, tmp)
     }
 
-    /// TempDir wrapper that sets `OPENCHAMBER_DATA_DIR` on creation and restores it on Drop.
+    /// TempDir wrapper that sets `OPENCHAMBER_DATA_DIR` (and `HOME`) on creation
+    /// and restores them on Drop.
+    ///
+    /// 测试隔离: 通过共享 `auth::tests::TEST_LOCK` 串行化所有修改
+    /// `OPENCHAMBER_DATA_DIR` / `HOME` 的测试 (quota/credentials/store、
+    /// session_goal/objectives、scheduled_tasks/routes), 防止并行竞争。
+    /// `HOME` 一并指向临时目录, 使 `data_dir()` 的 fallback
+    /// (`~/.config/openchamber`) 也落在临时目录内。
     struct TempDirWithEnv {
         path: std::path::PathBuf,
-        prev_env: Option<String>,
+        prev_data_dir: Option<String>,
+        prev_home: Option<String>,
+        _lock: std::sync::MutexGuard<'static, ()>,
     }
 
     impl TempDirWithEnv {
         fn new() -> Self {
+            // 串行化: 持有跨模块共享锁直到 Drop, 避免与同样改
+            // OPENCHAMBER_DATA_DIR/HOME 的测试并行竞争。
+            let lock = crate::opencode::auth::tests::TEST_LOCK
+                .lock()
+                .unwrap_or_else(|e| e.into_inner());
             let path = std::env::temp_dir().join(format!(
                 "oc-routes-test-{}-{}",
                 std::process::id(),
                 chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
             ));
             let _ = std::fs::create_dir_all(&path);
-            let prev_env = std::env::var("OPENCHAMBER_DATA_DIR").ok();
+            let prev_data_dir = std::env::var("OPENCHAMBER_DATA_DIR").ok();
+            let prev_home = std::env::var("HOME").ok();
             std::env::set_var("OPENCHAMBER_DATA_DIR", &path);
-            Self { path, prev_env }
+            std::env::set_var("HOME", &path);
+            Self {
+                path,
+                prev_data_dir,
+                prev_home,
+                _lock: lock,
+            }
         }
     }
 
     impl Drop for TempDirWithEnv {
         fn drop(&mut self) {
             // restore env BEFORE removing dir (read_settings may run during handler)
-            if let Some(p) = &self.prev_env {
-                std::env::set_var("OPENCHAMBER_DATA_DIR", p);
-            } else {
-                std::env::remove_var("OPENCHAMBER_DATA_DIR");
+            match &self.prev_data_dir {
+                Some(p) => std::env::set_var("OPENCHAMBER_DATA_DIR", p),
+                None => std::env::remove_var("OPENCHAMBER_DATA_DIR"),
+            }
+            match &self.prev_home {
+                Some(p) => std::env::set_var("HOME", p),
+                None => std::env::remove_var("HOME"),
             }
             let _ = std::fs::remove_dir_all(&self.path);
         }

@@ -116,6 +116,8 @@ pub(crate) mod tests {
     struct EnvGuard {
         prev_runtime: Option<String>,
         prev_allow_remote: Option<String>,
+        // 持有共享锁直到 EnvGuard drop, 保证测试体在锁内执行。
+        _lock: std::sync::MutexGuard<'static, ()>,
     }
     impl Drop for EnvGuard {
         fn drop(&mut self) {
@@ -131,8 +133,11 @@ pub(crate) mod tests {
     }
 
     /// 把两个 env var 重置为非 desktop / non-allow 状态, 返回 guard 在 drop 时还原。
+    ///
+    /// guard 持有共享 `TEST_LOCK` 直到调用方 drop 它, 保证整个测试体
+    /// (含 set_var + 断言) 在锁内执行, 避免并行竞争。
     fn lock_env_block_remote() -> EnvGuard {
-        let _g = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let prev_runtime = std::env::var("OPENCHAMBER_RUNTIME").ok();
         let prev_allow_remote = std::env::var("OPENCHAMBER_ALLOW_REMOTE_OPENAI_COMPAT_URLS").ok();
         std::env::remove_var("OPENCHAMBER_RUNTIME");
@@ -140,6 +145,7 @@ pub(crate) mod tests {
         EnvGuard {
             prev_runtime,
             prev_allow_remote,
+            _lock: lock,
         }
     }
 

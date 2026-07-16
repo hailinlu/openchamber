@@ -172,7 +172,15 @@ pub(crate) mod tests {
     }
 
     /// 强制目录用临时位置 (绕开 HOME env,直接覆盖内部变量)。
+    ///
+    /// 测试隔离: 持有共享 `auth::tests::TEST_LOCK` 串行化所有修改
+    /// `OPENCHAMBER_DATA_DIR` 的测试, 防止与 scheduled_tasks/routes、
+    /// session_goal/objectives 等并行竞争。
     fn with_temp_data_dir<F: FnOnce()>(f: F) {
+        // 串行化: 持有跨模块共享锁直到函数返回。
+        let _lock = auth_tests::TEST_LOCK
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
         let prev = std::env::var("OPENCHAMBER_DATA_DIR").ok();
         let dir = unique_dir();
         std::fs::create_dir_all(&dir).unwrap();
