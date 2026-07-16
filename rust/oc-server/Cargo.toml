@@ -29,6 +29,11 @@ sha2 = { workspace = true }
 scrypt = { workspace = true }
 hmac = { workspace = true }
 jsonwebtoken = { workspace = true }
+# relay 模块 (E2EE 隧道)
+aes-gcm = { workspace = true }
+hkdf = { workspace = true }
+subtle = { workspace = true }
+thiserror = { workspace = true }
 webauthn-rs = { workspace = true }
 webauthn-rs-proto = { workspace = true }
 # notifications 模块

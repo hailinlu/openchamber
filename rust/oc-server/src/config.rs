@@ -102,3 +102,29 @@ impl Config {
         None
     }
 }
+
+#[cfg(test)]
+impl Config {
+    /// Minimal `Config` for unit tests that don't exercise the OpenCode or
+    /// HTTP-binding layers. Mirrors the JSON shape `Config::parse()` would
+    /// produce from an empty argv + environment.
+    pub fn for_tests() -> Self {
+        Self {
+            host: std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)),
+            port: 0,
+            foreground: false,
+            api_only: true,
+            ui_password: None,
+            dist_dir: None,
+            opencode_binary: "opencode".to_string(),
+            opencode_host: None,
+            opencode_port: None,
+            opencode_skip_start: true,
+            opencode_hostname: "127.0.0.1".to_string(),
+            allow_unauthenticated_lan: false,
+            opencode_username: "opencode".to_string(),
+            opencode_password: None,
+            require_client_auth: false,
+        }
+    }
+}

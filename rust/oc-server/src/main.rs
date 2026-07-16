@@ -46,6 +46,8 @@ mod state;
 mod static_files;
 mod terminal;
 mod preview;
+mod dictation;
+mod relay;
 mod text;
 mod tts;
 mod tunnels;
@@ -104,6 +106,23 @@ async fn main() -> anyhow::Result<()> {
 
     // 3i. 启动 preview target TTL sweeper (每 30s 清理过期代理目标)
     state.preview_targets.clone().start_sweeper();
+
+    // 3j. 初始化私有中继 (Phase 3f Group 4) — host-lock + 生命周期
+    let relay_service = Arc::new(crate::relay::service::RelayService::new());
+    relay_service.attach_self_weak();
+    state.install_relay_service(relay_service);
+    // 中继在启动时读取 `privateRelay.enabled` 配置; 若已启用则自动开始。
+    // 使用 tokio::spawn 使其不阻塞主服务器启动路径。
+    let state_clone = state.clone();
+    tokio::spawn(async move {
+        let svc = state_clone.relay_service
+            .lock()
+            .expect("relay_service poisoned")
+            .clone();
+        if let Some(svc) = svc {
+            svc.start_if_enabled().await;
+        }
+    });
 
     // 4. 构建路由
     let app = build_router(state.clone(), &config);
@@ -438,6 +457,33 @@ fn build_router(state: Arc<AppState>, config: &Config) -> Router {
         .route(
             "/api/preview/proxy/{id}/{*rest}",
             any(preview::routes::proxy_or_ws_handler),
+        )
+        // Dictation 模块 (流式 STT + 本地 TTS)。本地推理路径本轮不移植
+        // (openai-compatible 提供方可用, local 返回 local_models_unsupported)。
+        // WS 路径已在 ui_auth/types.rs WS 白名单, 注册即获得 auth 覆盖。
+        .route("/api/dictation/status", get(dictation::routes::get_status_handler))
+        .route("/api/dictation/tts/speak", post(dictation::routes::post_tts_speak_handler))
+        .route(
+            "/api/dictation/models/{model_id}/download",
+            post(dictation::routes::post_model_download_handler),
+        )
+        .route(
+            "/api/dictation/models/{model_id}",
+            delete(dictation::routes::delete_model_handler),
+        )
+        .route("/api/dictation/ws", any(dictation::routes::dictation_ws_handler))
+        // 私有中继 (Phase 3f Group 4) — 管理路由
+        .route(
+            "/api/openchamber/relay/status",
+            get(relay::routes::get_status_handler),
+        )
+        .route(
+            "/api/openchamber/relay/enable",
+            post(relay::routes::post_enable_handler),
+        )
+        .route(
+            "/api/openchamber/relay/disable",
+            post(relay::routes::post_disable_handler),
         )
         // OpenCode 反向代理 (/api/* catch-all)
         // nest 会剥离 /api 前缀, proxy_handler 收到的 path 是去掉 /api 后的部分。

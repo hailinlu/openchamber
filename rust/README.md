@@ -864,3 +864,142 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
 - [x] 全量测试通过 (**923 passed, 0 failed** = 859 + 64);
       preview 模块 cargo clippy 0 warnings
 
+
+**阶段 3f Group 4 — 功能模块: relay (E2EE 隧道)** (完成):
+
+> 将 `packages/web/server/lib/relay/` (8 文件, ~2,370 行) 移植到
+> `rust/oc-server/src/relay/`。实现私有 relay 三层协议的全部 host 端逻辑
+> (Layer 1: WS 路由 + ECDSA 签名, Layer 2: ECDH P-256 + HKDF + AES-256-GCM
+> E2EE 握手, Layer 3: tunnel mux 帧/批量/分片)。与 Node/TS 实现**逐字节对齐**
+> 通过 `tests/cross_compat_vectors.rs` 冻结 JSON fixture 验证。
+
+- [x] 8 模块完整迁移:
+      - `crypto.rs` (Layer 2 E2EE 密码学 + host 握手状态机, 20 测试)
+      - `tunnel_codec.rs` (Layer 3 帧编解码 + 批量信封 + 分片重组, 21 测试)
+      - `identity.rs` (ECDSA P-256 签名 key + ECDH P-256 加密 key + serverId, 5 测试)
+      - `host_lock.rs` (`<data-dir>/relay-host.lock` 协同锁 + PID 活性探测, 39 测试)
+      - `host_client.rs` (出站 WS 客户端 + 指数退避重连 + 控制/数据 socket 管理,
+        21 测试)
+      - `tunnel_host.rs` (loopback HTTP/WS 分发 + 路径白名单 + 反压, 20 测试)
+      - `service.rs` (生命周期编排 + settings 持久化 + claim watcher, 15 测试)
+      - `routes.rs` (3 axum handler: `GET /api/openchamber/relay/status`,
+        `POST .../enable`, `POST .../disable`, 19 测试)
+- [x] **字节向量测试** (`tests/cross_compat_vectors.rs`, 7 测试):
+      - `scripts/generate-relay-fixtures.mjs` 生成 frozen JSON fixture
+      - 覆盖: tunnel 帧编解码 = JS/TS 逐字节一致
+      - batch 单帧/多帧编解码 = JS/TS 逐字节一致
+      - handshake ready JSON (batch / 客户端无 batch / 服务端无 batch) = JS/TS 一致
+- [x] 167 relay 测试全部通过 (含 7 跨兼容测试)
+- [x] AppState 集成: `relay_service: Mutex<Option<Arc<RelayService>>>`,
+      `install_relay_service()` 在 main.rs 启动序列中 init
+- [x] 路由注册: 3 路由在 dictation 之后、preview 之后
+- [x] COMPATIBILITY 加 `api.relay.v1`
+- [x] **已知边界**:
+      1. `has_relay_demand` 回调当前为 `|| false` stub, 等 pairing 模块接入
+      2. TungsteniteHostTransport (生产 WS 传输) 已实现但未在服务中激活 —
+         测试使用 FakeTransport / NullHostClientFactory
+      3. Node `relay/` 14 文件保留作 fallback, 等 Tauri 集成阶段一并切换
+- [x] 全量测试通过 (**1120 passed, 0 failed** = 953 + 167);
+      relay 模块 cargo clippy 0 新警告（修复 6 处）
+
+**阶段 3f Group 3 — 功能模块: dictation (服务端 STT + 本地 TTS 桩)** (完成):
+
+> 将 `packages/web/server/lib/dictation/` (14 文件, 2,904 行) 移植到
+> `rust/oc-server/src/dictation/`。**仅移植 openai-compatible 提供方**;
+> 本地 sherpa-onnx 推理栈 (`local/*` 6 文件, ~1,235 行) 本轮**不**移植 —
+> Rust 端 `local` 提供方返回明确的 `local_models_unsupported` 桩
+> (非隐藏降级), 后续阶段决定 native 方案 (保留 Node worker 子进程 vs
+> sherpa-rs) 后再实现。
+
+- [x] 模块结构: `dictation/{mod, audio, stream_manager, openai_session,
+      service, routes}.rs` — 对应 Node 同名文件 + 拆分
+- [x] `audio.rs` 纯 DSP (195 行 Node → ~330 行 Rust + 11 单元测试):
+      `parse_pcm_rate_from_format` (regex 一次性预编译 via `once_cell`),
+      `pcm16le_peak_abs` (奇数字节报错 + 早退 32767),
+      `pcm16_to_wav` (44 字节 RIFF/WAVE 头), `Pcm16MonoResampler`
+      (跨 chunk carry sample 的流式线性插值)
+- [x] `stream_manager.rs` 核心状态机 (461 行 Node → ~700 行 Rust + 6 oracle 测试):
+      `SttSession` trait + `CreateSttOutcome` 枚举 (Session/Error);
+      `DictationStreamManager<F>` 泛型 (工厂闭包); seq 重排 + ack (按
+      连续 seq 转发, 去重); 静音抑制 (`peak < 300` → clear 而非
+      commit, 避免 Whisper 幻觉); auto-commit (默认 15s 音频阈值,
+      `f64` 细粒度); adaptive finalize timeout (per-pending-segment +15s
+      / per-pending-audio-second +1.5s / per-missing-seq +250ms, 上限
+      5 分钟); 内联 `CommitAction` 枚举 + `should_auto_commit` 自由
+      函数解决 `handle_chunk` 转发循环中 `&mut self` 双重借用
+      (`maybe_auto_commit_segment` 全部内联)
+- [x] `openai_session.rs` 伪流式 Whisper 会话 (98 行 Node → ~180 行
+      Rust + 3 单元测试): `OpenAiCompatibleTranscriptionSession` 实现
+      `SttSession`; `commit()` 通过构造时捕获的
+      `tokio::runtime::Handle::current()` spawn 异步转录, **复用**
+      `crate::tts::stt::transcribe_audio` (零重复实现)
+- [x] `service.rs` 提供方解析 (302 行 Node → ~290 行 Rust + 6 单元测试):
+      `create_stt_session` 走 openai-compatible 真实路径 / `local`
+      返回 `CreateSttOutcome::Error { reason_code: "local_models_unsupported" }`;
+      `get_status` 从 `LOCAL_STT_MODEL_SPECS` / `LOCAL_TTS_MODEL_SPECS`
+      静态目录 (5 模型) 报告 `installed:false, available:false,
+      reasonCode:"local_models_unsupported"`; `synthesize_speech` 恒
+      返回 `SynthesizeResult::Error`; `request_model_download` /
+      `delete_model` 返回 `ok:false` 错误 (非隐藏降级 — 注释明确说明)
+- [x] `routes.rs` WS handler + 4 HTTP handler (278 行 Node → ~360 行 Rust):
+      镜像 `terminal::routes::terminal_ws_handler` 模式 —
+      `WebSocketUpgrade` + `on_upgrade(run_dictation_bridge)` + 4 路
+      `select!` (WS 接收 / manager 输出 channel / 30s WS-level
+      heartbeat ping / finalize deadline 500ms 检查); 工厂闭包将
+      `ManagerOutput` 序列化为 WS 文本帧
+- [x] **Auth 已预埋 (零改动)**: `ui_auth/types.rs:149` `is_url_auth_websocket_path`
+      已含 `/api/dictation/ws` (含测试 `:384`); 全局 auth 中间件自动
+      覆盖 WS 升级 — 注册路由即获得 auth, 无 allowlist 改动; 4 个
+      HTTP 路由 (`/api/dictation/status` / `tts/speak` /
+      `models/{id}/download` / `models/{id}`) 走标准 UI auth 中间件
+- [x] 路由注册 (`main.rs`: `build_router` 在 preview 之后、
+      OpenCode 代理 catch-all 之前注册 5 路由 —
+      `GET /api/dictation/status` +
+      `POST /api/dictation/tts/speak` +
+      `POST /api/dictation/models/{model_id}/download` +
+      `DELETE /api/dictation/models/{model_id}` +
+      `ANY /api/dictation/ws`); `state.rs` 新增
+      `dictation_service: Arc<DictationService>` (持有 models_dir
+      路径 + catalog 常量; 无 worker, 无下载状态); `routes.rs`
+      `COMPATIBILITY` capabilities 加 `api.dictation.v1`
+- [x] **Bug 修复记录** (4 个失败的 oracle 测试根因):
+      1. `handle_start` 中 factory 错误推入临时 `&mut Vec::new()`
+         后丢弃 → 改为持有 `outputs` Vec 并 `forward_outputs` 转发
+         (`reports_provider_readiness_errors` 通过);
+      2. `wait_for_outputs` 测试辅助函数将消息累加到本地
+         `collected` 后丢弃 (调用方再 `collect_available` 为空) →
+         改为返回累加的 `Vec<ManagerOutput>` (测试 1, 6 通过);
+      3. `handle_finish` 中 `maybe_seal_stream_finish` 调用
+         `stream.stt.commit()` 入队 Committed+Transcript 事件后,
+         `maybe_finalize_stream` 因 `awaiting_final_commit=true`
+         提前返回, 事件永远不被排空 (对齐 Node EventEmitter
+         回调) → 在两者之间插入 `drain_stream_events` (测试 1, 2
+         通过); 4. `on_committed` 末尾 `drop(stream)` 是引用
+         no-op → 改为显式作用域块界定借用
+- [x] **依赖**: 零新增 — 复用 `base64` / `tokio` (select!) /
+      `tokio-tungstenite` (preview 已加) / `once_cell` / `regex` /
+      `futures_util` 现有 crates; `tts::stt::transcribe_audio` 复用
+- [x] 新增测试 30 个 (audio 11 + stream_manager 6 oracle 移植自
+      Node `stream-manager.test.js` + openai_session 3 + service 6 +
+      service model action 4); 全量测试通过 (**953 passed, 0 failed**
+      = 923 + 30); dictation 模块 cargo clippy 0 warnings
+- [x] **明确暴露 local 不支持边界** (非隐藏降级):
+      1. `mod.rs` 模块级注释 + `service.rs` 顶部注释说明本地栈未移植
+         + native 方案决策推迟;
+      2. `service.rs::local_unavailable()` 集中返回
+         `LOCAL_MODELS_UNSUPPORTED_REASON` 常量;
+      3. `get_status` 报告所有 local 模型 `installed:false,
+         available:false, reasonCode:"local_models_unsupported"` —
+         客户端能区分 "未安装" vs "后端不支持";
+      4. `synthesize_speech` / `request_model_download` /
+         `delete_model` 全部返回 503/400 + 明确 reasonCode;
+      5. `audio.rs` / `service.rs` 用 `#[allow(dead_code)]` 标记
+         为本地 STT/TTS 预留的辅助函数 (`pcm16le_to_float32` /
+         `float32_to_pcm16le` / `Pcm16MonoResampler::reset` /
+         `Pcm16MonoResampler::input_rate` / `Pcm16MonoResampler::output_rate`
+         / `DEFAULT_LOCAL_TTS_MODEL` / `SynthesizeResult::Audio` /
+         `TtsSpeakBody::{model, speaker_id, speed}` / `DICTATION_WS_PATH`
+         / `pump_events`), 注释说明用途
+- [x] **Node 端未删除**: 本轮仅新增 Rust 路径; Node 仍保留 14 文件
+      (~2,904 行) 作为回退; 切换计划与 desktop 集成测试在后续阶段
+

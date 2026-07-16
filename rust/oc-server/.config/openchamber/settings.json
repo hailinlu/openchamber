@@ -1,0 +1,40 @@
+{
+  "privateRelay": {
+    "enabled": false,
+    "relayUrl": "wss://relay.openchamber.app/v1"
+  },
+  "projects": [
+    {
+      "id": "proj-1",
+      "name": "demo",
+      "path": "/tmp/proj-1"
+    }
+  ],
+  "relayEncryptionKey": {
+    "privateJwk": {
+      "crv": "P-256",
+      "d": "MKw2ZrDJg2vRRJTRZQDH7p5kBboWUbaTJOEXUGvanvA",
+      "kty": "EC"
+    },
+    "publicJwk": {
+      "crv": "P-256",
+      "kty": "EC",
+      "x": "g2HCbjj3kHbWhZIE7nFXW3kQqaHVAcU-N5cq-MeBJ1Q",
+      "y": "C9X3dhcItFucoqSjpc1_yF75YqfRXu5sUytqbiqLV2c"
+    }
+  },
+  "relaySigningKey": {
+    "privateJwk": {
+      "crv": "P-256",
+      "d": "B9-WmH4_eyAZb_K2TRggRzoszbmwywHwWUgovOccHx8",
+      "kty": "EC"
+    },
+    "publicJwk": {
+      "crv": "P-256",
+      "kty": "EC",
+      "x": "wKhBcz6a9ThvSVuvx1of5RHlC73f85qj0Be1zfN5_iY",
+      "y": "uZG37g5sj2Cw7BQqLnmFRgxQced5SQRrx263w0-bNIA"
+    }
+  },
+  "version": 1
+}

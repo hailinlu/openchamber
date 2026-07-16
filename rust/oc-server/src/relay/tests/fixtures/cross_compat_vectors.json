@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "source": "JS host (e2ee.js + tunnel-codec.js)",
+  "generated_at": "2026-07-16T13:41:54.478Z",
+  "keys": {
+    "host": {
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "G2ipIGT9Y1nKmcQGYDq9jYbAe-lUP8Y-13JjgS6G8yw",
+        "y": "1WkiKCW5xkvs_nFzQUk5Kt-6nrB1ApkJBnRlzd_iY-0"
+      },
+      "privateJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "G2ipIGT9Y1nKmcQGYDq9jYbAe-lUP8Y-13JjgS6G8yw",
+        "y": "1WkiKCW5xkvs_nFzQUk5Kt-6nrB1ApkJBnRlzd_iY-0",
+        "d": "Xf5EfD15aaA7PfEdLtDlH7qHRsbsL_TFvz0fmD4Aaxs"
+      }
+    },
+    "client": {
+      "publicJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "vptMLRETpIsO0N_ChNhIjyC8VpwOh1SdzxGxrQeVbaI",
+        "y": "GnDQM3Ff2q9ZCmRfM7FqYBdX5FxL-IfQg2EdCVLmUIY"
+      },
+      "privateJwk": {
+        "kty": "EC",
+        "crv": "P-256",
+        "x": "vptMLRETpIsO0N_ChNhIjyC8VpwOh1SdzxGxrQeVbaI",
+        "y": "GnDQM3Ff2q9ZCmRfM7FqYBdX5FxL-IfQg2EdCVLmUIY",
+        "d": "SUGbvxmNsmlpgPqIgWvEOMJ_bjKIADT1CBXcm_Liu5E"
+      }
+    }
+  },
+  "nonce_b64": "AAECAwQFBgcICQoLDA0ODw",
+  "handshake": {
+    "hello_batch": "{\"t\":\"hello\",\"v\":1,\"clientPubJwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"vptMLRETpIsO0N_ChNhIjyC8VpwOh1SdzxGxrQeVbaI\",\"y\":\"GnDQM3Ff2q9ZCmRfM7FqYBdX5FxL-IfQg2EdCVLmUIY\"},\"nonce\":\"AAECAwQFBgcICQoLDA0ODw\",\"batch\":true}",
+    "hello_no_batch": "{\"t\":\"hello\",\"v\":1,\"clientPubJwk\":{\"kty\":\"EC\",\"crv\":\"P-256\",\"x\":\"vptMLRETpIsO0N_ChNhIjyC8VpwOh1SdzxGxrQeVbaI\",\"y\":\"GnDQM3Ff2q9ZCmRfM7FqYBdX5FxL-IfQg2EdCVLmUIY\"},\"nonce\":\"AAECAwQFBgcICQoLDA0ODw\"}",
+    "ready_batch": "{\"t\":\"ready\",\"v\":1,\"batch\":true}",
+    "ready_no_batch": "{\"t\":\"ready\",\"v\":1}",
+    "ready_no_batch_from_nobatch_host": "{\"t\":\"ready\",\"v\":1}"
+  },
+  "tunnel_frame": {
+    "frame_type": 1,
+    "stream_id": 5,
+    "payload_b64": "eyJtZXRob2QiOiJHRVQifQ",
+    "encoded_b64": "AQAAAAV7Im1ldGhvZCI6IkdFVCJ9"
+  },
+  "batch": {
+    "single_frame_b64": "AAIAAAABb25seQ",
+    "single_raw_frame_b64": "AgAAAAFvbmx5",
+    "multi_frame_b64": "AQAAAAoCAAAAAWFscGhhAAAACQIAAAABYmV0YQAAAAoCAAAAAWdhbW1h",
+    "multi_raw_frames": [
+      "AgAAAAFhbHBoYQ",
+      "AgAAAAFiZXRh",
+      "AgAAAAFnYW1tYQ"
+    ]
+  }
+}

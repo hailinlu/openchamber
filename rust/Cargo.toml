@@ -54,6 +54,12 @@ sha2 = "0.10"
 scrypt = "0.11"
 # 密码学 (HMAC-SHA256 password binding)
 hmac = "0.12"
+# 密码学 (AES-256-GCM relay 帧加密, 12B IV + 16B tag)
+aes-gcm = "0.10"
+# 密码学 (HKDF-SHA256 relay session key 派生)
+hkdf = "0.12"
+# 密码学 (常量时间比较: counter 递增/fingerprint equality)
+subtle = "2.6"
 # JWT 签发/验证 (HS256 session token)
 jsonwebtoken = "9"
 # WebAuthn 服务端 (passkey 注册/认证)

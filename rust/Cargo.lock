@@ -3713,6 +3713,7 @@ dependencies = [
 name = "oc-server"
 version = "0.0.1"
 dependencies = [
+ "aes-gcm",
  "anyhow",
  "async-stream",
  "axum",
@@ -3725,6 +3726,7 @@ dependencies = [
  "fancy-regex",
  "futures-util",
  "h2",
+ "hkdf",
  "hmac",
  "jsonc-parser",
  "jsonwebtoken",
@@ -3744,6 +3746,8 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha2",
+ "subtle",
+ "thiserror 2.0.18",
  "tokio",
  "tokio-stream",
  "tokio-tungstenite 0.27.0",

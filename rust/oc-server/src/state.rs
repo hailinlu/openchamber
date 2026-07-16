@@ -213,6 +213,26 @@ pub struct AppState {
     // -----------------------------------------------------------------------
     /// Preview 目标存储 (TTL sweeper)。
     pub preview_targets: Arc<crate::preview::targets::PreviewTargetStore>,
+
+    // -----------------------------------------------------------------------
+    // Dictation 模块 (流式 STT + 本地 TTS)
+    // -----------------------------------------------------------------------
+    /// Dictation 服务。本轮仅 openai-compatible 提供方; local 返回桩错误。
+    pub dictation_service: Arc<crate::dictation::service::DictationService>,
+
+    // -----------------------------------------------------------------------
+    // Relay 模块 (阶段 3f Group 4 step 9) — private relay host.
+    // -----------------------------------------------------------------------
+    /// Relay service (settings persistence + lifecycle + routes facade).
+    /// `None` when the relay has not been initialized; the routes layer
+    /// degrades gracefully to a "disabled" snapshot in that case. The
+    /// production wire installs this in `main.rs` after building AppState.
+    #[allow(dead_code)]
+    pub relay_service: std::sync::Mutex<Option<Arc<crate::relay::service::RelayService>>>,
+    /// 测试覆盖: 测试可以在 AppState 已共享后注入 relay_service; 路由层
+    /// 优先读取这个覆盖. 生产路径忽略此字段.
+    #[cfg(test)]
+    pub relay_service_override: std::sync::Mutex<Option<Arc<crate::relay::service::RelayService>>>,
 }
 
 impl AppState {
@@ -361,7 +381,87 @@ impl AppState {
 
             // Preview 模块 — 目标存储 (TTL sweeper 由 main.rs 启动)
             preview_targets: Arc::new(crate::preview::targets::PreviewTargetStore::new()),
+
+            // Dictation 模块 — 服务 (models_dir 对齐 Node speech-models;
+            // 本轮无 worker/无下载, 仅 openai-compatible 提供方)
+            dictation_service: crate::dictation::service::DictationService::new(
+                crate::github::settings::user_config_root().join("speech-models"),
+            ),
+
+            // Relay 模块 — 由 main.rs 在启动时通过 `install_relay_service`
+            // 注入一个带 host-lock + host_factory 的实例。当前为 None;
+            // 路由层在没有 service 时返回 disabled 的 snapshot。
+            relay_service: std::sync::Mutex::new(None),
+            #[cfg(test)]
+            relay_service_override: std::sync::Mutex::new(None),
         }
+    }
+
+    /// 安装 relay service (生产 wire 由 main.rs 在 build_router 之前调用)。
+    pub fn install_relay_service(self: &Arc<Self>, svc: Arc<crate::relay::service::RelayService>) {
+        self.relay_service
+            .lock()
+            .expect("relay_service poisoned")
+            .replace(svc);
+    }
+
+    /// 测试钩子: 在 `AppState` 构造后注入一个 `RelayService`, 使 axum 路由
+    /// 测试能驱动真实的状态机。仅 `#[cfg(test)]` 时暴露。
+    #[cfg(test)]
+    pub fn set_relay_service_for_tests(
+        self: &Arc<Self>,
+        svc: Arc<crate::relay::service::RelayService>,
+    ) {
+        // 测试路径要求 state 在 set 之后才会被 `with_state` 共享出去. 我们
+        // 通过原子 store + Mutex 让 setter 即使在已共享场景下也能工作,
+        // 避免测试必须控制 Arc 的唯一性.
+        self.relay_service_override
+            .lock()
+            .expect("relay_service_override poisoned")
+            .replace(svc);
+    }
+
+    /// 读取测试注入的 relay_service 覆盖; 优先于字段值返回.
+    #[cfg(test)]
+    fn relay_service_for_request(&self) -> Option<Arc<crate::relay::service::RelayService>> {
+        if let Some(svc) = self
+            .relay_service_override
+            .lock()
+            .expect("relay_service_override poisoned")
+            .as_ref()
+        {
+            return Some(svc.clone());
+        }
+        self.relay_service
+            .lock()
+            .expect("relay_service poisoned")
+            .clone()
+    }
+
+    /// 测试专用: 直接构造一个带 relay_service 的 AppState.
+    #[cfg(test)]
+    pub fn new_with_relay_for_tests(
+        config: crate::config::Config,
+        relay: Arc<crate::relay::service::RelayService>,
+    ) -> Arc<Self> {
+        let state = Arc::new(Self::new(
+            config,
+            "http://127.0.0.1:1".to_string(),
+            String::new(),
+        ));
+        state.set_relay_service_for_tests(relay);
+        state
+    }
+
+    /// 测试专用 AppState 构造路径, 避免在路由测试中触发完整的 OpenCode /
+    /// 通知 trigger 初始化。
+    #[cfg(test)]
+    pub fn new_for_tests() -> Self {
+        Self::new(
+            crate::config::Config::for_tests(),
+            "http://127.0.0.1:1".to_string(),
+            String::new(),
+        )
     }
 
     /// 标记 OpenCode 就绪。

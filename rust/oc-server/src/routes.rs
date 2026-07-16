@@ -48,7 +48,9 @@ static COMPATIBILITY: Lazy<Value> = Lazy::new(|| {
             "api.scheduled-tasks.v1",
             "api.skills-catalog.v1",
             "api.preview.v1",
-        ]  
+            "api.dictation.v1",
+            "api.relay.v1",
+        ]
     })
 });
 
