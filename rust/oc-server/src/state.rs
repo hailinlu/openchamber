@@ -201,6 +201,18 @@ pub struct AppState {
     /// macOS `say` 命令能力缓存 (startup 时探测一次, 路由 GET 返回该值)。
     /// 默认值为 `SayTtsCapability::not_initialized()`, 经探测后覆盖。
     pub say_tts_capability: Arc<tokio::sync::RwLock<SayTtsCapability>>,
+
+    // -----------------------------------------------------------------------
+    // Terminal 模块 (PTY 会话 + WS 桥)
+    // -----------------------------------------------------------------------
+    /// 终端会话存储 (PTY session lifecycle + idle sweep)。
+    pub terminal_sessions: Arc<crate::terminal::session::TerminalSessionStore>,
+
+    // -----------------------------------------------------------------------
+    // Preview 模块 (dev server 反向代理 + WS 升级代理)
+    // -----------------------------------------------------------------------
+    /// Preview 目标存储 (TTL sweeper)。
+    pub preview_targets: Arc<crate::preview::targets::PreviewTargetStore>,
 }
 
 impl AppState {
@@ -341,6 +353,14 @@ impl AppState {
             say_tts_capability: Arc::new(tokio::sync::RwLock::new(
                 SayTtsCapability::not_initialized(),
             )),
+
+            // Terminal 模块 — 会话存储 (idle sweep 由 main.rs 启动)
+            terminal_sessions: Arc::new(
+                crate::terminal::session::TerminalSessionStore::new(),
+            ),
+
+            // Preview 模块 — 目标存储 (TTL sweeper 由 main.rs 启动)
+            preview_targets: Arc::new(crate::preview::targets::PreviewTargetStore::new()),
         }
     }
 

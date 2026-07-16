@@ -81,6 +81,8 @@ chrono-tz = "0.10"
 cron = "0.15"
 # 正则
 regex = "1"
+# 正则 (lookahead/lookbehind; preview body 重写需要)
+fancy-regex = "0.14"
 # MIME 推断
 mime_guess = "2"
 # 工具

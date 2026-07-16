@@ -737,3 +737,130 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
 - [x] 新增测试 8 个 (M1 客户端计数 3 + M2 URL 编码 4 + M3 build_url 失败 1)
 - [x] 全量测试通过 (837 passed, 0 failed); 我改动的文件 cargo clippy 0 warnings
 
+**阶段 3f Group 1 — 功能模块: terminal (PTY WebSocket 桥)** (完成):
+
+> 将 `packages/web/server/lib/terminal/` (PTY WebSocket 桥, 1398 行 / 3 文件) 迁移到
+> Rust axum。这是最后一个纯 Node 后端模块之一 (其余: preview/dictation/relay)。
+> terminal 是最小表面且有 `realtime/ws_bridge.rs` (749 行) 的 WS 模式可复用。
+
+- [x] PTY 后端 `portable-pty = "0.9"` (wezterm 作者维护, ~857k 下载/月,
+      ConPTY on Windows + POSIX openpty on macOS/Linux = 1:1 node-pty 平台模型)。
+      reader 是阻塞 `Box<dyn Read + Send>` → `tokio::task::spawn_blocking` 桥接
+      (wezterm 自己的官方模式)。新增依赖仅 `portable-pty` (libc/windows-sys 已存在)。
+- [x] 协议编解码 (`terminal/protocol.rs`: `[0x01 tag][UTF-8 JSON]` 控制帧;
+      客户端→服务端 `p` ping / `b` bind; 服务端→客户端 `ok` / `po` / `bok` /
+      `d` data / `x` exit / `e` error; 重绑速率限制 `prune_rebind_timestamps` +
+      `is_rebind_rate_limited` 阈值 `>=` 语义对齐 Node)
+- [x] 输出重放缓冲 (`terminal/replay_buffer.rs`: `ReplayBuffer` 64KB 上限,
+      晚订阅客户端拿到启动 prompt; `append` 截断旧 chunk 保 UTF-8 char 边界,
+      `list_since(cursor)` 增量回放, `latest_id()` 空缓冲返回 0)
+- [x] PTY 会话句柄 (`terminal/pty.rs`: `TerminalPty` 包装 portable-pty —
+      `spawn()` shell 候选解析 (`$OPENCHAMBER_TERMINAL_SHELL` → `$SHELL` →
+      `/bin/zsh`/`/bin/bash`/`/bin/sh` Unix; `ComSpec`/pwsh/cmd Windows) +
+      环境 sanitize (删 `BASH_XTRACEFD`/`BASH_ENV`/`ENV`) +
+      locale 回退 (darwin `en_US.UTF-8` / 其他 `C.UTF-8`);
+      `write`/`resize` (async); `kill_process_group` Unix `libc::kill(-(pid), sig)`
+      (portable-pty `setsid()` 使 pid==pgid, 对齐 Node `process.kill(-pid)`);
+      reader → broadcast fan-out; exit watcher task)
+- [x] 会话存储 (`terminal/session.rs`: `TerminalSessionStore` `MAX_SESSIONS=20`,
+      idle sweep 30min 后台 task, `kill_all()` 优雅关闭)
+- [x] 7 REST handler (`terminal/routes.rs`: `POST /api/terminal/create` +
+      `GET /api/terminal/{id}/stream` SSE 回退 + `POST /input` + `POST /resize` +
+      `DELETE /{id}` (SIGTERM 进程组) + `POST /restart` + `POST /force-kill`
+      (by sessionId / by cwd / all))
+- [x] WS 双向 I/O (`terminal/routes.rs::terminal_ws_handler` → `run_terminal_bridge`:
+      `select!` 循环 — WS 接收 → 文本/二进制路由 (控制帧 vs PTY 写入) +
+      PTY 输出 broadcast → `{t:"d",s,i,d}` + replay append +
+      PTY 退出 → `{t:"x",v:2,s,exitCode,signal}` +
+      30s 心跳 ping; bind 流程含速率检查 + replay cursor 回放;
+      `TERMINAL_WS_MAX_PAYLOAD_BYTES=64KB`)
+- [x] SSE stream 回退 (`stream` handler: `connected` 事件 → broadcast 输出 →
+      `data` 事件 → `exit` 事件, 15s heartbeat 注释行)
+- [x] Relay 兼容性: `/api/terminal/ws` 字面路径已存在于所有 3 个 Node allowlist
+      (tunnel-host / ui-auth / realtime-proxy) **及** Rust `ui_auth/types.rs:148`;
+      全局 auth 中间件 (`middleware/auth.rs`) 通过 `can_use_url_auth_token_for_request`
+      覆盖 WS 升级 — 注册路由即自动获得 auth。**无 allowlist 改动**。
+- [x] `COMPATIBILITY` capabilities 已含 `terminal.websocket.v1` (无改动)
+- [x] 新增测试 22 个 (protocol 13 + replay_buffer 6 + session 3 —
+      纯逻辑无 PTY 依赖, 不做系统 shell 集成测试)
+- [x] 全量测试通过 (**859 passed, 0 failed** = 837 + 22);
+      我改动的文件 cargo clippy 0 warnings
+
+
+**阶段 3f Group 2 — 功能模块: preview (dev server 反向代理 + WS 升级代理)** (完成):
+
+> 将 `packages/web/server/lib/preview/proxy-runtime.js` (1,599 行 / 1 文件) 迁移到
+> Rust axum。这是最后一个纯 Node 后端模块之一 (其余: dictation / relay)。preview
+> 选为下一个: 最小自包含表面 (1 文件), 无原生依赖, 有 392 行测试 oracle, 且 auth
+> 中间件已预埋 preview 旁路 (`middleware/auth.rs:87-93` `has_preview_proxy_token`
+> + `ui_auth/types.rs:136,150` 已含 `/api/preview/proxy/` 到两个白名单)。
+
+- [x] 核心难点: 替换 `http-proxy-middleware` (Node 唯一核心依赖), 它提供
+      `selfHandleResponse` + `responseInterceptor` + WS 升级转发, axum 无等价物 —
+      用 `reqwest` (HTTP) + `tokio-tungstenite` (WS 客户端) 手写。
+      新增依赖: `tokio-tungstenite` (workspace 已有, oc-server 新引用) +
+      `fancy-regex` (workspace 新增 — body 重写的 lookahead `(?=...)` /
+      negative lookahead `(?!//)` + 回引 `\1`/`\2` 标准 regex 不支持)。
+- [x] URL 规范化 + SSRF 防护 (`preview/normalize.rs`: `normalize_proxy_target_url`
+      loopback-only / allowExternal 双路径; `is_blocked_external_host` 拒绝
+      private/loopback/link-local/CGNAT/IPv4-mapped — 操作在 WHATWG 规范化后的
+      hostname 上, 对齐 Node `isBlockedExternalHost`)
+- [x] Body 重写 (`preview/rewrite.rs`: HTML attrs `src`/`href`/`action` + srcset
+      分段重写 + inline `<script type=module>` import 改写;
+      CSS `url()` + `@import` 重写 (fancy-regex 回引);
+      JS `import`/`from`/dynamic-import 重写 (fancy-regex negative lookahead);
+      CSP meta 标签剥离 (lookahead + backref);
+      CSP 指令重写 — 删 `frame-ancestors`/`require-trusted-types-for` +
+      per-response nonce 追加 `script-src`/`script-src-elem` + 无 script 时
+      从 `default-src` 合成 `script-src` + 删 lone `'none'`;
+      redirect location 重写 (loopback→代理, external 透传);
+      bridge 脚本注入 (`<head>` 后 / `</body>` 前 / append, nonce 属性);
+      Vite `/@vite/client` HMR 常量 patch (`base`/`hmrPort`/`socketHost`))
+- [x] 资源错误分类 + 导航策略 (`preview/classify.rs`: `classify_preview_resource_error`
+      suppress/report + `is_dev_server_noise` vite/astro/next/sveltekit/remix/nuxt/webpack
+      噪声规则集; `classify_preview_navigation` allow/proxy/external 策略)
+- [x] Cookie 解析/构造 (`preview/cookies.rs`: `parse_cookie_header` →
+      `HashMap<name,value>`; `build_cookie` 含 path/max_age/secure)
+- [x] 目标存储 (`preview/targets.rs`: `PreviewTargetStore`
+      `Mutex<HashMap<String, PreviewTarget>>` + TTL sweeper 30s 后台 task;
+      `create_target` 生成 hex id + 随机 token; `resolve_target_from_request`
+      从 path 提取 id + query/cookie token 校验; `build_upstream_url` +
+      `http_origin_to_ws` + `remove_raw_query_param` 剥离 oc_preview_token/
+      oc_client_token/oc_url_token/ocPreview)
+- [x] HTTP 反向代理 handler (`preview/routes.rs::proxy_handler`: 解析 target →
+      构造上游 URL → 过滤凭证 cookie/authorization/x-openchamber-ui-session +
+      passthrough Inertia headers + `accept-encoding: identity` → `reqwest` 发请求
+      (缓冲 body 10MB 上限, 240s 超时) → 缓冲响应 body → 按 content-type
+      (html/css/javascript) 决定重写 → 重写 headers (strip x-frame-options/CSP
+      frame-ancestors + nonce + redirect + cache-control no-store) → HTML 注入
+      bridge script + CSP nonce → Vite `/@vite/client` 特殊路径先 HMR patch 再
+      javascript 重写)
+- [x] WebSocket 升级代理 (`preview/routes.rs::preview_ws_handler`:
+      `Result<WebSocketUpgrade, WebSocketUpgradeRejection>` 统一入口分支
+      WS vs HTTP; WS 分支: 接受浏览器 WS → 解析 target + token 校验 →
+      构造上游 WS URL (http→ws, 剥离 oc_* 参数) → `tokio_tungstenite::connect_async`
+      连接上游 dev server → 双向桥 text/binary/ping/pong/close 全透传;
+      axum vs tungstenite `Utf8Bytes` 类型不兼容 → 通过 `String`/`bytes::Bytes` 转换)
+- [x] 目标创建 (`preview/routes.rs::post_targets_handler`:
+      `POST /api/preview/targets` — 规范化 URL → 创建 target → Set-Cookie
+      (path=`/api/preview/proxy/<id>`, max_age, 非 secure 仅 loopback) →
+      返回 `{id, proxyBasePath, previewToken, expiresAt}`)
+- [x] Preview bridge 脚本 (`preview/preview_bridge.js`, 707 行浏览器端 JS,
+      原样 `include_str!` 嵌入不移植 — 它操作 iframe 内 DOM, 是客户端代码)
+- [x] Auth 已全覆盖 (零改动): `middleware/auth.rs:87-93` `has_preview_proxy_token`
+      检查 `/api/preview/proxy/` 路径 + `oc_preview_token` 存在性 → 放行到 handler,
+      真实 token 校验在 handler 内 (对齐 Node `resolveTargetFromRequest`);
+      `ui_auth/types.rs:136,150` 两个白名单已含 `/api/preview/proxy/`;
+      `POST /api/preview/targets` 走正常 UI auth
+- [x] 路由注册 (`main.rs`: `/api/preview/targets` POST +
+      `/api/preview/proxy/{id}/{*rest}` ANY — WS+HTTP 同路径用
+      `Result<WebSocketUpgrade, WebSocketUpgradeRejection>` 分支)
+- [x] `state.rs`: `AppState` 新增 `preview_targets: Arc<PreviewTargetStore>`
+      + 启动 TTL sweeper
+- [x] `COMPATIBILITY` capabilities 已加 `api.preview.v1`
+- [x] 新增测试 64 个 (normalize 12 + rewrite 21 + classify 8 + cookies 5 +
+      targets 11 + mod 5 + routes 2 — 移植 Node `proxy-runtime.test.js` 392 行
+      oracle 的 body/redirect/CSP/navigation/resource 用例)
+- [x] 全量测试通过 (**923 passed, 0 failed** = 859 + 64);
+      preview 模块 cargo clippy 0 warnings
+

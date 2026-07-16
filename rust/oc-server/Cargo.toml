@@ -46,12 +46,17 @@ chrono-tz = { workspace = true }
 cron = { workspace = true }
 uuid = { workspace = true }
 regex = { workspace = true }
+fancy-regex = { workspace = true }
 mime_guess = { workspace = true }
 once_cell = { workspace = true }
 futures-util = { workspace = true }
 async-stream = { workspace = true }
 tokio-stream = { workspace = true }
 bytes = { workspace = true }
+# terminal 模块: PTY (ConPTY on Windows, openpty on Unix)
+portable-pty = "0.9"
+# preview 模块: WebSocket 客户端 (代理到上游 dev server WS)
+tokio-tungstenite = { workspace = true }
 
 # Unix: 进程组 kill
 [target.'cfg(unix)'.dependencies]

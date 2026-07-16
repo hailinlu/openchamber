@@ -44,6 +44,8 @@ mod skills_catalog;
 mod small_model;
 mod state;
 mod static_files;
+mod terminal;
+mod preview;
 mod text;
 mod tts;
 mod tunnels;
@@ -97,6 +99,12 @@ async fn main() -> anyhow::Result<()> {
     // 3g. 初始化 scheduled-tasks 运行时 (timer 调度 + 队列 + 并发控制)
     state.init_scheduled_tasks();
 
+    // 3h. 启动 terminal idle sweep (每 5min 清理 30min 无活动会话)
+    state.terminal_sessions.clone().start_idle_sweep();
+
+    // 3i. 启动 preview target TTL sweeper (每 30s 清理过期代理目标)
+    state.preview_targets.clone().start_sweeper();
+
     // 4. 构建路由
     let app = build_router(state.clone(), &config);
 
@@ -119,6 +127,9 @@ async fn main() -> anyhow::Result<()> {
     // 6. 关闭全局 hub (停止上游 SSE reader)
     tracing::info!("shutting down global event hub");
     state.global_hub.stop().await;
+
+    // 6b. 杀所有终端会话 (对齐 Node `shutdown`)
+    state.terminal_sessions.kill_all().await;
 
     // 7. 关闭 OpenCode 子进程
     tracing::info!("shutting down opencode process");
@@ -413,6 +424,21 @@ fn build_router(state: Arc<AppState>, config: &Config) -> Router {
         // WebSocket 桥
         .route("/api/global/event/ws", any(realtime::ws_bridge::global_ws_handler))
         .route("/api/event/ws", any(realtime::ws_bridge::directory_ws_handler))
+        // Terminal 模块 (PTY 会话 + WS 桥)
+        .route("/api/terminal/create", post(terminal::routes::create))
+        .route("/api/terminal/force-kill", post(terminal::routes::force_kill))
+        .route("/api/terminal/{sessionId}/stream", get(terminal::routes::stream))
+        .route("/api/terminal/{sessionId}/input", post(terminal::routes::input))
+        .route("/api/terminal/{sessionId}/resize", post(terminal::routes::resize))
+        .route("/api/terminal/{sessionId}/restart", post(terminal::routes::restart))
+        .route("/api/terminal/{sessionId}", delete(terminal::routes::delete))
+        .route("/api/terminal/ws", any(terminal::routes::terminal_ws_handler))
+        // Preview 模块 (dev server 反向代理 + WS 升级代理)
+        .route("/api/preview/targets", post(preview::routes::post_targets_handler))
+        .route(
+            "/api/preview/proxy/{id}/{*rest}",
+            any(preview::routes::proxy_or_ws_handler),
+        )
         // OpenCode 反向代理 (/api/* catch-all)
         // nest 会剥离 /api 前缀, proxy_handler 收到的 path 是去掉 /api 后的部分。
         // 具体路由 (fs/text/SSE/WS/version/system-info) 已在上面注册, axum 优先匹配。
