@@ -100,6 +100,7 @@ bytes = "1"
 # 内部 crate
 oc-core = { path = "oc-core" }
 oc-opencode-sdk = { path = "oc-opencode-sdk" }
+oc-server = { path = "oc-server" }
 
 [profile.release]
 lto = "thin"

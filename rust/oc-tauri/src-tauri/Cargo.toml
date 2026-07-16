@@ -15,6 +15,7 @@ tauri-build = { version = "2.6", features = [] }
 
 [dependencies]
 oc-core = { workspace = true }
+oc-server = { workspace = true }
 tauri = { version = "2.11", features = ["tray-icon", "image-png"] }
 tauri-plugin-log = "2"
 tauri-plugin-shell = "2"

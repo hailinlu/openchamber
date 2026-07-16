@@ -11,6 +11,7 @@
 //!
 //! 见 docs/plan/rust-migration-plan.md。
 
+mod backend;
 mod discovery;
 mod ipc;
 mod menu;
