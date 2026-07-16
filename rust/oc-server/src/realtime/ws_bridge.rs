@@ -21,7 +21,7 @@ use bytes::Bytes;
 use futures_util::stream::SplitSink;
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{json, Value};
 use tokio::sync::broadcast;
 use tokio::time;
 
@@ -339,6 +339,112 @@ pub async fn directory_ws_handler(
         .on_upgrade(move |socket| run_directory_bridge(socket, state, params))
 }
 
+/// 从 `session.status` payload 提取合成事件所需的字段。
+///
+/// 对应 Node `index.js:818-836` (`processForwardedEventPayload` 的解析部分)。
+/// 返回 `(session_id, status_type)` 或 `None` (非 session.status / 缺字段)。
+fn extract_session_status_for_synthesis(payload: &Value) -> Option<(String, String)> {
+    if payload.get("type").and_then(|v| v.as_str()) != Some("session.status") {
+        return None;
+    }
+
+    let properties = payload.get("properties")?.as_object()?;
+    let status = properties.get("status").and_then(|v| v.as_object());
+    let info = properties.get("info").and_then(|v| v.as_object());
+
+    let session_id = properties
+        .get("sessionID")
+        .and_then(|v| v.as_str())?
+        .trim();
+    if session_id.is_empty() {
+        return None;
+    }
+
+    // status.type 优先, info.type 回退 (与 SessionStateRuntime 一致)
+    let status_type = status
+        .and_then(|s| s.get("type"))
+        .and_then(|v| v.as_str())
+        .or_else(|| info.and_then(|i| i.get("type")).and_then(|v| v.as_str()))?
+        .trim()
+        .to_string();
+
+    if status_type.is_empty() {
+        return None;
+    }
+
+    Some((session_id.to_string(), status_type))
+}
+
+/// 对 `session.status` 上游事件, 合成 `openchamber:session-status` 和
+/// `openchamber:session-activity` 帧发给当前目录 WS 客户端。
+///
+/// 对应 Node `directory-ws-bridge.js:82` 的 `processForwardedEventPayload(payload, emitSyntheticEvent)`。
+/// 非 session.status 事件直接返回 true (无操作)。
+/// 返回 false 表示 send 失败 (连接已断)。
+async fn emit_synthetic_session_events(
+    sender: &mut SplitSink<WebSocket, Message>,
+    backpressure_warned: &AtomicBool,
+    pending_bytes: &AtomicUsize,
+    payload: &Value,
+) -> bool {
+    let (session_id, status) = match extract_session_status_for_synthesis(payload) {
+        Some(v) => v,
+        None => return true, // 非 session.status — 无操作
+    };
+
+    // 合成 session-status (对应 Node index.js:841-860)
+    let session_status_payload = json!({
+        "type": "openchamber:session-status",
+        "properties": {
+            "sessionID": session_id,
+            "status": status,
+            "timestamp": chrono::Utc::now().timestamp_millis(),
+            "metadata": {},
+            "needsAttention": false,
+        }
+    });
+    if !send_event_frame(
+        sender,
+        backpressure_warned,
+        pending_bytes,
+        &session_status_payload,
+        None,
+        Some("global"),
+    )
+    .await
+    {
+        return false;
+    }
+
+    // 合成 session-activity (对应 Node index.js:862-875)
+    let phase = if status == "busy" || status == "retry" {
+        "busy"
+    } else {
+        "idle"
+    };
+    let session_activity_payload = json!({
+        "type": "openchamber:session-activity",
+        "properties": {
+            "sessionId": session_id,
+            "phase": phase,
+        }
+    });
+    if !send_event_frame(
+        sender,
+        backpressure_warned,
+        pending_bytes,
+        &session_activity_payload,
+        None,
+        Some("global"),
+    )
+    .await
+    {
+        return false;
+    }
+
+    true
+}
+
 /// 目录 WS 桥连接生命周期。
 ///
 /// 对应 `directory-ws-bridge.js`。每连接独享上游 reader, 无 replay。
@@ -416,6 +522,18 @@ async fn run_directory_bridge(socket: WebSocket, state: Arc<AppState>, params: W
                         ).await {
                             break;
                         }
+                        // 对 session.status 合成 session-status + session-activity 帧
+                        // (对应 Node directory-ws-bridge.js:82 processForwardedEventPayload)。
+                        // 目录桥用 per-connection 上游 reader, 不走全局 hub, 所以 Part 1 的
+                        // broadcast 到不了这里 — 需本地合成。
+                        if !emit_synthetic_session_events(
+                            &mut sender,
+                            &backpressure_warned,
+                            &pending_bytes,
+                            &envelope.payload,
+                        ).await {
+                            break;
+                        }
                     }
                     Some(UpstreamEvent::Disconnect { .. }) => {
                         upstream_connected.store(false, Ordering::SeqCst);
@@ -479,4 +597,78 @@ async fn run_directory_bridge(socket: WebSocket, state: Arc<AppState>, params: W
     // 清理: 停止上游 reader + 关闭 WS
     reader.stop().await;
     let _ = sender.close().await;
+}
+
+// =========================================================================
+// 测试
+// =========================================================================
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    #[test]
+    fn extract_status_valid_with_status_type() {
+        let payload = json!({
+            "type": "session.status",
+            "properties": {
+                "sessionID": "sess-1",
+                "status": { "type": "busy", "attempt": 2 }
+            }
+        });
+        let result = extract_session_status_for_synthesis(&payload).unwrap();
+        assert_eq!(result.0, "sess-1");
+        assert_eq!(result.1, "busy");
+    }
+
+    #[test]
+    fn extract_status_uses_info_type_fallback() {
+        let payload = json!({
+            "type": "session.status",
+            "properties": {
+                "sessionID": "sess-2",
+                "info": { "type": "retry" }
+            }
+        });
+        let result = extract_session_status_for_synthesis(&payload).unwrap();
+        assert_eq!(result.0, "sess-2");
+        assert_eq!(result.1, "retry");
+    }
+
+    #[test]
+    fn extract_status_non_session_status_returns_none() {
+        let payload = json!({ "type": "message.updated" });
+        assert!(extract_session_status_for_synthesis(&payload).is_none());
+    }
+
+    #[test]
+    fn extract_status_missing_session_id_returns_none() {
+        let payload = json!({
+            "type": "session.status",
+            "properties": { "status": { "type": "busy" } }
+        });
+        assert!(extract_session_status_for_synthesis(&payload).is_none());
+    }
+
+    #[test]
+    fn extract_status_missing_type_returns_none() {
+        let payload = json!({
+            "type": "session.status",
+            "properties": { "sessionID": "sess-3" }
+        });
+        assert!(extract_session_status_for_synthesis(&payload).is_none());
+    }
+
+    #[test]
+    fn extract_status_empty_session_id_returns_none() {
+        let payload = json!({
+            "type": "session.status",
+            "properties": {
+                "sessionID": "  ",
+                "status": { "type": "idle" }
+            }
+        });
+        assert!(extract_session_status_for_synthesis(&payload).is_none());
+    }
 }

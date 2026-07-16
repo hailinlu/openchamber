@@ -204,6 +204,20 @@ impl GlobalHub {
         self.status_tx.subscribe()
     }
 
+    /// 广播合成事件 (openchamber:session-status / openchamber:session-activity) 到所有
+    /// WS 桥订阅者。
+    ///
+    /// 合成事件由 `SessionStateRuntime` 从上游 `session.status` 派生, 无 event_id,
+    /// **不入 replay ring** (不可 resume)。对应 Node `broadcastGlobalUiEvent` 对 WS
+    /// 客户端的扇出路径。
+    pub fn broadcast_synthetic(&self, payload: Value) {
+        let _ = self.event_tx.send(HubEvent {
+            payload,
+            directory: "global".to_string(),
+            event_id: None,
+        });
+    }
+
     /// 获取指定 eventId 之后的所有 replay 事件。
     ///
     /// 返回空 Vec 表示: eventId 未找到 (客户端落后太多, 需全量同步) 或 eventId 为 None。
@@ -343,6 +357,25 @@ mod tests {
         assert_eq!(buf.len(), GLOBAL_REPLAY_LIMIT);
         // 最旧的应该被驱逐
         assert_eq!(buf.front().unwrap().event_id.as_deref(), Some("evt-10"));
+    }
+
+    #[tokio::test]
+    async fn broadcast_synthetic_reaches_subscribers() {
+        let hub = GlobalHub::new(
+            "http://127.0.0.1:1".into(),
+            "Basic test".into(),
+            reqwest::Client::new(),
+        );
+        let mut rx = hub.subscribe_event();
+
+        let payload = json!({"type": "openchamber:session-activity"});
+        hub.broadcast_synthetic(payload.clone());
+
+        let event = rx.recv().await.unwrap();
+        assert_eq!(event.payload, payload);
+        assert_eq!(event.directory, "global");
+        // 合成事件无 event_id (不入 replay ring)
+        assert!(event.event_id.is_none());
     }
 
     fn replay_after(replay: &Arc<Mutex<VecDeque<ReplayEntry>>>, event_id: &str) -> Vec<ReplayEntry> {

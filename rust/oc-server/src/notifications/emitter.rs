@@ -48,7 +48,8 @@ impl NotificationEmitter {
     /// 写 SSE 事件到所有连接的客户端。
     ///
     /// 对应 Node `writeSseEvent(res, payload)`。
-    fn write_sse_event(&self, payload: &Value) {
+    /// pub: SessionStateRuntime 合成事件 fanout task (state.rs) 需要调用。
+    pub fn write_sse_event(&self, payload: &Value) {
         let data = format!("data: {}\n\n", payload);
         let bytes = Bytes::from(data);
         // send 失败 = 无接收者, 忽略

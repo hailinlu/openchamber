@@ -403,6 +403,38 @@ impl AppState {
             }
         });
 
+        // SessionStateRuntime 合成事件 fanout: session-status/session-activity →
+        // SSE 通知流 + 全局 WS 桥。
+        //
+        // SessionStateRuntime 从上游 session.status (经上面的 GlobalHub consumer 喂入)
+        // 派生合成事件。这里订阅它的 event_tx, 把合成事件扇出到:
+        // 1. SSE 通知流 (emitter.write_sse_event) — 对应 Node broadcastGlobalUiEvent→sseClients
+        // 2. 全局 hub WS 桥 (global_hub.broadcast_synthetic) — 对应 Node broadcastGlobalUiEvent→wsClients
+        //
+        // 合成事件无 event_id, 不进 replay ring, 不可 resume。
+        let emitter = self.emitter.clone();
+        let global_hub = self.global_hub.clone();
+        let mut synthetic_rx = self.session_state.subscribe_events();
+        tokio::spawn(async move {
+            tracing::info!("[session-state] synthetic event fanout started");
+            loop {
+                match synthetic_rx.recv().await {
+                    Ok(payload) => {
+                        emitter.write_sse_event(&payload);
+                        global_hub.broadcast_synthetic(payload);
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Lagged(n)) => {
+                        tracing::warn!(skipped = n, "[session-state] synthetic fanout lagged");
+                        continue;
+                    }
+                    Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                        tracing::info!("[session-state] synthetic fanout stopped");
+                        break;
+                    }
+                }
+            }
+        });
+
         trigger
     }
 

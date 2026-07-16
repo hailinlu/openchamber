@@ -677,3 +677,32 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
 - [x] 公开路由白名单: health/version/system-info/connect/auth-session/passkey-auth/
       pairing-redeem/OPTIONS (显式匹配, 比 Node 注册顺序更安全)
 - [x] 全量测试通过 (822 passed, 0 failed); 我改动的文件 cargo clippy 0 warnings
+
+**阶段 3e Group 2.5 — 测试隔离修复** (完成):
+
+> 3 个测试模块在并行执行时修改进程级 env var, 导致间歇性失败 (6-11 个测试)。
+
+- [x] `scheduled_tasks/routes.rs`: `TempDirWithEnv` 未持有跨模块共享锁 → 持有
+      `auth::tests::TEST_LOCK` + 同步设置 `HOME`
+- [x] `quota/credentials/store.rs`: `with_temp_data_dir` 未持有共享锁 → 持有 `TEST_LOCK` 直到函数返回
+- [x] `tts/base_url.rs`: `lock_env_block_remote()` 内 `TEST_LOCK` guard 在函数返回时立即释放
+      (`let _g = ...`) → `EnvGuard` 持有 `MutexGuard<'static, ()>` 直到 drop
+- [x] 全量测试通过 (822 passed, 0 failed, 并行); clippy 0 warnings
+
+**阶段 3e Group 3 — event-stream 合成事件转发** (完成):
+
+> `SessionStateRuntime` 已完整实现 (646 行) 但 `subscribe_events()` 从未被消费,
+> 合成的 `openchamber:session-status` / `openchamber:session-activity` 事件全部丢弃。
+> Node 侧 (`index.js:447-451`) 把 `broadcastGlobalUiEvent` 注入 sessionRuntime,
+> 同时扇出到 SSE 通知客户端和 WS 消息流客户端。
+
+- [x] **C1 (CRITICAL) — SSE 通知流**: `state.rs` 新增 `SessionStateRuntime` 合成事件 consumer task,
+      订阅 `subscribe_events()` → `emitter.write_sse_event()` (SSE 通知流)
+- [x] **C2 (CRITICAL) — 全局 WS 桥**: `global_hub.rs` 新增 `broadcast_synthetic()` 方法,
+      consumer task 同时调 `global_hub.broadcast_synthetic()` → 现有 `run_global_bridge` 自动收到合成事件;
+      合成事件无 event_id, 不进 replay ring
+- [x] **C3 (MAJOR) — 目录 WS 桥**: `ws_bridge.rs` 新增 `emit_synthetic_session_events()`,
+      在 `run_directory_bridge` 的 `UpstreamEvent::Event` 分支对 `session.status` 本地合成两个帧
+      (目录桥用 per-connection reader, 不走全局 hub, Part 1 的 broadcast 到不了)
+- [x] `emitter.rs`: `write_sse_event` 改 pub (consumer task 需跨模块调用)
+- [x] 全量测试通过; 我改动的文件 cargo clippy 0 warnings
