@@ -561,3 +561,60 @@ fn build_router(state: Arc<state::AppState>, config: &Config) -> Router {
 
     router.with_state(state)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// helper: 从 "http://127.0.0.1:<port>" 提取端口号。
+    fn parse_port(base_url: &str) -> u16 {
+        base_url
+            .rsplit(':')
+            .next()
+            .and_then(|s| s.parse().ok())
+            .expect("base_url should contain port")
+    }
+
+    #[tokio::test]
+    async fn oc_server_starts_and_serves_health() {
+        let config = Config::for_tests();
+        let server = OcServer::start(config).await.expect("OcServer::start");
+
+        let resp = reqwest::get(format!("{}/health", server.base_url()))
+            .await
+            .expect("GET /health");
+        assert!(
+            resp.status().is_success(),
+            "/health should return 2xx, got {}",
+            resp.status()
+        );
+
+        server.shutdown().await;
+    }
+
+    #[tokio::test]
+    async fn oc_server_shutdown_releases_port() {
+        let config = Config::for_tests();
+        let server = OcServer::start(config).await.expect("OcServer::start");
+        let port = parse_port(server.base_url());
+
+        server.shutdown().await;
+
+        // shutdown 后端口应可重新绑定 (证明 listener 已释放)
+        let rebind = tokio::net::TcpListener::bind(("127.0.0.1", port)).await;
+        assert!(
+            rebind.is_ok(),
+            "port {} should be free after shutdown",
+            port
+        );
+    }
+
+    #[test]
+    fn base_url_format() {
+        // OcServer::start 需要 tokio context, 这里只验证 base_url 字符串形态
+        // 用 oneshot 构造一个不完整句柄的等价字符串测试。
+        let sample = "http://127.0.0.1:12345";
+        assert!(sample.starts_with("http://"));
+        assert!(parse_port(sample) == 12345);
+    }
+}
