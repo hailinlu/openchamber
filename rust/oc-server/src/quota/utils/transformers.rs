@@ -146,8 +146,9 @@ mod tests {
 
     #[test]
     fn normalize_timestamp_seconverts() {
+        // 值 < 1e12 被视为秒, ×1000 → 毫秒 (与 Node normalizeTimestamp 一致)
         assert_eq!(normalize_timestamp(&json!(100u64)).unwrap(), 100_000);
-        assert_eq!(normalize_timestamp(&json!(100_000u64)).unwrap(), 100_000);
+        assert_eq!(normalize_timestamp(&json!(100_000u64)).unwrap(), 100_000_000);
     }
 
     #[test]

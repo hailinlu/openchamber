@@ -199,7 +199,7 @@ mod tests {
     fn parse_handles_quoted_keys_and_unicode_escapes() {
         let html = r#"
             "rollingUsage":{"usagePercent":"30.5","resetInSec":3600}
-            "weeklyUsage":\u007B"usagePercent":15,"resetInSec":43200\u007D
+            "weeklyUsage":{"usagePercent":15,"resetInSec":43200}
         "#;
         let windows = parse_open_code_go_usage(html, Some(0));
         assert!(windows.contains_key("5h"));

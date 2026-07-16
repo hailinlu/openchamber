@@ -45,9 +45,11 @@ fn normalize_ollama_cloud(value: Value) -> Option<Value> {
 }
 
 /// `cursor` normalizer: `{ accessToken, refreshToken }`.
+/// 两个字段都是可选的 — 缺失的键视为空 (与 Node `value?.accessToken` 一致),
+/// 只有两者都空才返回 None。
 fn normalize_cursor(value: Value) -> Option<Value> {
-    let access = clean(value.get("accessToken")?);
-    let refresh = clean(value.get("refreshToken")?);
+    let access = value.get("accessToken").map(clean).unwrap_or_default();
+    let refresh = value.get("refreshToken").map(clean).unwrap_or_default();
     if access.is_empty() && refresh.is_empty() {
         return None;
     }

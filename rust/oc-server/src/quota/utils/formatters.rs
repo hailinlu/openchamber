@@ -181,8 +181,10 @@ mod tests {
 
     #[test]
     fn format_reset_time_invalid_input() {
-        assert!(format_reset_time(-1).is_some()); // chrono handles it
-        assert!(format_reset_time(i64::MAX).is_some()); // chrono saturates to "+262143-04-26 04:17:00.150"
+        assert!(format_reset_time(-1).is_some()); // chrono handles negative ms
+        // i64::MAX ms (~year +292B) overflows chrono's NaiveDateTime range (max ~+262143),
+        // so from_timestamp_millis returns None — mirrors Node's Invalid-Date → null.
+        assert!(format_reset_time(i64::MAX).is_none());
     }
 
     #[test]
