@@ -706,3 +706,34 @@ cargo tauri dev              # 启动桌面壳 (dev URL 模式, 需先起 web de
       (目录桥用 per-connection reader, 不走全局 hub, Part 1 的 broadcast 到不了)
 - [x] `emitter.rs`: `write_sse_event` 改 pub (consumer task 需跨模块调用)
 - [x] 全量测试通过; 我改动的文件 cargo clippy 0 warnings
+
+**阶段 3e Group 4 — event-stream 残留修复 M1+M2+M3** (完成):
+
+> 三个 event-stream 残留差距收尾。
+
+- [x] **M1 (中) — 全局 hub 零客户端生命周期** (`global_hub.rs` + `ws_bridge.rs`):
+      Rust 全局 hub 上游 reader 一旦启动 (首个 WS 客户端连接) 就永不停止, 即使所有
+      WS 客户端断开后仍持续重连上游 `/global/event`。Node 侧 `stopHubIfUnused()`
+      (`global-ws-bridge.js:66-70`) 在 `clients.size === 0` 时停止 reader。
+      修复: `GlobalHub` 新增 `ws_client_count: AtomicUsize`; `register_ws_client()` /
+      `unregister_ws_client()` 在 0→1 / 1→0 转换时自动 `start()` / `stop()`。
+      `run_global_bridge` 重构为 `run_global_bridge_inner` (返回 bool), 外层包裹
+      `register` / `unregister`, 保证所有退出路径 (含 early return) 都正确收尾。
+      仅跟踪 WS 客户端 (不含后台 notification/permission/session-assist 派生消费者)。
+- [x] **M2 (中) — 目录 WS 桥 URL percent-encoding** (`ws_bridge.rs`):
+      目录桥 `build_url` 用裸字符串拼接 `?directory=` + 路径, 路径含空格/`&`/`#`/`+`
+      会破坏 URL。Node 用 `new URL()` + `searchParams.set('directory', ...)`。
+      修复: 改用 `url::Url::parse()` + `query_pairs_mut().append_pair("directory", ...)`,
+      自动 percent-encode (与 Node `URLSearchParams` 一致)。
+- [x] **M3 (低) — `build_url` 错误分化** (`upstream_reader.rs` + `global_hub.rs` + `ws_bridge.rs`):
+      `build_url` 闭包签名从 `Fn() -> String` 改为 `Fn() -> Result<String, ()>`,
+      删除 `catch_unwind` (panic 机制不再需要)。
+      `UpstreamErrorKind` 新增 `BuildUrlFailed` 变体 (对应 Node `buildUrlFailed`)。
+      `HubStatus::Error` 新增 `build_url_failed: bool` 字段。
+      两桥错误消息从二态改为三态: `upstream_unavailable` → "OpenCode event stream unavailable";
+      `build_url_failed` → "OpenCode service unavailable"; `stream_error` →
+      "Failed to connect to OpenCode event stream"。
+- [x] `url = "2"` 已在 Cargo.toml (无新增依赖)
+- [x] 新增测试 8 个 (M1 客户端计数 3 + M2 URL 编码 4 + M3 build_url 失败 1)
+- [x] 全量测试通过 (837 passed, 0 failed); 我改动的文件 cargo clippy 0 warnings
+

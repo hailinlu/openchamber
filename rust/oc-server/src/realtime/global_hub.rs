@@ -11,7 +11,7 @@
 //!   WS 桥据此重发 ready 帧让浏览器做 scoped state repair
 
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::sync::Mutex;
 
@@ -39,8 +39,13 @@ pub enum HubStatus {
     Connect { was_ready: bool },
     /// 上游断开。
     Disconnect { reason: String },
-    /// 上游错误。`initial` = true 表示首次连接前错误。
-    Error { kind: String, initial: bool },
+    /// 上游错误。`initial` = true 表示首次连接前错误;
+    /// `build_url_failed` = true 表示 URL 构建失败 (对应 Node `buildUrlFailed`)。
+    Error {
+        kind: String,
+        initial: bool,
+        build_url_failed: bool,
+    },
 }
 
 /// replay ring 中的一条记录。
@@ -64,6 +69,9 @@ pub struct GlobalHub {
     status_tx: broadcast::Sender<HubStatus>,
     connected: Arc<AtomicBool>,
     ever_connected: Arc<AtomicBool>,
+    // WS 桥客户端计数 (仅跟踪 WS 客户端, 不含后台消费者)。
+    // 0→1 自动 start(), 1→0 自动 stop()。对应 Node `stopHubIfUnused`。
+    ws_client_count: Arc<AtomicUsize>,
     // reader 生命周期管理
     reader: Mutex<Option<Arc<UpstreamSseReader>>>,
     reader_task: Mutex<Option<JoinHandle<()>>>,
@@ -88,6 +96,7 @@ impl GlobalHub {
             status_tx,
             connected: Arc::new(AtomicBool::new(false)),
             ever_connected: Arc::new(AtomicBool::new(false)),
+            ws_client_count: Arc::new(AtomicUsize::new(0)),
             reader: Mutex::new(None),
             reader_task: Mutex::new(None),
         }
@@ -106,7 +115,10 @@ impl GlobalHub {
 
         let config = UpstreamReaderConfig {
             build_url: Box::new(move || {
-                format!("{}/global/event", base_url.trim_end_matches('/'))
+                let raw = format!("{}/global/event", base_url.trim_end_matches('/'));
+                url::Url::parse(&raw)
+                    .map(|u| u.to_string())
+                    .map_err(|_| ())
             }),
             auth_header,
             http_client,
@@ -150,15 +162,21 @@ impl GlobalHub {
                     }
                     UpstreamEvent::Error { kind, .. } => {
                         let initial = !ever_connected.load(Ordering::SeqCst);
-                        let kind_str = match kind {
+                        let (kind_str, build_url_failed) = match kind {
                             super::upstream_reader::UpstreamErrorKind::UpstreamUnavailable => {
-                                "upstream_unavailable"
+                                ("upstream_unavailable", false)
                             }
-                            super::upstream_reader::UpstreamErrorKind::StreamError => "stream_error",
+                            super::upstream_reader::UpstreamErrorKind::StreamError => {
+                                ("stream_error", false)
+                            }
+                            super::upstream_reader::UpstreamErrorKind::BuildUrlFailed => {
+                                ("stream_error", true)
+                            }
                         };
                         let _ = status_tx.send(HubStatus::Error {
                             kind: kind_str.into(),
                             initial,
+                            build_url_failed,
                         });
                     }
                 }
@@ -181,6 +199,29 @@ impl GlobalHub {
         }
         self.connected.store(false, Ordering::SeqCst);
         self.ever_connected.store(false, Ordering::SeqCst);
+    }
+
+    /// 注册一个 WS 桥客户端。客户端数从 0→1 时自动 `start()`。
+    /// 对应 Node `global-ws-bridge.js` 的 `accept()` → `globalHub.start()`。
+    pub fn register_ws_client(&self) {
+        let prev = self.ws_client_count.fetch_add(1, Ordering::SeqCst);
+        if prev == 0 {
+            self.start();
+        }
+    }
+
+    /// 注销一个 WS 桥客户端。客户端数→0 时自动 `stop()`。
+    /// 对应 Node `global-ws-bridge.js` 的 `stopHubIfUnused()`。
+    pub async fn unregister_ws_client(&self) {
+        // 防下溢: 只在计数 > 0 时递减
+        let prev = if self.ws_client_count.load(Ordering::SeqCst) == 0 {
+            return;
+        } else {
+            self.ws_client_count.fetch_sub(1, Ordering::SeqCst)
+        };
+        if prev == 1 {
+            self.stop().await;
+        }
     }
 
     /// 上游是否已连接。
@@ -376,6 +417,58 @@ mod tests {
         assert_eq!(event.directory, "global");
         // 合成事件无 event_id (不入 replay ring)
         assert!(event.event_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn register_ws_client_starts_reader_on_zero_to_one() {
+        // 0→1 转换应启动 reader (is_connected 在连接前为 false, 但 reader 槽位应被填充)
+        let hub = GlobalHub::new(
+            "http://127.0.0.1:1".into(), // 端口 1, 不会真正连接
+            "Basic test".into(),
+            reqwest::Client::new(),
+        );
+        assert_eq!(hub.ws_client_count.load(Ordering::SeqCst), 0);
+        // register 应触发 start(): reader 槽位从 None 变为 Some
+        assert!(hub.reader.lock().unwrap().is_none());
+        hub.register_ws_client();
+        assert!(hub.reader.lock().unwrap().is_some());
+        assert_eq!(hub.ws_client_count.load(Ordering::SeqCst), 1);
+        // 第二次 register 不重复 start (reader 槽位已有值)
+        hub.register_ws_client();
+        assert_eq!(hub.ws_client_count.load(Ordering::SeqCst), 2);
+        // 清理
+        hub.unregister_ws_client().await;
+        hub.unregister_ws_client().await;
+        assert_eq!(hub.ws_client_count.load(Ordering::SeqCst), 0);
+        assert!(hub.reader.lock().unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn unregister_ws_client_stops_reader_at_zero() {
+        let hub = GlobalHub::new(
+            "http://127.0.0.1:1".into(),
+            "Basic test".into(),
+            reqwest::Client::new(),
+        );
+        hub.register_ws_client();
+        assert!(hub.reader.lock().unwrap().is_some());
+        // 1→0 转换应停止 reader
+        hub.unregister_ws_client().await;
+        assert_eq!(hub.ws_client_count.load(Ordering::SeqCst), 0);
+        // reader 槽位被 take() 清空
+        assert!(hub.reader.lock().unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn unregister_below_zero_is_noop() {
+        // 防下溢: 在计数为 0 时调用 unregister 不应导致下溢
+        let hub = GlobalHub::new(
+            "http://127.0.0.1:1".into(),
+            "Basic test".into(),
+            reqwest::Client::new(),
+        );
+        hub.unregister_ws_client().await;
+        assert_eq!(hub.ws_client_count.load(Ordering::SeqCst), 0);
     }
 
     fn replay_after(replay: &Arc<Mutex<VecDeque<ReplayEntry>>>, event_id: &str) -> Vec<ReplayEntry> {

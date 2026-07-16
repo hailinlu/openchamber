@@ -44,18 +44,21 @@ pub enum UpstreamEvent {
     },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum UpstreamErrorKind {
     /// 上游不可用 (非 2xx 响应)。
     UpstreamUnavailable,
     /// 流读取错误 (网络中断等)。
     StreamError,
+    /// URL 构建失败 (对应 Node `buildUrlFailed` — base URL 非法、解析失败)。
+    BuildUrlFailed,
 }
 
 /// 上游 SSE reader 配置。
 pub struct UpstreamReaderConfig {
     /// 构建 SSE 请求 URL (每次重连调用, 可能返回不同 URL)。
-    pub build_url: Box<dyn Fn() -> String + Send + Sync>,
+    /// 返回 `Err(())` 表示 URL 构建失败 (对应 Node `buildUrlFailed`)。
+    pub build_url: Box<dyn Fn() -> Result<String, ()> + Send + Sync>,
     /// Authorization header value (例如 `Basic <base64>`)。
     pub auth_header: String,
     /// HTTP client (复用连接池)。
@@ -172,12 +175,10 @@ impl UpstreamSseReader {
 
     /// 单次连接 + 流式读取。
     async fn connect_and_stream(&self) -> StreamOutcome {
-        let url = match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            (self.config.build_url)()
-        })) {
+        let url = match (self.config.build_url)() {
             Ok(url) => url,
-            Err(_) => {
-                return StreamOutcome::Error(UpstreamErrorKind::StreamError, None);
+            Err(()) => {
+                return StreamOutcome::Error(UpstreamErrorKind::BuildUrlFailed, None);
             }
         };
 
@@ -321,7 +322,7 @@ mod tests {
     #[test]
     fn reader_starts_with_initial_last_event_id() {
         let (reader, _rx) = UpstreamSseReader::new(UpstreamReaderConfig {
-            build_url: Box::new(|| "http://localhost/test".into()),
+            build_url: Box::new(|| Ok("http://localhost/test".into())),
             auth_header: "Basic test".into(),
             http_client: reqwest::Client::new(),
             initial_last_event_id: Some("evt-initial".into()),
@@ -334,7 +335,7 @@ mod tests {
     #[test]
     fn reader_starts_with_none_last_event_id() {
         let (reader, _rx) = UpstreamSseReader::new(UpstreamReaderConfig {
-            build_url: Box::new(|| "http://localhost/test".into()),
+            build_url: Box::new(|| Ok("http://localhost/test".into())),
             auth_header: "Basic test".into(),
             http_client: reqwest::Client::new(),
             initial_last_event_id: None,
@@ -347,7 +348,7 @@ mod tests {
     #[tokio::test]
     async fn stop_cancels_reader() {
         let (reader, _rx) = UpstreamSseReader::new(UpstreamReaderConfig {
-            build_url: Box::new(|| "http://127.0.0.1:1/nonexistent".into()),
+            build_url: Box::new(|| Ok("http://127.0.0.1:1/nonexistent".into())),
             auth_header: "Basic test".into(),
             http_client: reqwest::Client::builder()
                 .timeout(Duration::from_millis(100))
@@ -364,5 +365,27 @@ mod tests {
         // stop 应该在合理时间内返回
         let stop_result = tokio::time::timeout(Duration::from_secs(5), reader.stop()).await;
         assert!(stop_result.is_ok(), "stop should complete within timeout");
+    }
+
+    #[tokio::test]
+    async fn build_url_failure_yields_build_url_failed_error() {
+        // build_url 返回 Err → connect_and_stream 返回 BuildUrlFailed
+        let (reader, _rx) = UpstreamSseReader::new(UpstreamReaderConfig {
+            build_url: Box::new(|| Err(())),
+            auth_header: "Basic test".into(),
+            http_client: reqwest::Client::new(),
+            initial_last_event_id: None,
+            stall_timeout: Duration::from_secs(20),
+            reconnect_delay: Duration::from_millis(250),
+        });
+        let reader = Arc::new(reader);
+        let outcome = reader.connect_and_stream().await;
+        match outcome {
+            StreamOutcome::Error(kind, status) => {
+                assert_eq!(kind, UpstreamErrorKind::BuildUrlFailed);
+                assert_eq!(status, None);
+            }
+            other => panic!("expected Error(BuildUrlFailed, None), got non-Error variant"),
+        }
     }
 }

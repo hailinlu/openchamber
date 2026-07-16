@@ -62,41 +62,55 @@ pub async fn global_ws_handler(
 ///
 /// 对应 `global-ws-bridge.js` 的 `accept` + 事件循环。
 async fn run_global_bridge(socket: WebSocket, state: Arc<AppState>, params: WsParams) {
+    // M1: 注册客户端 — 0→1 自动启动 hub reader。
+    // 所有退出路径 (含 early return) 都经由 `unregister_ws_client` 收尾,
+    // 1→0 自动 stop reader。对应 Node `stopHubIfUnused`。
+    state.global_hub.register_ws_client();
+
+    // 主体逻辑返回 true = 正常退出需 close; false = 已自行 close。
+    let _normal_exit = run_global_bridge_inner(socket, &state, params).await;
+
+    // 收尾: 注销客户端 (1→0 停 reader)
+    state.global_hub.unregister_ws_client().await;
+}
+
+async fn run_global_bridge_inner(
+    socket: WebSocket,
+    state: &Arc<AppState>,
+    params: WsParams,
+) -> bool {
     let (mut sender, mut receiver) = socket.split();
     let requested_last_event_id = params.last_event_id.unwrap_or_default();
     let ready = Arc::new(AtomicBool::new(false));
     let backpressure_warned = Arc::new(AtomicBool::new(false));
     let pending_bytes = Arc::new(AtomicUsize::new(0));
 
-    // 1. 启动 hub (幂等)
-    state.global_hub.start();
-
-    // 2. 订阅事件 + 状态
+    // 1. 订阅事件 + 状态 (hub 已由 register_ws_client 启动)
     let mut event_rx = state.global_hub.subscribe_event();
     let mut status_rx = state.global_hub.subscribe_status();
 
-    // 3. 如果 hub 已连接 → markReady
+    // 2. 如果 hub 已连接 → markReady
     if state.global_hub.is_connected()
         && !mark_ready(
             &mut sender,
             &ready,
             &backpressure_warned,
             &pending_bytes,
-            &state,
+            state,
             &requested_last_event_id,
         )
         .await
     {
-        return; // send 失败, 连接已关闭
+        return false; // send 失败, 连接已关闭
     }
 
-    // 4. 心跳定时器
+    // 3. 心跳定时器
     let mut ping_interval = time::interval(WS_HEARTBEAT_INTERVAL);
     ping_interval.tick().await; // 跳过第一次
     let mut heartbeat_interval = time::interval(WS_HEARTBEAT_INTERVAL);
     heartbeat_interval.tick().await; // 跳过第一次
 
-    // 5. 事件循环
+    // 4. 事件循环
     loop {
         tokio::select! {
             // hub 事件 → 转发给客户端
@@ -114,7 +128,7 @@ async fn run_global_bridge(socket: WebSocket, state: Arc<AppState>, params: WsPa
                             hub_event.event_id.as_deref(),
                             Some(&hub_event.directory),
                         ).await {
-                            return; // send 失败
+                            return false; // send 失败
                         }
                     }
                     Err(broadcast::error::RecvError::Lagged(n)) => {
@@ -134,27 +148,33 @@ async fn run_global_bridge(socket: WebSocket, state: Arc<AppState>, params: WsPa
                                 &ready,
                                 &backpressure_warned,
                                 &pending_bytes,
-                                &state,
+                                state,
                                 &requested_last_event_id,
                             ).await {
-                                return;
+                                return false;
                             }
                         } else if was_ready {
                             // 重连后恢复 → 重发 ready (让浏览器做 scoped repair)
                             let frame = WsFrame::Ready { scope: "global".into() };
                             if sender.send(Message::Text(frame.to_json().into())).await.is_err() {
-                                return;
+                                return false;
                             }
                         }
                     }
                     Ok(HubStatus::Disconnect { .. }) => {
                         // 静默 — 浏览器靠心跳超时检测
                     }
-                    Ok(HubStatus::Error { kind, initial }) => {
+                    Ok(HubStatus::Error { kind, initial, build_url_failed }) => {
                         if initial && !ready.load(Ordering::SeqCst) {
                             // 初始错误 → 关闭客户端
+                            // 三态消息 (对应 Node global-ws-bridge.js:139-156):
+                            //   upstream_unavailable → "OpenCode event stream unavailable"
+                            //   build_url_failed     → "OpenCode service unavailable"
+                            //   stream_error         → "Failed to connect to OpenCode event stream"
                             let msg = if kind == "upstream_unavailable" {
                                 "OpenCode event stream unavailable".to_string()
+                            } else if build_url_failed {
+                                "OpenCode service unavailable".to_string()
                             } else {
                                 "Failed to connect to OpenCode event stream".to_string()
                             };
@@ -164,7 +184,7 @@ async fn run_global_bridge(socket: WebSocket, state: Arc<AppState>, params: WsPa
                                 code: 1011,
                                 reason: msg.into(),
                             }))).await;
-                            return;
+                            return false;
                         }
                     }
                     Err(broadcast::error::RecvError::Lagged(_)) => {}
@@ -174,7 +194,7 @@ async fn run_global_bridge(socket: WebSocket, state: Arc<AppState>, params: WsPa
             // ping 定时器
             _ = ping_interval.tick() => {
                 if sender.send(Message::Ping(Bytes::new())).await.is_err() {
-                    return;
+                    return false;
                 }
             }
             // synthetic heartbeat 定时器 (仅 hub connected 时)
@@ -194,7 +214,7 @@ async fn run_global_bridge(socket: WebSocket, state: Arc<AppState>, params: WsPa
                     None,
                     Some("global"),
                 ).await {
-                    return;
+                    return false;
                 }
             }
             // 客户端消息 (忽略, 但需要检测 close)
@@ -207,8 +227,9 @@ async fn run_global_bridge(socket: WebSocket, state: Arc<AppState>, params: WsPa
         }
     }
 
-    // 清理: 发送 close
+    // 正常退出: 发送 close
     let _ = sender.close().await;
+    true
 }
 
 /// 标记客户端 ready: 发 ready 帧 + replay events。
@@ -464,12 +485,15 @@ async fn run_directory_bridge(socket: WebSocket, state: Arc<AppState>, params: W
 
     let config = UpstreamReaderConfig {
         build_url: Box::new(move || {
-            let mut url = format!("{}/event", base_url.trim_end_matches('/'));
+            // M2: 用 url::Url + query_pairs_mut 正确 percent-encode directory 参数。
+            // 对应 Node `directory-ws-bridge.js:105-120` 的 `new URL()` +
+            // `targetUrl.searchParams.set('directory', ...)`。
+            let raw = format!("{}/event", base_url.trim_end_matches('/'));
+            let mut url = url::Url::parse(&raw).map_err(|_| ())?;
             if !dir_for_url.is_empty() {
-                url.push_str("?directory=");
-                url.push_str(&dir_for_url);
+                url.query_pairs_mut().append_pair("directory", &dir_for_url);
             }
-            url
+            Ok(url.to_string())
         }),
         auth_header,
         http_client,
@@ -540,11 +564,21 @@ async fn run_directory_bridge(socket: WebSocket, state: Arc<AppState>, params: W
                     }
                     Some(UpstreamEvent::Error { kind, status }) => {
                         if !stream_ready.load(Ordering::SeqCst) {
-                            // 初始错误 → 关闭
-                            let msg = if matches!(kind, super::upstream_reader::UpstreamErrorKind::UpstreamUnavailable) {
-                                format!("OpenCode event stream unavailable ({})", status.unwrap_or(0))
-                            } else {
-                                "Failed to connect to OpenCode event stream".to_string()
+                            // 初始错误 → 关闭。
+                            // 三态消息 (对应 Node directory-ws-bridge.js:137-163):
+                            //   UpstreamUnavailable → "OpenCode event stream unavailable (status)"
+                            //   BuildUrlFailed      → "OpenCode service unavailable"
+                            //   StreamError         → "Failed to connect to OpenCode event stream"
+                            let msg = match kind {
+                                super::upstream_reader::UpstreamErrorKind::UpstreamUnavailable => {
+                                    format!("OpenCode event stream unavailable ({})", status.unwrap_or(0))
+                                }
+                                super::upstream_reader::UpstreamErrorKind::BuildUrlFailed => {
+                                    "OpenCode service unavailable".to_string()
+                                }
+                                super::upstream_reader::UpstreamErrorKind::StreamError => {
+                                    "Failed to connect to OpenCode event stream".to_string()
+                                }
                             };
                             let frame = WsFrame::Error { message: msg.clone() };
                             let _ = sender.send(Message::Text(frame.to_json().into())).await;
@@ -670,5 +704,46 @@ mod tests {
             }
         });
         assert!(extract_session_status_for_synthesis(&payload).is_none());
+    }
+
+    /// M2: 验证目录桥 build_url 正确 percent-encode 含空格/特殊字符的 directory。
+    fn build_directory_upstream_url(base_url: &str, dir: &str) -> Result<String, ()> {
+        let raw = format!("{}/event", base_url.trim_end_matches('/'));
+        let mut url = url::Url::parse(&raw).map_err(|_| ())?;
+        if !dir.is_empty() {
+            url.query_pairs_mut().append_pair("directory", dir);
+        }
+        Ok(url.to_string())
+    }
+
+    #[test]
+    fn directory_url_encodes_spaces_in_directory() {
+        // 含空格的路径。url crate 的 query_pairs_mut 用 `+` 编码空格
+        // (application/x-www-form-urlencoded 风格, 与 Node URLSearchParams 一致)。
+        let url = build_directory_upstream_url("http://127.0.0.1:4096", "/Users/x/My Projects").unwrap();
+        assert!(url.contains("directory=%2FUsers%2Fx%2FMy+Projects"),
+            "spaces (+) and slashes (%2F) should be percent-encoded, got: {}", url);
+    }
+
+    #[test]
+    fn directory_url_encodes_ampersand_and_hash() {
+        // 含 & 和 # 的路径 — 这些在裸拼接中会破坏 URL
+        let url = build_directory_upstream_url("http://127.0.0.1:4096", "/work/a&b#c").unwrap();
+        assert!(url.contains("directory=%2Fwork%2Fa%26b%23c"),
+            "& and # must be encoded, got: {}", url);
+    }
+
+    #[test]
+    fn directory_url_omits_query_when_dir_empty() {
+        let url = build_directory_upstream_url("http://127.0.0.1:4096", "").unwrap();
+        assert_eq!(url, "http://127.0.0.1:4096/event");
+        assert!(!url.contains('?'));
+    }
+
+    #[test]
+    fn directory_url_returns_err_for_invalid_base() {
+        // 非法 base URL → Err (对应 M3 BuildUrlFailed)
+        let result = build_directory_upstream_url("not a url", "/work");
+        assert!(result.is_err());
     }
 }
