@@ -118,7 +118,7 @@ impl Config {
             dist_dir: None,
             opencode_binary: "opencode".to_string(),
             opencode_host: None,
-            opencode_port: None,
+            opencode_port: Some(1),
             opencode_skip_start: true,
             opencode_hostname: "127.0.0.1".to_string(),
             allow_unauthenticated_lan: false,
