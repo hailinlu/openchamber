@@ -287,7 +287,7 @@ mod inner {
 
             let request_id = generate_request_id();
             let now = now_millis();
-            let challenge_ttl = super::DEFAULT_CHALLENGE_TTL_MS;
+            let challenge_ttl = super::super::DEFAULT_CHALLENGE_TTL_MS;
 
             let challenge_str = serde_json::to_string(&ccr.public_key.challenge)
                 .unwrap_or_default()
@@ -404,7 +404,7 @@ mod inner {
 
             let request_id = generate_request_id();
             let now = now_millis();
-            let challenge_ttl = super::DEFAULT_CHALLENGE_TTL_MS;
+            let challenge_ttl = super::super::DEFAULT_CHALLENGE_TTL_MS;
 
             let record = AuthenticationChallenge {
                 challenge: serde_json::to_string(&rcr.public_key.challenge)

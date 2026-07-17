@@ -36,6 +36,7 @@ pub mod relay;
 pub mod text;
 pub mod tts;
 pub mod tunnels;
+pub mod behavior;
 pub mod ui_auth;
 
 // --- 便捷 re-export ---
@@ -478,6 +479,9 @@ fn build_router(state: Arc<state::AppState>, config: &Config) -> Router {
         .route("/api/config/skills/install", post(skills_catalog::routes::install_skills))
         .route("/api/config/skills/{name}", get(skills_catalog::routes::get_skill).post(skills_catalog::routes::create_skill).patch(skills_catalog::routes::update_skill).delete(skills_catalog::routes::delete_skill))
         .route("/api/config/skills/{name}/files/{*file_path}", get(skills_catalog::routes::read_skill_file).put(skills_catalog::routes::write_skill_file).delete(skills_catalog::routes::delete_skill_file))
+        // Behavior 设置 (Tauri 模式下 Node 后端不可达)
+        .route("/api/config/settings", get(behavior::get_settings).put(behavior::put_settings))
+        .route("/api/behavior/agents-md", get(behavior::get_agents_md).put(behavior::put_agents_md))
         // SSE 透传代理 (具体路由, 优先于 catch-all)
         .route("/api/global/event", get(realtime::sse_proxy::sse_proxy_handler))
         .route("/api/event", get(realtime::sse_proxy::sse_proxy_handler))

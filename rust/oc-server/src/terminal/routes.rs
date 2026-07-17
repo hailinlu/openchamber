@@ -449,7 +449,8 @@ pub async fn terminal_ws_handler(
     State(state): State<Arc<AppState>>,
 ) -> Response {
     ws.max_message_size(TERMINAL_WS_MAX_PAYLOAD_BYTES * 2)
-        .max_write_buffer_size(TERMINAL_WS_MAX_PAYLOAD_BYTES)
+        .write_buffer_size(TERMINAL_WS_MAX_PAYLOAD_BYTES)
+        .max_write_buffer_size(TERMINAL_WS_MAX_PAYLOAD_BYTES * 2)
         .on_upgrade(move |socket| run_terminal_bridge(socket, state))
 }
 
