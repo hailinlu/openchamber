@@ -76,3 +76,8 @@ test-results/
 # Rust build artifacts
 rust/target/
 rust/**/target/
+
+# Tauri mobile icon build artifacts (desktop shell only; iOS/Android not built)
+rust/oc-tauri/src-tauri/icons/android/
+rust/oc-tauri/src-tauri/icons/ios/
+rust/oc-tauri/src-tauri/icons/64x64.png
