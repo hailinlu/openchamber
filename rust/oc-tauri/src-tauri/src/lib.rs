@@ -23,11 +23,12 @@ mod ssh;
 mod tray;
 mod updater;
 
-use std::sync::Mutex;
+use std::sync::{LazyLock, Mutex};
 
 use backend::BackendHandle;
 use ipc::globals::{build_init_script, RuntimeContext};
 use sidecar::SidecarBuilder;
+use tauri::image::Image;
 use tauri::Manager;
 
 /// 全局后端句柄 + 它专属的 tokio 运行时。
@@ -37,6 +38,44 @@ struct BackendState {
 }
 
 static BACKEND: Mutex<Option<BackendState>> = Mutex::new(None);
+
+/// 编译时嵌入主窗口图标。
+///
+/// `cargo tauri dev` 不打包 .app bundle, macOS/Linux/Windows 在 dev 模式下不会读
+/// `bundle.icon` 配置, 而是回退到 Tauri 默认图标。这里显式 `set_icon` 把 OpenChamber
+/// 品牌图标注入运行时窗口 (Dock / 任务栏 / 标题栏)。
+/// build 模式下 .icns/.ico 已随 bundle 生效, 此 set_icon 无害 (同源图标)。
+static WINDOW_ICON: LazyLock<Image<'static>> = LazyLock::new(|| {
+    Image::from_bytes(include_bytes!("../icons/128x128.png"))
+        .expect("failed to parse embedded window icon PNG")
+});
+
+/// 初始化主窗口: 注入 init_script + 应用 vibrancy + 设置窗口图标。
+///
+/// 抽出此 helper 消除 sidecar / in-process 两条路径的重复窗口初始化逻辑。
+/// 图标设置在所有平台执行 (dev 模式的核心修复点)。
+fn init_main_window(app: &tauri::AppHandle, init_script: &str) {
+    let Some(window) = app.get_webview_window("main") else {
+        log::warn!("main window not found, skipping init");
+        return;
+    };
+
+    // 1. 窗口图标 — dev 模式核心修复 (见 WINDOW_ICON 注释)
+    if let Err(e) = window.set_icon(WINDOW_ICON.clone()) {
+        log::warn!("failed to set window icon: {}", e);
+    }
+
+    // 2. 注入 init_script (后端 base_url / 桥全局变量)
+    if let Err(e) = window.eval(init_script) {
+        log::error!("failed to inject init_script: {}", e);
+    }
+
+    // 3. macOS vibrancy (可选, 默认开)
+    #[cfg(all(target_os = "macos", feature = "vibrancy"))]
+    {
+        apply_vibrancy_if_enabled(&window);
+    }
+}
 
 /// 获取后端 base_url (供 IPC 命令 HTTP 调用后端端点)。
 ///
@@ -101,15 +140,7 @@ pub fn run() {
 
                             let ctx = RuntimeContext::from_sidecar_port(port);
                             let init_script = build_init_script(&ctx);
-                            if let Some(window) = app.get_webview_window("main") {
-                                if let Err(e) = window.eval(&init_script) {
-                                    log::error!("failed to inject init_script: {}", e);
-                                }
-                                #[cfg(all(target_os = "macos", feature = "vibrancy"))]
-                                {
-                                    apply_vibrancy_if_enabled(&window);
-                                }
-                            }
+                            init_main_window(app.handle(), &init_script);
 
                             *BACKEND.lock().unwrap() = Some(BackendState {
                                 handle: Some(BackendHandle::Sidecar(h)),
@@ -136,15 +167,7 @@ pub fn run() {
 
                             let ctx = RuntimeContext::from_sidecar_port(port);
                             let init_script = build_init_script(&ctx);
-                            if let Some(window) = app.get_webview_window("main") {
-                                if let Err(e) = window.eval(&init_script) {
-                                    log::error!("failed to inject init_script: {}", e);
-                                }
-                                #[cfg(all(target_os = "macos", feature = "vibrancy"))]
-                                {
-                                    apply_vibrancy_if_enabled(&window);
-                                }
-                            }
+                            init_main_window(app.handle(), &init_script);
 
                             *BACKEND.lock().unwrap() = Some(BackendState {
                                 handle: Some(BackendHandle::InProcess(server)),

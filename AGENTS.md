@@ -6,36 +6,49 @@ OpenChamber provides UI runtimes (web/desktop/VS Code) for interacting with an O
 
 ## Runtime architecture (IMPORTANT)
 
-- `Desktop` (Electron) boots the web server **in the same Node process** as the Electron main, then loads the web UI from `http://127.0.0.1:<port>`. No sidecar subprocess.
-- Backend/domain logic lives in `packages/web/server/*` (and `packages/vscode/*` for VS Code bridge/runtime parity). Electron owns the desktop shell/security boundary: windows, menus, dialogs, notifications, updater, deep-links, runtime host switching, local IPC gates, and SSH/tunnel management.
+There are two desktop shells in active development:
+
+- **Tauri (`rust/oc-tauri`)** — the migration target. Default mode embeds the Rust `oc-server` (axum) **in-process** via `oc_server::OcServer::start(config)` (same single-process model as Electron, but Rust+axum instead of Node+Express). `OPENCHAMBER_SIDECAR=1` switches to a sidecar fallback that spawns the `@openchamber/web` CLI as a subprocess (decision: `rust/oc-tauri/src-tauri/src/backend.rs:use_sidecar()`). Migration status is tracked in `rust/README.md` (authoritative, phase-by-phase).
+- **Electron (`packages/electron`)** — legacy, still the shipped desktop release. Boots the web server **in the same Node process** as the Electron main, then loads the web UI from `http://127.0.0.1:<port>`. No sidecar subprocess.
+
+Backend/domain logic for the Node path lives in `packages/web/server/*` (and `packages/vscode/*` for VS Code bridge/runtime parity). The Rust port of the same backend lives in `rust/oc-server/src/*`. The desktop shell owns the security boundary: windows, menus, dialogs, notifications, updater, deep-links, runtime host switching, local IPC gates, and SSH/tunnel management.
 - Do not add OpenCode feature backends to the native shell. Shared UI features should remain server/runtime APIs unless the capability is inherently native.
 
 ### Desktop Shell
 
-- **Desktop work goes into `packages/electron/`.**
-- Desktop-side changes (IPC handlers, native integrations, window/quit/notification behavior) land in `packages/electron/main.mjs` + `packages/electron/preload.mjs`.
-- Electron imports the server via `@openchamber/web/server/index.js` (workspace dep) and calls `startWebUiServer({...})`. The returned handle has `getPort()` / `stop()`. Notifications flow via an `onDesktopNotification` callback injected at startup — no stdout-parsing IPC.
+- **Tauri (migration target):** `rust/oc-tauri/src-tauri/src/`. `lib.rs::run()` builds the app; `setup` spawns the backend (in-process oc-server or sidecar), injects `window.__OPENCHAMBER_DESKTOP__` via `init_main_window`, applies macOS vibrancy, and installs SIGTERM/SIGINT cleanup. Modules: `backend.rs` (handle enum + sidecar decision), `ipc/` (window/system/dialog/shell commands), `tray.rs` (breathing animation), `ssh/` (ControlMaster, 1:1 port of `ssh-manager.mjs`), `settings.rs`, `power.rs`, `updater.rs`, `menu.rs`. Config: `rust/oc-tauri/src-tauri/tauri.conf.json`. Capabilities ACL: `capabilities/default.json`.
+- **Electron (legacy):** `packages/electron/`. Desktop-side changes (IPC handlers, native integrations, window/quit/notification behavior) land in `packages/electron/main.mjs` + `packages/electron/preload.mjs`. Electron imports the server via `@openchamber/web/server/index.js` (workspace dep) and calls `startWebUiServer({...})`. The returned handle has `getPort()` / `stop()`. Notifications flow via an `onDesktopNotification` callback injected at startup — no stdout-parsing IPC.
 - Windows OS integrations must avoid console-window flashes. Any non-user-visible `child_process` call on Windows (system probes, tool discovery, updater/install helpers, SSH/tunnel helpers, cleanup, etc.) should run the target executable directly with `windowsHide: true`; detached/background helpers usually also need `stdio: 'ignore'`. Avoid `cmd.exe /c` pipelines and wrappers that spawn console grandchildren (`taskkill`, `ping`, nested `powershell`, batch shims), because `windowsHide` only reliably applies to the first child. If a delayed/background operation must outlive the app process, use a single hidden first-level helper (for example `powershell.exe -WindowStyle Hidden -EncodedCommand ...`) or a native Node/Electron API. Only omit this for intentionally user-visible shells/apps.
-- Build/release: Electron is the desktop release target.
+- Build/release: Electron is the current desktop release target. Tauri is the migration target (Phase 4B complete; see `rust/README.md`).
 
-## Tech stack (source of truth: `package.json`, resolved: `bun.lock`)
+## Tech stack
 
-- Runtime/tooling: Bun (`package.json` `packageManager`), Node >=22 (`package.json` `engines`)
+- Package manager: pnpm (`package.json` `packageManager: pnpm@11.12.0`, lockfile `pnpm-lock.yaml`, workspaces `pnpm-workspace.yaml`). Bun is used as a task runner (`bun run`, `bun x`) but is NOT the package manager.
+- Node >=22 (`package.json` `engines`)
 - UI: React, TypeScript, Vite, Tailwind v4
 - State: Zustand stores and sync layer (`packages/ui/src/stores/`, `packages/ui/src/sync/`)
 - UI primitives: Base UI (`@base-ui/react`, primary source for dropdown/select/dialog/menu/tooltip/etc. — wrappers live in `packages/ui/src/components/ui/`), Radix UI (`package.json` deps, legacy usages being migrated), HeroUI (`package.json` deps), Remixicon as SVG sprite source only (use shared `Icon`, never direct `@remixicon/react` imports)
-- Server: Express (`packages/web/server/index.js`)
-- Desktop: Electron 41 (`packages/electron/`)
+- Server (Node): Express (`packages/web/server/index.js`)
+- Server (Rust): axum (`rust/oc-server`, Rust port of the Express server; edition 2021, MSRV 1.85)
+- Desktop (migration target): Tauri 2.11 (`rust/oc-tauri`)
+- Desktop (legacy): Electron 41 (`packages/electron/`)
 - VS Code: extension + webview (`packages/vscode/`)
 
 ## Monorepo layout
 
-Workspaces are `packages/*` (see `package.json`).
+Node workspaces are `packages/*` (see `package.json`, `pnpm-workspace.yaml`). The Rust migration lives in a separate Cargo workspace under `rust/` (see `rust/Cargo.toml`).
 
+Node packages:
 - Shared UI: `packages/ui`
 - Web app + server + CLI: `packages/web`
-- Desktop shell: `packages/electron`
+- Desktop shell (legacy): `packages/electron`
 - VS Code extension: `packages/vscode`
+
+Rust workspace (`rust/`, separate from pnpm):
+- `rust/oc-core` — shared types/errors (`Error` with `http_status()`/`to_json()`)
+- `rust/oc-opencode-sdk` — OpenCode server-side client (replaces `@opencode-ai/sdk` server-side usage)
+- `rust/oc-server` — axum backend binary + lib, the Rust port of `packages/web/server` (Express → axum)
+- `rust/oc-tauri/src-tauri` — Tauri desktop shell, the Rust replacement for `packages/electron`
 
 ## Documentation map
 
@@ -179,17 +192,25 @@ All scripts are in `package.json`.
 
 - Validate: `bun run type-check`, `bun run lint`
 - Build all: `bun run build`
-- Desktop build (Electron — primary): `bun run electron:build`
-- Desktop dev (Electron): `bun run electron:dev`
+- Desktop build (Electron — current release): `bun run electron:build`
+- Desktop dev (Electron, legacy): `bun run electron:dev`
+- Desktop dev (Tauri, migration target): `bun run tauri:dev` (in-process oc-server; orchestrator: `scripts/tauri-dev.mjs` → `scripts/dev-web-hmr.mjs` + `cargo tauri dev`)
+- Desktop dev (Tauri, sidecar fallback): `bun run tauri:dev:sidecar` (`OPENCHAMBER_SIDECAR=1`)
+- Desktop build (Tauri): `cargo tauri build` (run inside `rust/oc-tauri/src-tauri`; expects prebuilt UI at `rust/ui-dist`)
+- Rust build/test: `cargo build` / `cargo test` (run inside `rust/`)
 - VS Code build: `bun run vscode:build`
 - Release smoke build: `bun run release:test` (shell script: `scripts/test-release-build.sh`)
+
+Note: `tauri:dev` Ctrl+C may print `error: script "dev:server:watch" exited with code 130`. This is benign teardown noise — SIGINT is forwarded through the nodemon child process; bun reports the non-zero exit as an error. Process-tree cleanup (`stopChildTree`) is unaffected.
 
 ## Runtime entry points
 
 - Web bootstrap: `packages/web/src/main.tsx`
-- Web server: `packages/web/server/index.js`
+- Web server (Node): `packages/web/server/index.js`
 - Web CLI: `packages/web/bin/cli.js` (package bin: `packages/web/package.json`)
-- Desktop: `packages/electron/main.mjs` (boots the web server in-process via `startWebUiServer`, loads web UI over loopback; preload at `packages/electron/preload.mjs` exposes the desktop IPC bridge)
+- Desktop (Electron, legacy): `packages/electron/main.mjs` (boots the web server in-process via `startWebUiServer`, loads web UI over loopback; preload at `packages/electron/preload.mjs` exposes the desktop IPC bridge)
+- Desktop (Tauri, migration target): `rust/oc-tauri/src-tauri/src/main.rs` → `lib.rs::run()` (embeds oc-server in-process or spawns it as sidecar; injects `window.__OPENCHAMBER_DESKTOP__` init script; config: `rust/oc-tauri/src-tauri/tauri.conf.json`)
+- Rust backend: `rust/oc-server/src/main.rs` → `lib.rs::OcServer::start()` (thin shell: `tracing` init + `Config::load()` + `build_router` + ordered `shutdown()`; route registry in `lib.rs::build_router`)
 - VS Code extension host: `packages/vscode/src/extension.ts`
 - VS Code webview bootstrap: `packages/vscode/webview/main.tsx`
 
