@@ -23,6 +23,7 @@ mod ssh;
 mod tray;
 mod updater;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{LazyLock, Mutex};
 
 use backend::BackendHandle;
@@ -38,6 +39,58 @@ struct BackendState {
 }
 
 static BACKEND: Mutex<Option<BackendState>> = Mutex::new(None);
+
+const BACKGROUND_START_ARG: &str = "--background";
+static QUIT_REQUESTED: AtomicBool = AtomicBool::new(false);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClosePolicy {
+    AllowClose,
+    HideToTray,
+}
+
+fn close_policy(
+    is_windows: bool,
+    is_main_window: bool,
+    minimize_to_tray: bool,
+    quit_requested: bool,
+) -> ClosePolicy {
+    if is_windows && is_main_window && minimize_to_tray && !quit_requested {
+        ClosePolicy::HideToTray
+    } else {
+        ClosePolicy::AllowClose
+    }
+}
+
+fn should_start_in_background<I, S>(args: I) -> bool
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    args.into_iter()
+        .any(|arg| arg.as_ref() == BACKGROUND_START_ARG)
+}
+
+#[derive(Debug, Default)]
+struct MaximizeState {
+    last: Option<bool>,
+}
+
+impl MaximizeState {
+    fn transition(&mut self, next: bool) -> Option<bool> {
+        if self.last == Some(next) {
+            return None;
+        }
+
+        self.last = Some(next);
+        Some(next)
+    }
+}
+
+pub(crate) fn request_quit(app: &tauri::AppHandle) {
+    QUIT_REQUESTED.store(true, Ordering::SeqCst);
+    app.exit(0);
+}
 
 /// 编译时嵌入主窗口图标。
 ///
@@ -405,5 +458,72 @@ mod tests {
         let _ = rx.recv();
         // 此时 Mutex 已 poison。shutdown_backend 必须 tolerate。
         shutdown_backend(); // 不 panic 即通过
+    }
+
+    #[test]
+    fn windows_main_close_hides_when_enabled() {
+        assert_eq!(
+            close_policy(true, true, true, false),
+            ClosePolicy::HideToTray,
+        );
+    }
+
+    #[test]
+    fn disabled_minimize_to_tray_allows_close() {
+        assert_eq!(
+            close_policy(true, true, false, false),
+            ClosePolicy::AllowClose,
+        );
+    }
+
+    #[test]
+    fn explicit_quit_bypasses_close_to_tray() {
+        assert_eq!(
+            close_policy(true, true, true, true),
+            ClosePolicy::AllowClose,
+        );
+    }
+
+    #[test]
+    fn non_windows_or_non_main_windows_are_not_intercepted() {
+        assert_eq!(
+            close_policy(false, true, true, false),
+            ClosePolicy::AllowClose,
+        );
+        assert_eq!(
+            close_policy(true, false, true, false),
+            ClosePolicy::AllowClose,
+        );
+    }
+
+    #[test]
+    fn detects_exact_background_argument() {
+        assert!(should_start_in_background([
+            "GridForge.exe",
+            "--background",
+        ]));
+    }
+
+    #[test]
+    fn ignores_unrelated_or_prefixed_background_arguments() {
+        assert!(!should_start_in_background([
+            "GridForge.exe",
+            "--some-other-flag",
+        ]));
+        assert!(!should_start_in_background([
+            "GridForge.exe",
+            "--background=true",
+        ]));
+    }
+
+    #[test]
+    fn maximize_state_emits_initial_and_changed_values_only() {
+        let mut state = MaximizeState::default();
+
+        assert_eq!(state.transition(false), Some(false));
+        assert_eq!(state.transition(false), None);
+        assert_eq!(state.transition(true), Some(true));
+        assert_eq!(state.transition(true), None);
+        assert_eq!(state.transition(false), Some(false));
     }
 }
