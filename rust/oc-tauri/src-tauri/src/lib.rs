@@ -24,12 +24,11 @@ mod tray;
 mod updater;
 
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{LazyLock, Mutex};
+use std::sync::Mutex;
 
 use backend::BackendHandle;
 use ipc::globals::{build_init_script, RuntimeContext};
 use sidecar::SidecarBuilder;
-use tauri::image::Image;
 use tauri::Manager;
 
 /// 全局后端句柄 + 它专属的 tokio 运行时。
@@ -92,38 +91,51 @@ pub(crate) fn request_quit(app: &tauri::AppHandle) {
     app.exit(0);
 }
 
-/// 编译时嵌入主窗口图标。
+/// 配置主窗口 shell (必须在后端启动之前调用)。
 ///
-/// `cargo tauri dev` 不打包 .app bundle, macOS/Linux/Windows 在 dev 模式下不会读
-/// `bundle.icon` 配置, 而是回退到 Tauri 默认图标。这里显式 `set_icon` 把 GridForge
-/// 品牌图标注入运行时窗口 (Dock / 任务栏 / 标题栏)。
-/// build 模式下 .icns/.ico 已随 bundle 生效, 此 set_icon 无害 (同源图标)。
-static WINDOW_ICON: LazyLock<Image<'static>> = LazyLock::new(|| {
-    Image::from_bytes(include_bytes!("../icons/128x128.png"))
-        .expect("failed to parse embedded window icon PNG")
-});
-
-/// 初始化主窗口: 注入 init_script + 应用 vibrancy + 设置窗口图标。
-///
-/// 抽出此 helper 消除 sidecar / in-process 两条路径的重复窗口初始化逻辑。
-/// 图标设置在所有平台执行 (dev 模式的核心修复点)。
-fn init_main_window(app: &tauri::AppHandle, init_script: &str) {
+/// 负责 platform-native 的窗口骨架: 图标 + Windows 无边框 + 后台启动时隐藏。
+/// 不依赖后端 base_url,因此可以在 backend 启动前/失败时安全执行。
+fn configure_main_window_shell(app: &tauri::AppHandle, background_start: bool) {
     let Some(window) = app.get_webview_window("main") else {
-        log::warn!("main window not found, skipping init");
+        log::warn!("main window not found during shell setup");
         return;
     };
 
-    // 1. 窗口图标 — dev 模式核心修复 (见 WINDOW_ICON 注释)
-    if let Err(e) = window.set_icon(WINDOW_ICON.clone()) {
-        log::warn!("failed to set window icon: {}", e);
+    // 1. 窗口图标 — 用 tauri.conf.json bundle 配置的图标 (dev/build 都生效)
+    if let Some(icon) = app.default_window_icon().cloned() {
+        if let Err(error) = window.set_icon(icon) {
+            log::warn!("failed to set main window icon: {}", error);
+        }
     }
 
-    // 2. 注入 init_script (后端 base_url / 桥全局变量)
-    if let Err(e) = window.eval(init_script) {
-        log::error!("failed to inject init_script: {}", e);
+    // 2. Windows 关闭原生 chrome (使用 web title bar + 自绘窗口控制)
+    #[cfg(target_os = "windows")]
+    if let Err(error) = window.set_decorations(false) {
+        log::warn!("failed to disable Windows window decorations: {}", error);
     }
 
-    // 3. macOS vibrancy (可选, 默认开)
+    // 3. 后台启动 → 立即隐藏 (托盘激活后用 Show GridForge 恢复)
+    if background_start {
+        if let Err(error) = window.hide() {
+            log::warn!("failed to hide main window for background launch: {}", error);
+        }
+    }
+}
+
+/// 向主窗口注入运行时桥 (后端就绪后调用)。
+///
+/// 仅负责依赖后端 base_url / 端口的运行时脚本注入,以及 macOS vibrancy 应用。
+fn inject_main_window_runtime(app: &tauri::AppHandle, init_script: &str) {
+    let Some(window) = app.get_webview_window("main") else {
+        return;
+    };
+
+    // 1. 注入 init_script (后端 base_url / 桥全局变量)
+    if let Err(error) = window.eval(init_script) {
+        log::warn!("failed to inject main window runtime: {}", error);
+    }
+
+    // 2. macOS vibrancy (可选, 默认开)
     #[cfg(all(target_os = "macos", feature = "vibrancy"))]
     {
         apply_vibrancy_if_enabled(&window);
@@ -169,6 +181,12 @@ pub fn run() {
                 )?;
             }
 
+            // --- 配置主窗口 shell (在后端启动之前) ---
+            // 不依赖后端 base_url/端口: 图标 + Windows 无边框 + 后台启动时立即隐藏。
+            // 这样后台启动时窗口不会先闪一下再消失,且 Windows chrome 与后端就绪解耦。
+            let background_start = should_start_in_background(std::env::args());
+            configure_main_window_shell(app.handle(), background_start);
+
             // --- 启动后端 (仅桌面端) ---
             #[cfg(desktop)]
             {
@@ -193,7 +211,7 @@ pub fn run() {
 
                             let ctx = RuntimeContext::from_sidecar_port(port);
                             let init_script = build_init_script(&ctx);
-                            init_main_window(app.handle(), &init_script);
+                            inject_main_window_runtime(app.handle(), &init_script);
 
                             *BACKEND.lock().unwrap() = Some(BackendState {
                                 handle: Some(BackendHandle::Sidecar(h)),
@@ -220,7 +238,7 @@ pub fn run() {
 
                             let ctx = RuntimeContext::from_sidecar_port(port);
                             let init_script = build_init_script(&ctx);
-                            init_main_window(app.handle(), &init_script);
+                            inject_main_window_runtime(app.handle(), &init_script);
 
                             *BACKEND.lock().unwrap() = Some(BackendState {
                                 handle: Some(BackendHandle::InProcess(server)),
