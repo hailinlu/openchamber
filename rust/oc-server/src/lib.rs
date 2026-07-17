@@ -536,7 +536,12 @@ fn build_router(state: Arc<state::AppState>, config: &Config) -> Router {
         .layer(axum::middleware::from_fn_with_state(
             state.clone(),
             middleware::auth::require_api_auth,
-        ));
+        ))
+        // CORS 最外层 (axum layer 栈: 后挂的先执行) — 对齐 Node 在
+        // `app.use(requireApiAuth)` 之前注册 CORS (`index.js:1328`)。
+        // OPTIONS 预检在此直接返回 204, 不进 auth 中间件。
+        // 必要: Tauri dev 模式 UI (vite :5180) 与 API (oc-server) 跨域。
+        .layer(axum::middleware::from_fn(middleware::cors::cors_layer));
 
     // 静态 dist 托管 + SPA fallback
     if config.api_only {

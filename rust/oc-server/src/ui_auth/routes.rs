@@ -181,6 +181,28 @@ pub async fn auth_session_status(
             .into_response();
     }
 
+    // 未配置密码 (disabled) — 对齐 Node `handleSessionStatus` (ui-auth.js:555-564):
+    //   - requireClientAuth: 校验 client token, 通过则 authenticated, 否则 401 clientAuthRequired
+    //   - 否则: 直接 authenticated (disabled 模式无需认证)
+    if !state.ui_auth.enabled {
+        if state.ui_auth.require_client_auth {
+            if authenticate_client(&state, &headers).is_some() {
+                return Json(json!({ "authenticated": true, "disabled": true, "scope": "client" }))
+                    .into_response();
+            }
+            return (
+                StatusCode::UNAUTHORIZED,
+                Json(json!({
+                    "authenticated": false,
+                    "locked": true,
+                    "clientAuthRequired": true
+                })),
+            )
+                .into_response();
+        }
+        return Json(json!({ "authenticated": true, "disabled": true })).into_response();
+    }
+
     // 检查 session cookie
     if has_valid_session(&state, &headers) {
         return Json(json!({ "authenticated": true })).into_response();
