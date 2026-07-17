@@ -7,6 +7,12 @@
 //   3. 起 `cargo tauri dev` (默认进程内嵌 oc-server; OPENCHAMBER_SIDECAR=1 走 sidecar 回退)
 //   4. 退出时整树清理 (SIGINT/SIGTERM/SIGHUP 或任一子进程退出)
 //
+// 已知良性噪音 (非 bug):
+//   Ctrl+C 停止时, 终端可能打印 `error: script "dev:server:watch" exited with code 130`。
+//   这是 bun 的固有行为 —— teardown 链 (tauri:dev → dev-web-hmr.mjs → nodemon) 把 SIGINT
+//   逐级转发, nodemon 被信号杀死后以 130 退出, bun run 把非零退出码当 error 报。
+//   属于用户主动停止的正常副作用, 不影响清理完整性 (stopChildTree 保证进程树回收)。
+//
 // 用法:
 //   node scripts/tauri-dev.mjs              # 默认 (进程内嵌 oc-server)
 //   OPENCHAMBER_SIDECAR=1 node scripts/tauri-dev.mjs   # sidecar 回退路径

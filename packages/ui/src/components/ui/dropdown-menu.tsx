@@ -51,6 +51,11 @@ function DropdownMenu({
 function DropdownMenuTrigger({
   asChild,
   children,
+  // Base UI 的 Menu.Trigger 默认 nativeButton=true,会在 render prop 不是 <button>
+  // 时打出可访问性警告。本仓库 5/5 调用点都用 <div> 作为 trigger (ModelControls /
+  // ModelSelector / AgentSelector),因此这里默认 false 以消除警告;需要原生 button
+  // 语义的调用点可显式传 nativeButton={true}。
+  nativeButton = false,
   onPointerDownCapture,
   onFocusCapture,
   ...props
@@ -68,6 +73,7 @@ function DropdownMenuTrigger({
   return (
     <BaseMenu.Trigger
       data-slot="dropdown-menu-trigger"
+      nativeButton={nativeButton}
       onPointerDownCapture={(event) => {
         syncPortalContainer(event.currentTarget);
         onPointerDownCapture?.(event);
