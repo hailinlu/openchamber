@@ -1,7 +1,6 @@
 import React from 'react';
 
 import { SortableTabsStrip } from '@/components/ui/sortable-tabs-strip';
-import { ProjectNotesTodoPanel } from '@/components/session/ProjectNotesTodoPanel';
 import { GitView } from '@/components/views/GitView';
 import { Icon } from "@/components/icon/Icon";
 import { useGitStore } from '@/stores/useGitStore';
@@ -12,6 +11,7 @@ import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
 import { formatDirectoryName, cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
+import { ProjectNotesTodoPanel } from '@/components/session/ProjectNotesTodoPanel';
 import { SidebarFilesTree } from './SidebarFilesTree';
 
 type RightTab = 'git' | 'files' | 'context';
@@ -118,6 +118,11 @@ export const ProjectContextPanel: React.FC = () => {
   );
 };
 
+// Hides git and context tabs from the right sidebar.
+// Set to false to restore them.
+const HIDE_GIT_TAB = true;
+const HIDE_CONTEXT_TAB = true;
+
 export const RightSidebarTabs: React.FC = () => {
   const { t } = useI18n();
   const rightSidebarTab = useUIStore((state) => state.rightSidebarTab);
@@ -150,21 +155,21 @@ export const RightSidebarTabs: React.FC = () => {
   }, [hiddenRightTab, rightSidebarTab, setRightSidebarTab]);
 
   const tabItems = React.useMemo(() => [
-    {
-      id: 'git',
+    ...(!HIDE_GIT_TAB ? [{
+      id: 'git' as const,
       label: t('layout.rightSidebar.git'),
       icon: <Icon name="git-branch" className="h-3.5 w-3.5" />,
-    },
+    }] : []),
     {
-      id: 'files',
+      id: 'files' as const,
       label: t('layout.rightSidebar.files'),
       icon: <Icon name="folder-3" className="h-3.5 w-3.5" />,
     },
-    {
-      id: 'context',
+    ...(!HIDE_CONTEXT_TAB ? [{
+      id: 'context' as const,
       label: t('layout.rightSidebar.context'),
       icon: <Icon name="file-list-2" className="h-3.5 w-3.5" />,
-    },
+    }] : []),
   ], [t]);
 
   const visibleTabItems = React.useMemo(

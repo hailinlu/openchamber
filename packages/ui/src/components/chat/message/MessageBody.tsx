@@ -39,7 +39,7 @@ import { Icon } from "@/components/icon/Icon";
 import { formatTimestampForDisplay } from './timeFormat';
 import { ToolRevealOnMount } from './parts/ToolRevealOnMount';
 import { StaticToolRow } from './parts/ProgressiveGroup';
-import { isExpandableTool, isStandaloneTool } from './parts/toolRenderUtils';
+import { isExpandableTool, isStandaloneTool, EDIT_TOOL_NAMES } from './parts/toolRenderUtils';
 import TurnActivity from '../components/TurnActivity';
 import { createProjectPlanFile } from '@/lib/openchamberConfig';
 import { resolveProjectForSessionDirectory } from '@/lib/projectResolution';
@@ -421,6 +421,7 @@ interface MessageBodyProps {
     userActionsMode?: 'inline' | 'external-content' | 'external-actions';
     stickyUserHeaderEnabled?: boolean;
     reviewTransferDirection?: ReviewTransferDirection | null;
+    hideNonEditToolCalls?: boolean;
 }
 
 const TOOL_REVEAL_CACHE_MAX = 200;
@@ -1039,8 +1040,9 @@ const AssistantMessageBody = React.memo(({
     hasTextContent = false,
     onCopyMessage,
     onAuxiliaryContentComplete,
-    showReasoningTraces = false,
+    showReasoningTraces = true,
     turnGroupingContext,
+    hideNonEditToolCalls = false,
     errorMessage,
     errorVariant = 'error',
     reviewTransferDirection = null,
@@ -1728,6 +1730,7 @@ const AssistantMessageBody = React.memo(({
                             animatedToolIds={animatedToolIdsLookup}
                             diffStats={turnGroupingContext.diffStats}
                             renderJustificationActions={renderJustificationActions}
+                            hideNonEditToolCalls={hideNonEditToolCalls}
                         />
                     </div>
                 );
@@ -1836,6 +1839,41 @@ const AssistantMessageBody = React.memo(({
                     continue;
                 }
 
+                // When the user opts to hide non-edit tool calls, skip everything
+                // except edit-family tools (edit/write/multiedit/apply_patch/...).
+                if (hideNonEditToolCalls && !EDIT_TOOL_NAMES.has(toolName)) {
+                    // For todowrite/todoread, extract in_progress task descriptions as
+                    // inline text so the user sees what's being worked on without the
+                    // full block. Data lives in part.state.input.todos (JSON string) or
+                    // part.state.output (JSON string).
+                    if (toolName === 'todowrite' || toolName === 'todoread') {
+                        const toolState = toolPart.state as { input?: Record<string, unknown>; output?: string } | undefined;
+                        const rawInputTodos = toolState?.input?.todos;
+                        const rawOutput = toolState?.output;
+                        const parseTodoJson = (raw: unknown): Array<Record<string, unknown>> => {
+                            if (Array.isArray(raw)) return raw as Array<Record<string, unknown>>;
+                            if (typeof raw === 'string') {
+                                try { const p = JSON.parse(raw); return Array.isArray(p) ? p : []; } catch { /* not JSON */ }
+                            }
+                            return [];
+                        };
+                        const todos = parseTodoJson(rawInputTodos).length > 0
+                            ? parseTodoJson(rawInputTodos)
+                            : parseTodoJson(rawOutput);
+                        const inProgress = todos.filter((t) => t.status === 'in_progress');
+                        if (inProgress.length > 0) {
+                            const stripBrackets = (s: string) => s.replace(/【[^】]*】/g, '').trim();
+                            rendered.push(
+                                <div key={`todo-summary-${part.id}`} className="px-1 py-0.5 text-xs text-muted-foreground/75 italic">
+                                    → {inProgress.map((t) => stripBrackets(String(t.content ?? ''))).join(' → ')}
+                                </div>
+                            );
+                        }
+                    }
+                    i++;
+                    continue;
+                }
+
                 // Expandable tools: bash, edit, write, task, question — individual rows
                 if (isExpandableTool(toolName)) {
                     rendered.push(
@@ -1914,6 +1952,7 @@ const AssistantMessageBody = React.memo(({
         shouldShowTool,
         effectiveStreamPhase,
         showReasoningTraces,
+        hideNonEditToolCalls,
         shouldDeferSortedInlineText,
         toggleActivityGroup,
         turnGroupingContext,

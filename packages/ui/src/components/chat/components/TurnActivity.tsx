@@ -28,6 +28,7 @@ interface TurnActivityProps {
     animatedToolIds?: Set<string>;
     diffStats?: DiffStats;
     renderJustificationActions?: (activity: TurnActivityRecord) => React.ReactNode;
+    hideNonEditToolCalls?: boolean;
 }
 
 const TurnActivity: React.FC<TurnActivityProps> = (props) => {

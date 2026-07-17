@@ -48,6 +48,7 @@ import { areRenderRelevantPartsEqual } from '../renderCompare';
 import { useI18n } from '@/lib/i18n';
 import { getDiffPatchEntries, getPatchText, type DiffPatchEntry } from './toolDiffUtils';
 import { isEmbeddedSessionChat } from '@/components/layout/contextPanelEmbeddedChat';
+import { EDIT_TOOL_NAMES } from './toolRenderUtils';
 
 const TOOL_ROW_TEXT_CLASS = '!text-[length:var(--text-meta)] !leading-5 sm:!leading-6 tracking-normal';
 const TOOL_ROW_TITLE_CLASS = cn('typography-meta font-medium', TOOL_ROW_TEXT_CLASS);
@@ -1022,6 +1023,7 @@ const readTaskSessionIdFromOutput = (output: string | undefined): string | undef
 
 const buildTaskSummaryEntriesFromSession = (messages: SessionMessageWithParts[]): TaskToolSummaryEntry[] => {
     const entries: TaskToolSummaryEntry[] = [];
+    const hideNonEditToolCalls = useUIStore.getState().hideNonEditToolCalls === true;
 
     for (const message of messages) {
         if (message?.info?.role !== 'assistant') {
@@ -1034,6 +1036,9 @@ const buildTaskSummaryEntriesFromSession = (messages: SessionMessageWithParts[])
             }
             const toolName = normalizeToolName(part.tool);
             if (!toolName || toolName === 'task' || toolName === 'todowrite' || toolName === 'todoread') {
+                continue;
+            }
+            if (hideNonEditToolCalls && !EDIT_TOOL_NAMES.has(toolName)) {
                 continue;
             }
             const partState = part.state as { status?: string; title?: string; input?: unknown } | undefined;

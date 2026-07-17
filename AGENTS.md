@@ -491,6 +491,48 @@ A single store with N properties means every subscriber re-evaluates on every st
 - For sync or startup changes, verify fresh load, retry/failure, and restart behavior.
 - For session changes, verify create, stream, abort, permission, archive/delete, and revisit flows when relevant.
 
+## Frequently-misdiagnosed runtime issues
+
+These are recurring user-facing failures whose on-screen copy is misleading enough that an agent reading the report will guess the wrong root cause. The entries below capture the real cause and the right place to look. Do not patch the symptom (the visible UI / error screen) without first reading the entry — the symptom is usually a downstream effect of a problem elsewhere.
+
+### "We could not verify the UI session" / "Unable to reach server"
+
+- **Symptom**: Opening OpenChamber (typically from a phone / tablet / second laptop on the LAN, but can also happen on the desktop itself) shows:
+
+  > **Unable to reach server**
+  > We could not verify the UI session. If you're opening OpenChamber from another device on your local network, make sure Desktop Network Access is enabled on the desktop app and use the LAN address shown in Settings.
+
+  Note the title — "Unable to reach server" — is the real signal. The body text is a generic message; it does **not** mean LAN access is the problem.
+
+- **Actual root cause**: the browser is fetching the session status from an API base URL whose **port does not match the backend that is actually serving the page**. The page rendered on one port, but `window.__OPENCHAMBER_API_BASE_URL__` (read by `packages/ui/src/lib/runtime-url.ts`) points to a different port, so `runtimeFetch('/api/client-auth/status', ...)` (`SessionAuthGate.tsx:99 fetchSessionStatus`) throws a network-level error → `setState('error')` → `ErrorScreen errorType='network'` (`SessionAuthGate.tsx:273`) → the misleading copy above.
+
+  History: commit `fd1dfd66 fix: resolve runtime URLs from injected desktop API base` introduced call-time resolution of the injected base URL precisely to stop the resolver from holding a stale port; regressions of this issue usually mean the injected `__OPENCHAMBER_API_BASE_URL__` is missing or wrong for the surface the user opened.
+
+- **How to confirm before doing anything else**:
+  1. In the failing browser, open DevTools → Console and run:
+     ```js
+     window.__OPENCHAMBER_API_BASE_URL__
+     window.__OPENCHAMBER_LOCAL_ORIGIN__
+     location.origin
+     ```
+  2. `location.origin` is the port the page is on. `__OPENCHAMBER_API_BASE_URL__` must point to the **same** scheme + host + port (or a routed equivalent). If they differ → bug surface, do not chase LAN settings.
+  3. From the same browser, try fetching the API base directly:
+     ```js
+     fetch(window.__OPENCHAMBER_API_BASE_URL__ + '/api/client-auth/status', { credentials: 'include' })
+     ```
+     A network error / CORS error / non-200 means the backend is not reachable on that port. If `location.origin` is fine but the injected base URL points elsewhere, that is the bug.
+
+- **Where this surfaces in code**:
+  - Error UI: `packages/ui/src/components/auth/SessionAuthGate.tsx:273` (`ErrorScreen`, `errorType='network'`).
+  - Status probe: `packages/ui/src/components/auth/SessionAuthGate.tsx:99` (`fetchSessionStatus` → `runtimeFetch(STATUS_CHECK_ENDPOINT, …)`).
+  - URL plumbing: `packages/ui/src/lib/runtime-url.ts` (resolver), `packages/ui/src/lib/runtime-fetch.ts:245` (`runtimeFetch`), `packages/web/src/runtimeConfig.ts:32` (reads `window.__OPENCHAMBER_API_BASE_URL__`).
+  - i18n keys: `sessionAuth.error.networkTitle` / `networkDescription` in every locale (`packages/ui/src/lib/i18n/messages/*.ts`).
+
+- **Triage rules for an agent seeing this report**:
+  1. First check port alignment via the DevTools snippet above. If `__OPENCHAMBER_API_BASE_URL__` ≠ `location.origin`, that is the cause — fix the injection site (`packages/web/server/`, `packages/electron/`, or the runtime surface that built the injected value), do **not** tweak `SessionAuthGate`.
+  2. The "enable Desktop Network Access" instruction in the body copy is unrelated to this failure mode. Do not send users down that path when the title says "Unable to reach server" — it is a port-mismatch, not a LAN-binding issue.
+  3. Do **not** loosen the auth gate (e.g. skip `fetchSessionStatus` on error) — that would hide real backend outages. The correct response is to repair the URL plumbing.
+
 ## Recent changes
 
 - Releases + high-level changes: `CHANGELOG.md`

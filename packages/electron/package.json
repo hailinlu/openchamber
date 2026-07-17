@@ -2,8 +2,8 @@
   "name": "@openchamber/electron",
   "version": "1.16.0",
   "private": true,
-  "description": "Electron desktop runtime for OpenChamber",
-  "author": "OpenChamber",
+  "description": "Electron desktop runtime for GridForge",
+  "author": "GridForge",
   "type": "module",
   "main": "./dist-bundle/main.mjs",
   "dependencies": {
@@ -46,7 +46,7 @@
   },
   "build": {
     "appId": "dev.openchamber.desktop",
-    "productName": "OpenChamber",
+    "productName": "GridForge",
     "files": [
       "dist-bundle/main.mjs",
       "preload.mjs"
@@ -115,16 +115,17 @@
       "artifactName": "${productName}-${version}-linux-${arch}.${ext}",
       "desktop": {
         "entry": {
-          "Name": "OpenChamber",
-          "Comment": "Desktop runtime for OpenChamber",
+          "Name": "GridForge",
+          "Comment": "Desktop runtime for GridForge",
           "Icon": "openchamber",
           "StartupWMClass": "openchamber"
         }
       }
     },
     "nsis": {
-      "oneClick": true,
+      "oneClick": false,
       "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
       "installerIcon": "resources/icons/icon.ico",
       "uninstallerIcon": "resources/icons/icon.ico",
       "installerHeaderIcon": "resources/icons/icon.ico"

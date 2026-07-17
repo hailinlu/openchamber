@@ -14,7 +14,7 @@ import { Icon } from "@/components/icon/Icon";
 import { FadeInOnReveal } from '../FadeInOnReveal';
 import { getToolIcon } from './toolPresentation';
 import { getToolMetadata } from '@/lib/toolHelpers';
-import { isExpandableTool, isStandaloneTool, isStaticTool } from './toolRenderUtils';
+import { isExpandableTool, isStandaloneTool, isStaticTool, EDIT_TOOL_NAMES } from './toolRenderUtils';
 import { RuntimeAPIContext } from '@/contexts/runtimeAPIContext';
 import { useDirectoryStore } from '@/stores/useDirectoryStore';
 import { useUIStore } from '@/stores/useUIStore';
@@ -45,6 +45,7 @@ interface ProgressiveGroupProps {
     animateRows?: boolean;
     animatedToolIds?: Set<string>;
     renderJustificationActions?: (activity: TurnActivityPart) => React.ReactNode;
+    hideNonEditToolCalls?: boolean;
 }
 
 const ExternalLinkFavicon: React.FC<{ href: string }> = ({ href }) => {
@@ -481,7 +482,7 @@ const MemoStaticGroupedToolRow = React.memo(StaticGroupedToolRow, (prev, next) =
  * Expandable tools (edit, bash, write, question) stay as individual rows.
  * Unknown tools stay as individual expandable rows (fallback).
  */
-const aggregateRows = (parts: TurnActivityPart[]): AggregatedRow[] => {
+const aggregateRows = (parts: TurnActivityPart[], hideNonEditToolCalls = false): AggregatedRow[] => {
     const rows: AggregatedRow[] = [];
 
     let i = 0;
@@ -503,6 +504,11 @@ const aggregateRows = (parts: TurnActivityPart[]): AggregatedRow[] => {
         // Tool part
         const toolPart = activity.part as ToolPartType;
         const toolName = toolPart.tool?.toLowerCase() ?? '';
+
+        if (hideNonEditToolCalls && !EDIT_TOOL_NAMES.has(toolName)) {
+            i++;
+            continue;
+        }
 
         if (isStandaloneTool(toolName)) {
             // Standalone tools are rendered separately, skip
@@ -831,6 +837,7 @@ const ProgressiveGroup: React.FC<ProgressiveGroupProps> = ({
     animateRows = true,
     animatedToolIds,
     renderJustificationActions,
+    hideNonEditToolCalls,
 }) => {
     const previewCount = showHeader && !isExpanded
         ? Math.max(0, Math.floor(collapsedPreviewCount))
@@ -848,8 +855,8 @@ const ProgressiveGroup: React.FC<ProgressiveGroupProps> = ({
         if (!shouldRenderRows) {
             return [] as AggregatedRow[];
         }
-        return aggregateRows(sortedParts);
-    }, [shouldRenderRows, sortedParts]);
+        return aggregateRows(sortedParts, hideNonEditToolCalls);
+    }, [shouldRenderRows, sortedParts, hideNonEditToolCalls]);
 
     const previewHiddenCount = React.useMemo(() => {
         if (isExpanded || previewCount === 0) {

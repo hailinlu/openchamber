@@ -814,7 +814,15 @@ export const registerFsRoutes = (app, dependencies) => {
         return res.status(400).json({ error: 'Specified path is not a file' });
       }
 
-      let content = await fsPromises.readFile(canonicalPath, 'utf8');
+      let rawBuffer = await fsPromises.readFile(canonicalPath);
+      // Auto-detect encoding: try UTF-8 first, fallback to GBK for CJK files.
+      // Node.js supports GBK via ICU (TextDecoder built-in).
+      let content;
+      try {
+        content = new TextDecoder('utf-8', { fatal: true }).decode(rawBuffer);
+      } catch {
+        content = new TextDecoder('gbk').decode(rawBuffer);
+      }
       // Retry empty reads — concurrent writer may have truncated the file
       // between our stat and read (O_TRUNC window). If the file existed with
       // content at stat time but we read nothing, the writer hasn't finished
@@ -822,8 +830,17 @@ export const registerFsRoutes = (app, dependencies) => {
       if (content.length === 0 && stats.size > 0) {
         for (let attempt = 0; attempt < 3; attempt++) {
           await new Promise((r) => setTimeout(r, 50 * (attempt + 1)));
-          content = await fsPromises.readFile(canonicalPath, 'utf8');
-          if (content.length > 0) break;
+          const retryBuffer = await fsPromises.readFile(canonicalPath);
+          let decoded;
+          try {
+            decoded = new TextDecoder('utf-8', { fatal: true }).decode(retryBuffer);
+          } catch {
+            decoded = new TextDecoder('gbk').decode(retryBuffer);
+          }
+          if (decoded.length > 0) {
+            content = decoded;
+            break;
+          }
         }
         if (content.length === 0) {
           console.warn(`Read retry exhausted for ${canonicalPath}: stat reported ${stats.size} bytes but content is empty`);

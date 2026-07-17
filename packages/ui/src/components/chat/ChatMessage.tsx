@@ -31,6 +31,7 @@ import { FadeInOnReveal } from './message/FadeInOnReveal';
 import { streamPerfCount } from '@/stores/utils/streamDebug';
 import { areOptionalRenderRelevantMessagesEqual, areRenderRelevantMessagesEqual, areRelevantTurnGroupingContextsEqual } from './message/renderCompare';
 import type { ReviewTransferDirection } from '@/lib/reviewFlow';
+import { EDIT_TOOL_NAMES } from './message/parts/toolRenderUtils';
 
 const ToolOutputDialog = lazyWithChunkRecovery(() => import('./message/ToolOutputDialog'));
 
@@ -39,16 +40,6 @@ const expandedToolsStateCache = new Map<string, Set<string>>();
 const collapsedToolsStateCache = new Map<string, Set<string>>();
 
 const BASH_TOOL_NAMES = new Set(['bash', 'shell', 'cmd', 'terminal']);
-const EDIT_TOOL_NAMES = new Set([
-    'apply_patch',
-    'edit',
-    'write',
-    'multiedit',
-    'str_replace',
-    'str_replace_based_edit_tool',
-    'create',
-    'file_write',
-]);
 
 const normalizeToolName = (toolName: unknown): string => {
     if (typeof toolName !== 'string') return '';
@@ -168,13 +159,14 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
     }
 
     const providers = useConfigStore((state) => state.providers);
-    const { showReasoningTraces, stickyUserHeader, chatRenderMode, showExpandedBashTools, showExpandedEditTools } = useUIStore(
+    const { showReasoningTraces, stickyUserHeader, chatRenderMode, showExpandedBashTools, showExpandedEditTools, hideNonEditToolCalls } = useUIStore(
         useShallow((state) => ({
             showReasoningTraces: state.showReasoningTraces,
             stickyUserHeader: state.stickyUserHeader,
             chatRenderMode: state.chatRenderMode,
             showExpandedBashTools: state.showExpandedBashTools,
             showExpandedEditTools: state.showExpandedEditTools,
+            hideNonEditToolCalls: state.hideNonEditToolCalls,
         }))
     );
 
@@ -1042,6 +1034,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                                                 errorVariant={assistantErrorVariant}
                                                 userActionsMode={useExternalUserActionsRow ? 'external-content' : 'inline'}
                                                 stickyUserHeaderEnabled={stickyUserHeader}
+                                                hideNonEditToolCalls={hideNonEditToolCalls}
                                             />
                                         </div>
                                         {useExternalUserActionsRow ? (
@@ -1076,6 +1069,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                                                 errorVariant={assistantErrorVariant}
                                                 userActionsMode="external-actions"
                                                 stickyUserHeaderEnabled={stickyUserHeader}
+                                                hideNonEditToolCalls={hideNonEditToolCalls}
                                             />
                                         ) : null}
                                     </div>
@@ -1126,6 +1120,7 @@ const ChatMessage: React.FC<ChatMessageProps> = ({
                                 errorMessage={assistantErrorText}
                                 errorVariant={assistantErrorVariant}
                                 reviewTransferDirection={reviewTransferDirection}
+                                hideNonEditToolCalls={hideNonEditToolCalls}
                             />
 
                         </div>

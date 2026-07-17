@@ -303,7 +303,7 @@ const isFileMissingError = (error: unknown): boolean => {
     || normalized.includes('does not exist');
 };
 
-const MAX_VIEW_CHARS = 200_000;
+const MAX_EDIT_CHARS = 1_000_000; // 1M chars for editing
 const FILE_EDITOR_AUTO_SAVE_KEY = 'openchamber:files:auto-save-enabled';
 type FileLineEnding = '\n' | '\r\n';
 
@@ -1611,12 +1611,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
     };
   }, [files, openPaths, removeOpenPathsByPrefix, root]);
 
-  const displayedContent = React.useMemo(() =>
-    fileContent.length > MAX_VIEW_CHARS
-      ? `${fileContent.slice(0, MAX_VIEW_CHARS)}\n\n… truncated …`
-      : fileContent,
-    [fileContent]
-  );
+  const displayedContent = React.useMemo(() => fileContent, [fileContent]);
 
   const isDirty = draftContent !== displayedContent;
 
@@ -1841,9 +1836,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
         setFileContent(editorContent);
         diagramXmlRef.current = editorContent;
         diagramSavedXmlRef.current = editorContent;
-        setDraftContent(editorContent.length > MAX_VIEW_CHARS
-          ? `${editorContent.slice(0, MAX_VIEW_CHARS)}\n\n… truncated …`
-          : editorContent);
+	        setDraftContent(editorContent);
         setLoadedFilePath(node.path);
         void readFileStat(node.path, readOptions)
           .then((stat) => {
@@ -2319,7 +2312,7 @@ export const FilesView: React.FC<FilesViewProps> = ({ mode = 'full' }) => {
 
   const canCopy = Boolean(selectedFile && (!isSelectedImage || isSelectedSvg) && !isSelectedPdf && fileContent.length > 0);
   const canCopyPath = Boolean(selectedFile && displaySelectedPath.length > 0);
-  const canEdit = Boolean(selectedFile && !selectedFileIsOutsideWorkspace && !isSelectedImage && !isSelectedPdf && files.writeFile && fileContent.length <= MAX_VIEW_CHARS);
+  const canEdit = Boolean(selectedFile && !selectedFileIsOutsideWorkspace && !isSelectedImage && !isSelectedPdf && files.writeFile && fileContent.length <= MAX_EDIT_CHARS);
   const isMarkdown = Boolean(selectedFile?.path && isMarkdownFile(selectedFile.path));
   const isJson = Boolean(selectedFile?.path && isJsonFile(selectedFile.path));
   const isHtml = Boolean(selectedFile?.path && isHtmlFile(selectedFile.path));

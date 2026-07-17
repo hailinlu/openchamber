@@ -86,7 +86,7 @@ const MERMAID_RENDERING_OPTIONS: Option<'svg' | 'ascii'>[] = [
     },
 ];
 
-const DEFAULT_PWA_INSTALL_NAME = 'OpenChamber - AI Coding Assistant';
+const DEFAULT_PWA_INSTALL_NAME = 'GridForge';
 const PWA_ORIENTATION_OPTIONS: Option<'system' | 'portrait' | 'landscape'>[] = [
     {
         id: 'system',
@@ -329,6 +329,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     const setShowExpandedBashTools = useUIStore(state => state.setShowExpandedBashTools);
     const showExpandedEditTools = useUIStore(state => state.showExpandedEditTools);
     const setShowExpandedEditTools = useUIStore(state => state.setShowExpandedEditTools);
+    const hideNonEditToolCalls = useUIStore(state => state.hideNonEditToolCalls);
+    const setHideNonEditToolCalls = useUIStore(state => state.setHideNonEditToolCalls);
     const timeFormatPreference = useUIStore(state => state.timeFormatPreference);
     const setTimeFormatPreference = useUIStore(state => state.setTimeFormatPreference);
     const weekStartPreference = useUIStore(state => state.weekStartPreference);
@@ -1638,6 +1640,28 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                     {shouldShow('expandedTools') && (
                                         <section className="p-2 md:col-span-2 space-y-0.5">
                                             <div className="typography-ui-header font-medium text-foreground py-1.5">{t('settings.openchamber.visual.section.showToolsOpenedByDefault')}</div>
+
+                                            <div
+                                                data-settings-item="chat.showNonEditToolCalls"
+                                                className="group flex cursor-pointer items-center gap-2 py-0.5"
+                                                role="button"
+                                                tabIndex={0}
+                                                aria-pressed={!hideNonEditToolCalls}
+                                                onClick={() => setHideNonEditToolCalls(!hideNonEditToolCalls)}
+                                                onKeyDown={(event) => {
+                                                    if (event.key === ' ' || event.key === 'Enter') {
+                                                        event.preventDefault();
+                                                        setHideNonEditToolCalls(!hideNonEditToolCalls);
+                                                    }
+                                                }}
+                                            >
+                                                <Checkbox
+                                                    checked={!hideNonEditToolCalls}
+                                                    onChange={(checked) => setHideNonEditToolCalls(!checked)}
+                                                    ariaLabel={t('settings.openchamber.visual.field.showNonEditToolCallsAria')}
+                                                />
+                                                <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.showNonEditToolCalls')}</span>
+                                            </div>
 
                                             <div
                                                 className="group flex cursor-pointer items-center gap-2 py-0.5"

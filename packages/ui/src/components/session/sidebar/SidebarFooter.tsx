@@ -12,6 +12,8 @@ type Props = {
   onOpenShareOpinion: () => void;
   showRuntimeButtons?: boolean;
   showUpdateButton?: boolean;
+  showAboutButton?: boolean;
+  showShareOpinionButton?: boolean;
 };
 
 const footerButtonClassName = 'inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground hover:bg-interactive-hover/50 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50';
@@ -24,6 +26,8 @@ export function SidebarFooter({
   onOpenShareOpinion,
   showRuntimeButtons = true,
   showUpdateButton = true,
+  showAboutButton = true,
+  showShareOpinionButton = true,
 }: Props): React.ReactNode {
   const { t } = useI18n();
 
@@ -47,14 +51,16 @@ export function SidebarFooter({
             </TooltipTrigger>
             <TooltipContent side="top" sideOffset={4}><p>{t('sessions.sidebar.footer.actions.shortcuts')}</p></TooltipContent>
           </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <button type="button" onClick={onOpenAbout} className={footerButtonClassName} aria-label={t('sessions.sidebar.footer.actions.aboutOpenChamber')}>
-                <Icon name="information" className="h-4.5 w-4.5" />
-              </button>
-            </TooltipTrigger>
-            <TooltipContent side="top" sideOffset={4}><p>{t('sessions.sidebar.footer.actions.aboutOpenChamber')}</p></TooltipContent>
-          </Tooltip>
+          {showAboutButton ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button type="button" onClick={onOpenAbout} className={footerButtonClassName} aria-label={t('sessions.sidebar.footer.actions.aboutOpenChamber')}>
+                  <Icon name="information" className="h-4.5 w-4.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" sideOffset={4}><p>{t('sessions.sidebar.footer.actions.aboutOpenChamber')}</p></TooltipContent>
+            </Tooltip>
+          ) : null}
         </>
       ) : null}
       {showUpdateButton ? (
@@ -67,7 +73,7 @@ export function SidebarFooter({
         >
           {t('sessions.sidebar.footer.actions.update')}
         </Button>
-      ) : (
+      ) : showShareOpinionButton ? (
         <Button
           type="button"
           variant="default"
@@ -77,7 +83,7 @@ export function SidebarFooter({
         >
           {t('sessions.sidebar.footer.actions.shareOpinion')}
         </Button>
-      )}
+      ) : null}
     </div>
   );
 }

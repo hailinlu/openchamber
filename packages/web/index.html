@@ -8,7 +8,7 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="icon" type="image/png" href="/favicon-32.png" sizes="32x32" />
     <link rel="icon" type="image/png" href="/favicon-16.png" sizes="16x16" />
-    <link rel="mask-icon" href="/favicon.svg" color="#edb449" />
+    <link rel="mask-icon" href="/favicon.svg" color="#2dd4bf" />
 
     <!-- Apple touch icon - PNG format required for iOS PWA support -->
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png" />
@@ -24,8 +24,8 @@
     <!-- Web app manifest (endpoint-first with data URL fallback) -->
     <script>
       const baseUrl = location.origin;
-      const defaultAppName = 'OpenChamber - AI Coding Assistant';
-      const defaultShortName = 'OpenChamber';
+      const defaultAppName = 'GridForge';
+      const defaultShortName = 'GridForge';
       const pwaNameStorageKey = 'openchamber.pwaName';
       const pwaOrientationStorageKey = 'openchamber.pwaOrientation';
       const mobileKeyboardModeStorageKey = 'openchamber.mobileKeyboardMode';
@@ -239,7 +239,7 @@
           display_override: ['window-controls-overlay'],
           ...(manifestOrientation ? { orientation: manifestOrientation } : {}),
           background_color: '#151313',
-          theme_color: '#edb449',
+          theme_color: '#2dd4bf',
           icons: [
             { src: `${baseUrl}/pwa-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
             { src: `${baseUrl}/pwa-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
@@ -428,12 +428,12 @@
     <!-- iOS Safari PWA styling -->
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-    <meta name="apple-mobile-web-app-title" content="OpenChamber" />
+    <meta name="apple-mobile-web-app-title" content="GridForge" />
 
-    <title>OpenChamber - AI Coding Assistant</title>
+    <title>GridForge</title>
     <meta name="description" content="Web interface companion for OpenCode AI coding agent" />
-    <meta name="application-name" content="OpenChamber" />
-    <meta name="apple-mobile-web-app-title" content="OpenChamber" />
+    <meta name="application-name" content="GridForge" />
+    <meta name="apple-mobile-web-app-title" content="GridForge" />
 
     <!-- Inline CSS for loading screen and Nerd Fonts (before Tailwind loads) -->
     <style>
@@ -463,10 +463,10 @@
       }
 
       :root {
-        --splash-background-dark: #151313;
-        --splash-stroke-dark: #CECDC3;
+        --splash-background-dark: #0d2823;
+        --splash-stroke-dark: #2dd4bf;
         --splash-background-light: #FFFCF0;
-        --splash-stroke-light: #100F0F;
+        --splash-stroke-light: #0d5247;
 
         --splash-background: var(--splash-background-dark);
         --splash-stroke: var(--splash-stroke-dark);
@@ -521,59 +521,84 @@
       <!-- Loading fallback while React initializes -->
       <div id="initial-loading">
         <div style="display: flex; align-items: center; justify-content: center;">
-          <svg width="120" height="120" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="OpenChamber loading icon">
-            <!-- Isometric cube: edge=48, centerY=50 -->
-            <!-- Points: top(50,2), left(8.432,26), right(91.568,26), center(50,50), bottomLeft(8.432,74), bottomRight(91.568,74), bottom(50,98) -->
-
-            <!-- Left face - base fill with stroke -->
-            <path d="M50 50 L8.432 26 L8.432 74 L50 98 Z" fill="var(--splash-face-fill)" stroke="var(--splash-stroke)" stroke-width="2" stroke-linejoin="round"/>
-
-            <!-- Left face grid cells (4x4) with varying opacity -->
-            <path d="M50 50 L39.608 44 L39.608 56 L50 62 Z" fill="var(--splash-cell-fill)" opacity="0.2"/>
-            <path d="M39.608 44 L29.216 38 L29.216 50 L39.608 56 Z" fill="var(--splash-cell-fill)" opacity="0.45"/>
-            <path d="M29.216 38 L18.824 32 L18.824 44 L29.216 50 Z" fill="var(--splash-cell-fill)" opacity="0.15"/>
-            <path d="M18.824 32 L8.432 26 L8.432 38 L18.824 44 Z" fill="var(--splash-cell-fill)" opacity="0.55"/>
-            <path d="M50 62 L39.608 56 L39.608 68 L50 74 Z" fill="var(--splash-cell-fill)" opacity="0.35"/>
-            <path d="M39.608 56 L29.216 50 L29.216 62 L39.608 68 Z" fill="var(--splash-cell-fill)" opacity="0.1"/>
-            <path d="M29.216 50 L18.824 44 L18.824 56 L29.216 62 Z" fill="var(--splash-cell-fill)" opacity="0.5"/>
-            <path d="M18.824 44 L8.432 38 L8.432 50 L18.824 56 Z" fill="var(--splash-cell-fill)" opacity="0.25"/>
-            <path d="M50 74 L39.608 68 L39.608 80 L50 86 Z" fill="var(--splash-cell-fill)" opacity="0.4"/>
-            <path d="M39.608 68 L29.216 62 L29.216 74 L39.608 80 Z" fill="var(--splash-cell-fill)" opacity="0.3"/>
-            <path d="M29.216 62 L18.824 56 L18.824 68 L29.216 74 Z" fill="var(--splash-cell-fill)" opacity="0.45"/>
-            <path d="M18.824 56 L8.432 50 L8.432 62 L18.824 68 Z" fill="var(--splash-cell-fill)" opacity="0.15"/>
-            <path d="M50 86 L39.608 80 L39.608 92 L50 98 Z" fill="var(--splash-cell-fill)" opacity="0.55"/>
-            <path d="M39.608 80 L29.216 74 L29.216 86 L39.608 92 Z" fill="var(--splash-cell-fill)" opacity="0.2"/>
-            <path d="M29.216 74 L18.824 68 L18.824 80 L29.216 86 Z" fill="var(--splash-cell-fill)" opacity="0.35"/>
-            <path d="M18.824 68 L8.432 62 L8.432 74 L18.824 80 Z" fill="var(--splash-cell-fill)" opacity="0.1"/>
-
-            <!-- Right face - base fill with stroke -->
-            <path d="M50 50 L91.568 26 L91.568 74 L50 98 Z" fill="var(--splash-face-fill)" stroke="var(--splash-stroke)" stroke-width="2" stroke-linejoin="round"/>
-
-            <!-- Right face grid cells (4x4) with varying opacity -->
-            <path d="M50 50 L60.392 44 L60.392 56 L50 62 Z" fill="var(--splash-cell-fill)" opacity="0.3"/>
-            <path d="M60.392 44 L70.784 38 L70.784 50 L60.392 56 Z" fill="var(--splash-cell-fill)" opacity="0.15"/>
-            <path d="M70.784 38 L81.176 32 L81.176 44 L70.784 50 Z" fill="var(--splash-cell-fill)" opacity="0.45"/>
-            <path d="M81.176 32 L91.568 26 L91.568 38 L81.176 44 Z" fill="var(--splash-cell-fill)" opacity="0.25"/>
-            <path d="M50 62 L60.392 56 L60.392 68 L50 74 Z" fill="var(--splash-cell-fill)" opacity="0.5"/>
-            <path d="M60.392 56 L70.784 50 L70.784 62 L60.392 68 Z" fill="var(--splash-cell-fill)" opacity="0.35"/>
-            <path d="M70.784 50 L81.176 44 L81.176 56 L70.784 62 Z" fill="var(--splash-cell-fill)" opacity="0.1"/>
-            <path d="M81.176 44 L91.568 38 L91.568 50 L81.176 56 Z" fill="var(--splash-cell-fill)" opacity="0.4"/>
-            <path d="M50 74 L60.392 68 L60.392 80 L50 86 Z" fill="var(--splash-cell-fill)" opacity="0.2"/>
-            <path d="M60.392 68 L70.784 62 L70.784 74 L60.392 80 Z" fill="var(--splash-cell-fill)" opacity="0.55"/>
-            <path d="M70.784 62 L81.176 56 L81.176 68 L70.784 74 Z" fill="var(--splash-cell-fill)" opacity="0.3"/>
-            <path d="M81.176 56 L91.568 50 L91.568 62 L81.176 68 Z" fill="var(--splash-cell-fill)" opacity="0.15"/>
-            <path d="M50 86 L60.392 80 L60.392 92 L50 98 Z" fill="var(--splash-cell-fill)" opacity="0.45"/>
-            <path d="M60.392 80 L70.784 74 L70.784 86 L60.392 92 Z" fill="var(--splash-cell-fill)" opacity="0.25"/>
-            <path d="M70.784 74 L81.176 68 L81.176 80 L70.784 86 Z" fill="var(--splash-cell-fill)" opacity="0.4"/>
-            <path d="M81.176 68 L91.568 62 L91.568 74 L81.176 80 Z" fill="var(--splash-cell-fill)" opacity="0.2"/>
-
-            <!-- Top face - open (no fill), only stroke -->
-            <path d="M50 2 L8.432 26 L50 50 L91.568 26 Z" fill="none" stroke="var(--splash-stroke)" stroke-width="2" stroke-linejoin="round"/>
-
-            <!-- OpenCode logo on top face -->
-            <g transform="matrix(0.866, 0.5, -0.866, 0.5, 50, 26) scale(0.75)">
-              <path fill-rule="evenodd" clip-rule="evenodd" d="M-16 -20 L16 -20 L16 20 L-16 20 Z M-8 -12 L-8 12 L8 12 L8 -12 Z" fill="var(--splash-logo-fill)"/>
-              <path d="M-8 -4 L8 -4 L8 12 L-8 12 Z" fill="var(--splash-logo-fill)" fill-opacity="0.4"/>
+          <svg width="120" height="120" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="GridForge loading icon">
+            <defs>
+              <linearGradient id="splash-coreTop" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#7bf2ff" />
+                <stop offset="100%" stop-color="#29cce8" />
+              </linearGradient>
+              <linearGradient id="splash-coreLeft" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#0f8ba4" />
+                <stop offset="100%" stop-color="#064d5f" />
+              </linearGradient>
+              <linearGradient id="splash-coreRight" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#14aac7" />
+                <stop offset="100%" stop-color="#08748a" />
+              </linearGradient>
+              <linearGradient id="splash-ring" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#bfe6ff" stop-opacity="0.9" />
+                <stop offset="50%" stop-color="#33e0ff" stop-opacity="0.7" />
+                <stop offset="100%" stop-color="#006685" stop-opacity="0.9" />
+              </linearGradient>
+              <filter id="splash-shadow" x="-30%" y="-30%" width="160%" height="160%">
+                <feDropShadow dx="0" dy="3" stdDeviation="3" flood-color="#000000" flood-opacity="0.8" />
+                <feDropShadow dx="0" dy="1" stdDeviation="1" flood-color="#1bb9d4" flood-opacity="0.2" />
+              </filter>
+              <filter id="splash-glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="2" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+              <filter id="splash-glowStrong" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="3" result="blur" />
+                <feMerge>
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="blur" />
+                  <feMergeNode in="SourceGraphic" />
+                </feMerge>
+              </filter>
+            </defs>
+            <g fill="none" stroke="#00d5ff" stroke-opacity="0.15" stroke-width="0.5">
+              <circle cx="50" cy="50" r="40" stroke-dasharray="0.7 1.3" />
+              <circle cx="50" cy="50" r="37" stroke-dasharray="2 2" />
+              <path d="M 50 10 L 50 90 M 10 50 L 90 50" stroke-width="0.8" stroke-dasharray="0.2 1.7" />
+              <path d="M 20 20 L 80 80" stroke-dasharray="3 7" />
+              <path d="M 80 20 L 20 80" stroke-dasharray="3 7" />
+            </g>
+            <g filter="url(#splash-shadow)">
+              <polygon points="50,30 70,40 50,50 30,40" fill="#042b36" />
+              <polygon points="30,40 50,50 50,70 30,60" fill="#021e25" />
+              <polygon points="50,50 70,40 70,60 50,70" fill="#032630" />
+              <polygon points="50,35 64,42 50,49 36,42" fill="url(#splash-coreTop)" stroke="#a1f5ff" stroke-width="0.5" stroke-opacity="0.5" />
+              <polygon points="36,42 50,49 50,62 36,55" fill="url(#splash-coreLeft)" />
+              <polygon points="50,49 64,42 64,55 50,62" fill="url(#splash-coreRight)" />
+              <polygon points="50,38 57,41 50,44 43,41" fill="#0d5869" fill-opacity="0.6" stroke="#00c3ff" stroke-width="0.3" />
+              <polygon points="43,41 50,44 50,50 43,47" fill="#07323e" fill-opacity="0.8" />
+              <polygon points="50,44 57,41 57,47 50,50" fill="#0a4856" fill-opacity="0.8" />
+            </g>
+            <g filter="url(#splash-shadow)">
+              <ellipse cx="50" cy="50" rx="25" ry="9" fill="none" stroke="url(#splash-ring)" stroke-width="1.5" stroke-dasharray="4 2 1 2" transform="rotate(-30 50 50)" />
+              <ellipse cx="50" cy="50" rx="25" ry="9" fill="none" stroke="#FFFFFF" stroke-opacity="0.8" stroke-width="0.5" stroke-dasharray="3 3" transform="rotate(-30 50 50)" />
+              <ellipse cx="50" cy="50" rx="28" ry="10" fill="none" stroke="url(#splash-ring)" stroke-width="1" stroke-dasharray="2 2" transform="rotate(40 50 50)" />
+              <g filter="url(#splash-glow)">
+                <circle cx="50" cy="28" r="1" fill="#d8fcff" />
+                <circle cx="72" cy="43" r="1" fill="#19d4ff" />
+                <circle cx="47" cy="75" r="1.2" fill="#ffffff" />
+                <circle cx="28" cy="57" r="1" fill="#1ad4ff" />
+              </g>
+            </g>
+            <g filter="url(#splash-glowStrong)">
+              <polygon points="50,33 54,45 52,45 53,58 48,51 50,51 49,33" fill="none" stroke="#ffffff" stroke-width="0.8" />
+            </g>
+            <g filter="url(#splash-glow)">
+              <polygon points="50,33 54,45 52,45 53,58 48,51 50,51 49,33" fill="#ffffff" />
+              <polygon points="50,35 52,44 51,44 52,53 48,49 50,49 50,35" fill="#bbf9ff" />
+            </g>
+            <g fill="#57828f" font-family="'Montserrat','Segoe UI',sans-serif" font-weight="900" letter-spacing="1.7">
+              <text x="50" y="88" font-size="3" text-anchor="middle" fill="#1cc4e0" fill-opacity="0.7">AUTOMATED GRID</text>
+              <text x="50" y="93" font-size="1.7" text-anchor="middle" fill="#ffffff" fill-opacity="0.2" letter-spacing="0.7">HUMANLESS OPERATIONS</text>
             </g>
           </svg>
         </div>

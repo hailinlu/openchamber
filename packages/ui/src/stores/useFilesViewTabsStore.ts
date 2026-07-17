@@ -6,6 +6,7 @@ import { createDeferredSafeJSONStorage } from './utils/safeStorage';
 type RootTabsState = {
   openPaths: string[];
   selectedPath: string | null;
+  selectedPaths: string[];
   expandedPaths: string[];
   touchedAt: number;
 };
@@ -24,6 +25,8 @@ type FilesViewTabsActions = {
   toggleExpandedPath: (root: string, path: string) => void;
   expandPath: (root: string, path: string) => void;
   expandPaths: (root: string, paths: string[]) => void;
+  toggleSelectedPath: (root: string, path: string) => void;
+  clearSelectedPaths: (root: string) => void;
 };
 
 export type FilesViewTabsStore = FilesViewTabsState & FilesViewTabsActions;
@@ -82,6 +85,7 @@ const sanitizeByRoot = (input: unknown): Record<string, RootTabsState> => {
     const state = rawState as {
       openPaths?: unknown;
       selectedPath?: unknown;
+      selectedPaths?: unknown;
       expandedPaths?: unknown;
       touchedAt?: unknown;
     };
@@ -108,6 +112,13 @@ const sanitizeByRoot = (input: unknown): Record<string, RootTabsState> => {
       ? selectedPathCandidate
       : (openPaths[0] ?? null);
 
+    const rawSelectedPaths = Array.isArray(state.selectedPaths)
+      ? state.selectedPaths
+        .filter((value): value is string => typeof value === 'string')
+        .map((value) => normalizePath(value))
+        .filter((value) => isPathWithinRoot(value, root))
+      : [];
+
     const touchedAt = typeof state.touchedAt === 'number' && Number.isFinite(state.touchedAt)
       ? state.touchedAt
       : Date.now();
@@ -117,9 +128,11 @@ const sanitizeByRoot = (input: unknown): Record<string, RootTabsState> => {
       const mergedOpenPaths = Array.from(new Set([...existing.openPaths, ...openPaths]));
       const mergedExpandedPaths = Array.from(new Set([...existing.expandedPaths, ...expandedPaths]));
       const mergedSelectedPath = existing.selectedPath ?? selectedPath ?? (mergedOpenPaths[0] ?? null);
+      const mergedSelectedPaths = Array.from(new Set([...existing.selectedPaths, ...rawSelectedPaths]));
       next[root] = {
         openPaths: mergedOpenPaths,
         selectedPath: mergedSelectedPath,
+        selectedPaths: mergedSelectedPaths,
         expandedPaths: mergedExpandedPaths,
         touchedAt: Math.max(existing.touchedAt, touchedAt),
       };
@@ -129,6 +142,7 @@ const sanitizeByRoot = (input: unknown): Record<string, RootTabsState> => {
     next[root] = {
       openPaths,
       selectedPath,
+      selectedPaths: rawSelectedPaths,
       expandedPaths,
       touchedAt,
     };
@@ -155,7 +169,7 @@ const touchRoot = (prev: RootTabsState | undefined): RootTabsState => {
   if (prev) {
     return { ...prev, touchedAt: Date.now() };
   }
-  return { openPaths: [], selectedPath: null, expandedPaths: [], touchedAt: Date.now() };
+  return { openPaths: [], selectedPath: null, selectedPaths: [], expandedPaths: [], touchedAt: Date.now() };
 };
 
 export const useFilesViewTabsStore = create<FilesViewTabsStore>()(
@@ -408,6 +422,56 @@ export const useFilesViewTabsStore = create<FilesViewTabsStore>()(
               [normalizedRoot]: {
                 ...current,
                 expandedPaths: [...current.expandedPaths, normalizedPath],
+              },
+            };
+            return { byRoot: clampRoots(byRoot, 20) };
+          });
+        },
+
+        toggleSelectedPath: (root, path) => {
+          const normalizedRoot = normalizePath((root || '').trim());
+          const normalizedPath = normalizePath((path || '').trim());
+          if (!normalizedRoot || !normalizedPath || !isPathWithinRoot(normalizedPath, normalizedRoot)) {
+            return;
+          }
+
+          set((state) => {
+            const current = state.byRoot[normalizedRoot];
+            const touched = touchRoot(current);
+            const isSelected = current?.selectedPaths?.includes(normalizedPath) ?? false;
+            const nextSelectedPaths = isSelected
+              ? touched.selectedPaths.filter((p) => p !== normalizedPath)
+              : [...(touched.selectedPaths ?? []), normalizedPath];
+
+            const byRoot = {
+              ...state.byRoot,
+              [normalizedRoot]: {
+                ...touched,
+                selectedPaths: nextSelectedPaths,
+              },
+            };
+            return { byRoot: clampRoots(byRoot, 20) };
+          });
+        },
+
+        clearSelectedPaths: (root) => {
+          const normalizedRoot = normalizePath((root || '').trim());
+          if (!normalizedRoot) {
+            return;
+          }
+
+          set((state) => {
+            const current = state.byRoot[normalizedRoot];
+            if (!current || !current.selectedPaths || current.selectedPaths.length === 0) {
+              return state;
+            }
+
+            const byRoot = {
+              ...state.byRoot,
+              [normalizedRoot]: {
+                ...current,
+                selectedPaths: [],
+                touchedAt: Date.now(),
               },
             };
             return { byRoot: clampRoots(byRoot, 20) };

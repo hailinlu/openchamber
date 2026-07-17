@@ -10,15 +10,15 @@ type ShareOpinionDialogProps = {
   onOpenChange: (open: boolean) => void;
 };
 
-const SHARE_OPINION_MARKDOWN = `**Help shape what OpenChamber becomes next!**
+	const SHARE_OPINION_MARKDOWN = `**Help shape what GridForge becomes next!**
 
 Hey 👋,
 
-OpenChamber has grown mostly through word of mouth, GitHub issues, Discord feedback, and people telling me what is broken, confusing, or surprisingly useful.
+	GridForge has grown mostly through word of mouth, GitHub issues, Discord feedback, and people telling me what is broken, confusing, or surprisingly useful.
 
 I'm planning the next chapter now - mobile, better remote access, a tighter VS Code ↔ desktop/web/mobile flow, and more, but before building too much, I want to hear from the people actually using it.
 
-I'm doing a round of short 1-on-1 calls. No sales pitch, no formal script - just a real conversation about how you use OpenChamber, what you love, what frustrates you, and what would make it much more valuable.
+	I'm doing a round of short 1-on-1 calls. No sales pitch, no formal script - just a real conversation about how you use GridForge, what you love, what frustrates you, and what would make it much more valuable.
 
 You can book a call or use the short survey below.
 
@@ -27,7 +27,7 @@ What you get:
 - A direct chance to influence the roadmap
 - Your pain points and feature requests prioritized with more context
 - A Power User role in Discord for people helping shape the product
-- My genuine thanks for helping make OpenChamber better
+	- My genuine thanks for helping make GridForge better
 
 **This project is what it is because of your feedback. Thank you, genuinely.**
 

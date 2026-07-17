@@ -1442,7 +1442,7 @@ const showOpenChamberNotification = (payload: { title?: unknown; body?: unknown;
 
     const title = typeof payload?.title === 'string' && payload.title.trim().length > 0
       ? payload.title.trim()
-      : 'OpenChamber';
+      : 'GridForge';
     const body = typeof payload?.body === 'string' ? payload.body : '';
     const sessionId = typeof payload?.sessionId === 'string' && payload.sessionId.trim().length > 0
       ? payload.sessionId.trim()

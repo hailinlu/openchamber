@@ -43,6 +43,7 @@ import { FileTypeIcon } from '@/components/icons/FileTypeIcon';
 import { Icon } from "@/components/icon/Icon";
 import { getContextFileOpenFailureMessage, validateContextFileOpen } from '@/lib/contextFileOpenGuard';
 import { useI18n } from '@/lib/i18n';
+import { FileCompareDialog } from './FileCompareDialog';
 
 type FileNode = {
   name: string;
@@ -186,6 +187,7 @@ interface FileRowProps {
   root: string;
   isExpanded: boolean;
   isActive: boolean;
+  isMultiSelected: boolean;
   status?: FileStatus | null;
   badge?: { modified: number; added: number } | null;
   permissions: {
@@ -197,9 +199,12 @@ interface FileRowProps {
   };
   downloadFile?: (path: string) => Promise<void>;
   onSelect: (node: FileNode) => void;
+  onMultiSelect: (node: FileNode) => void;
   onToggle: (path: string) => void;
   onRevealPath: (path: string) => void;
   onOpenDialog: (type: 'createFile' | 'createFolder' | 'rename' | 'delete', data: { path: string; name?: string; type?: 'file' | 'directory' }) => void;
+  compareBasePath?: string | null;
+  onCompareAction?: (path: string) => void;
 }
 
 const FileRow: React.FC<FileRowProps> = ({
@@ -207,14 +212,18 @@ const FileRow: React.FC<FileRowProps> = ({
   root,
   isExpanded,
   isActive,
+  isMultiSelected,
   status,
   badge,
   permissions,
   downloadFile,
   onSelect,
+  onMultiSelect,
   onToggle,
   onRevealPath,
   onOpenDialog,
+  compareBasePath,
+  onCompareAction,
 }) => {
   const { t } = useI18n();
   const isDir = node.type === 'directory';
@@ -227,18 +236,20 @@ const FileRow: React.FC<FileRowProps> = ({
   const [rightClickOpen, setRightClickOpen] = React.useState(false);
 
   const handleContextMenu = React.useCallback((event?: React.MouseEvent) => {
-    if (!canRename && !canCreateFile && !canCreateFolder && !canDelete && !canReveal) return;
+    if (!canRename && !canCreateFile && !canCreateFolder && !canDelete && !canReveal && !onCompareAction) return;
     event?.preventDefault();
     setRightClickOpen(true);
-  }, [canRename, canCreateFile, canCreateFolder, canDelete, canReveal]);
+  }, [canRename, canCreateFile, canCreateFolder, canDelete, canReveal, onCompareAction]);
 
-  const handleInteraction = React.useCallback(() => {
+  const handleInteraction = React.useCallback((event: React.MouseEvent) => {
     if (isDir) {
       onToggle(node.path);
+    } else if (event.metaKey || event.ctrlKey) {
+      onMultiSelect(node);
     } else {
       onSelect(node);
     }
-  }, [isDir, node, onSelect, onToggle]);
+  }, [isDir, node, onSelect, onMultiSelect, onToggle]);
 
   const handleMenuButtonClick = React.useCallback((event: React.MouseEvent) => {
     event.stopPropagation();
@@ -271,6 +282,24 @@ const FileRow: React.FC<FileRowProps> = ({
       }}>
         <Icon name="file-copy" className="mr-2 h-4 w-4" /> {t('sidebarFilesTree.menu.copyPath')}
       </Item>
+      {!isDir && onCompareAction && (
+        <>
+          <Separator />
+          {compareBasePath === node.path ? (
+            <Item onClick={(e: React.MouseEvent) => { e.stopPropagation(); onCompareAction(node.path); }}>
+              <Icon name="arrow-left-right" className="mr-2 h-4 w-4" /> {t('sidebarFilesTree.menu.clearCompareBase')}
+            </Item>
+          ) : compareBasePath ? (
+            <Item onClick={(e: React.MouseEvent) => { e.stopPropagation(); onCompareAction(node.path); }}>
+              <Icon name="arrow-left-right" className="mr-2 h-4 w-4" /> {t('sidebarFilesTree.menu.compareWith', { name: compareBasePath.split('/').pop() ?? compareBasePath })}
+            </Item>
+          ) : (
+            <Item onClick={(e: React.MouseEvent) => { e.stopPropagation(); onCompareAction(node.path); }}>
+              <Icon name="arrow-left-right" className="mr-2 h-4 w-4" /> {t('sidebarFilesTree.menu.setCompareBase')}
+            </Item>
+          )}
+        </>
+      )}
       {!isDir && downloadFile && (
         <Item onClick={(e: React.MouseEvent) => {
           e.stopPropagation();
@@ -334,7 +363,8 @@ const FileRow: React.FC<FileRowProps> = ({
         onDragStart={handleDragStart}
         className={cn(
           'flex w-full items-center gap-1.5 rounded-md px-2 py-1 text-left text-foreground transition-colors pr-8 select-none',
-          isActive ? 'bg-interactive-selection/70' : 'hover:bg-interactive-hover/40',
+          isActive ? 'bg-interactive-selection/70' : isMultiSelected ? 'bg-primary/10' : 'hover:bg-interactive-hover/40',
+          compareBasePath === node.path && 'ring-1 ring-primary/30 bg-primary/5',
           'cursor-grab active:cursor-grabbing'
         )}
       >
@@ -358,7 +388,7 @@ const FileRow: React.FC<FileRowProps> = ({
           </span>
         )}
       </button>
-      {(canRename || canCreateFile || canCreateFolder || canDelete || canReveal) && (
+      {(canRename || canCreateFile || canCreateFolder || canDelete || canReveal || (!isDir && !!onCompareAction)) && (
         <div className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 focus-within:opacity-100 group-hover:opacity-100">
           <DropdownMenu
             open={contextMenuOpen}
@@ -402,14 +432,18 @@ const areFileRowPropsEqual = (prev: FileRowProps, next: FileRowProps): boolean =
   && prev.root === next.root
   && prev.isExpanded === next.isExpanded
   && prev.isActive === next.isActive
+  && prev.isMultiSelected === next.isMultiSelected
   && prev.status === next.status
   && prev.badge === next.badge
   && prev.permissions === next.permissions
   && prev.downloadFile === next.downloadFile
   && prev.onSelect === next.onSelect
+  && prev.onMultiSelect === next.onMultiSelect
   && prev.onToggle === next.onToggle
   && prev.onRevealPath === next.onRevealPath
   && prev.onOpenDialog === next.onOpenDialog
+  && prev.compareBasePath === next.compareBasePath
+  && prev.onCompareAction === next.onCompareAction
 );
 
 const MemoizedFileRow = React.memo(FileRow, areFileRowPropsEqual);
@@ -504,14 +538,22 @@ export const SidebarFilesTree: React.FC = () => {
     }
   }, [root]);
 
+  // Clear compare base when root (workspace directory) changes
+  React.useEffect(() => {
+    setCompareBasePath(null);
+  }, [root]);
+
   const EMPTY_PATHS: string[] = React.useMemo(() => [], []);
   const EMPTY_CONTEXT_TABS: Array<{ mode: string; targetPath: string | null }> = React.useMemo(() => [], []);
   const expandedPaths = useFilesViewTabsStore((state) => (root ? (state.byRoot[root]?.expandedPaths ?? EMPTY_PATHS) : EMPTY_PATHS));
   const selectedPath = useFilesViewTabsStore((state) => (root ? (state.byRoot[root]?.selectedPath ?? null) : null));
+  const selectedPaths = useFilesViewTabsStore((state) => (root ? (state.byRoot[root]?.selectedPaths ?? EMPTY_PATHS) : EMPTY_PATHS));
   const setSelectedPath = useFilesViewTabsStore((state) => state.setSelectedPath);
   const addOpenPath = useFilesViewTabsStore((state) => state.addOpenPath);
   const removeOpenPathsByPrefix = useFilesViewTabsStore((state) => state.removeOpenPathsByPrefix);
   const toggleExpandedPath = useFilesViewTabsStore((state) => state.toggleExpandedPath);
+  const toggleSelectedPath = useFilesViewTabsStore((state) => state.toggleSelectedPath);
+  const clearSelectedPaths = useFilesViewTabsStore((state) => state.clearSelectedPaths);
   const contextTabs = useUIStore((state) => (root ? (state.contextPanelByDirectory[root]?.tabs ?? EMPTY_CONTEXT_TABS) : EMPTY_CONTEXT_TABS));
   const openContextFilePaths = React.useMemo(() => new Set(
     contextTabs
@@ -519,6 +561,36 @@ export const SidebarFilesTree: React.FC = () => {
       .filter((targetPath): targetPath is string => typeof targetPath === 'string' && targetPath.length > 0)
       .map((targetPath) => normalizePath(targetPath))
   ), [contextTabs]);
+
+  const selectedPathsSet = React.useMemo(() => new Set(selectedPaths), [selectedPaths]);
+
+  // File compare dialog state
+  const [compareDialogOpen, setCompareDialogOpen] = React.useState(false);
+  const [compareFileA, setCompareFileA] = React.useState<string | null>(null);
+  const [compareFileB, setCompareFileB] = React.useState<string | null>(null);
+  const [compareBasePath, setCompareBasePath] = React.useState<string | null>(null);
+
+  // Large file confirmation dialog state
+  const [largeFileDialog, setLargeFileDialog] = React.useState<{
+    path: string;
+    lineCount: number;
+  } | null>(null);
+
+  const handleCompareAction = React.useCallback((path: string) => {
+    if (compareBasePath === null) {
+      // First click: set as compare base
+      setCompareBasePath(path);
+    } else if (compareBasePath === path) {
+      // Clicking the same file again clears the base
+      setCompareBasePath(null);
+    } else {
+      // Second file: compare with the base
+      setCompareFileA(compareBasePath);
+      setCompareFileB(path);
+      setCompareDialogOpen(true);
+      setCompareBasePath(null);
+    }
+  }, [compareBasePath]);
 
   // Dialog state for CRUD operations
   const [activeDialog, setActiveDialog] = React.useState<'createFile' | 'createFolder' | 'rename' | 'delete' | null>(null);
@@ -865,6 +937,10 @@ export const SidebarFilesTree: React.FC = () => {
 
     const openValidation = await validateContextFileOpen(files, node.path);
     if (!openValidation.ok) {
+      if (openValidation.reason === 'too-large' && openValidation.lineCount) {
+        setLargeFileDialog({ path: node.path, lineCount: openValidation.lineCount });
+        return;
+      }
       toast.error(getContextFileOpenFailureMessage(openValidation.reason));
       return;
     }
@@ -872,7 +948,24 @@ export const SidebarFilesTree: React.FC = () => {
     setSelectedPath(root, node.path);
     addOpenPath(root, node.path);
     openContextFile(root, node.path);
-  }, [addOpenPath, files, openContextFile, root, setSelectedPath]);
+    // Normal click clears multi-select
+    clearSelectedPaths(root);
+  }, [addOpenPath, clearSelectedPaths, files, openContextFile, root, setSelectedPath]);
+
+  const handleConfirmLargeFile = React.useCallback(() => {
+    if (!root || !largeFileDialog) return;
+    const path = largeFileDialog.path;
+    setLargeFileDialog(null);
+    setSelectedPath(root, path);
+    addOpenPath(root, path);
+    openContextFile(root, path);
+    clearSelectedPaths(root);
+  }, [addOpenPath, clearSelectedPaths, openContextFile, root, largeFileDialog, setSelectedPath]);
+
+  const handleMultiSelect = React.useCallback((node: FileNode) => {
+    if (!root) return;
+    toggleSelectedPath(root, node.path);
+  }, [root, toggleSelectedPath]);
 
   const toggleDirectory = React.useCallback(async (dirPath: string) => {
     const normalized = normalizePath(dirPath);
@@ -1023,6 +1116,7 @@ export const SidebarFilesTree: React.FC = () => {
       const isDir = node.type === 'directory';
       const isExpanded = isDir && expandedPaths.includes(node.path);
       const isActive = selectedPath === node.path;
+      const isMultiSelected = !isDir && selectedPathsSet.has(node.path);
       const isLast = index === nodes.length - 1;
 
       return (
@@ -1040,14 +1134,18 @@ export const SidebarFilesTree: React.FC = () => {
             root={root}
             isExpanded={isExpanded}
             isActive={isActive}
+            isMultiSelected={isMultiSelected}
             status={!isDir ? getFileStatus(node.path) : undefined}
             badge={isDir ? getFolderBadge(node.path) : undefined}
             permissions={fileRowPermissions}
             downloadFile={files.downloadFile}
             onSelect={handleOpenFile}
+            onMultiSelect={handleMultiSelect}
             onToggle={toggleDirectory}
             onRevealPath={handleRevealPath}
             onOpenDialog={handleOpenDialog}
+            compareBasePath={compareBasePath}
+            onCompareAction={handleCompareAction}
           />
           {isDir && isExpanded && (
             <ul className="flex flex-col gap-1 ml-3 pl-3 border-l border-border/40 relative">
@@ -1252,6 +1350,33 @@ export const SidebarFilesTree: React.FC = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Large file confirmation dialog */}
+      <Dialog open={largeFileDialog !== null} onOpenChange={(open) => { if (!open) setLargeFileDialog(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('contextFileOpen.confirm.title')}</DialogTitle>
+            <DialogDescription>
+              {largeFileDialog && t('contextFileOpen.confirm.description', { count: largeFileDialog.lineCount.toLocaleString() })}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setLargeFileDialog(null)}>
+              {t('sidebarFilesTree.dialog.cancel')}
+            </Button>
+            <Button variant="default" onClick={handleConfirmLargeFile}>
+              {t('contextFileOpen.confirm.openAnyway')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <FileCompareDialog
+        open={compareDialogOpen}
+        onOpenChange={setCompareDialogOpen}
+        fileA={compareFileA}
+        fileB={compareFileB}
+      />
     </section>
   );
 };

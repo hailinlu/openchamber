@@ -573,6 +573,7 @@ interface UIStore {
   eventStreamStatus: EventStreamStatus;
   eventStreamHint: string | null;
   showReasoningTraces: boolean;
+  hideNonEditToolCalls: boolean;
   sessionRecapEnabled: boolean;
   sessionSuggestionEnabled: boolean;
   sessionGoalEnabled: boolean;
@@ -731,6 +732,7 @@ interface UIStore {
   setSettingsRemoteInstancesSelectedId: (instanceId: string | null) => void;
   setEventStreamStatus: (status: EventStreamStatus, hint?: string | null) => void;
   setShowReasoningTraces: (value: boolean) => void;
+  setHideNonEditToolCalls: (value: boolean) => void;
   setSessionRecapEnabled: (value: boolean) => void;
   setSessionSuggestionEnabled: (value: boolean) => void;
   setSessionGoalEnabled: (value: boolean) => void;
@@ -849,7 +851,7 @@ export const useUIStore = create<UIStore>()(
         isRightSidebarOpen: false,
         rightSidebarWidth: RIGHT_SIDEBAR_MIN_WIDTH,
         hasManuallyResizedRightSidebar: false,
-        rightSidebarTab: 'git',
+        rightSidebarTab: 'files',
         contextPanelByDirectory: {},
         isBottomTerminalOpen: false,
         isBottomTerminalExpanded: false,
@@ -887,6 +889,9 @@ export const useUIStore = create<UIStore>()(
         eventStreamStatus: 'idle',
         eventStreamHint: null,
         showReasoningTraces: true,
+        // Default hidden: chat message area only shows edit-family tool calls.
+        // Users can opt-in to see shell/skill/grep/etc. from Visual Settings.
+        hideNonEditToolCalls: true,
         sessionRecapEnabled: true,
         sessionSuggestionEnabled: true,
         sessionGoalEnabled: true,
@@ -1596,6 +1601,10 @@ export const useUIStore = create<UIStore>()(
           set({ showReasoningTraces: value });
         },
 
+        setHideNonEditToolCalls: (value) => {
+          set({ hideNonEditToolCalls: value });
+        },
+
         setSessionRecapEnabled: (value) => {
           set({ sessionRecapEnabled: value });
         },
@@ -2265,7 +2274,7 @@ export const useUIStore = create<UIStore>()(
             typeof state.rightSidebarTab !== 'string'
             || (state.rightSidebarTab !== 'git' && state.rightSidebarTab !== 'files' && state.rightSidebarTab !== 'context')
           ) {
-            state.rightSidebarTab = 'git';
+            state.rightSidebarTab = 'files';
           }
 
           state.contextPanelByDirectory = sanitizeContextPanelByDirectory(state.contextPanelByDirectory);

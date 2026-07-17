@@ -69,6 +69,10 @@ workspaces/
 .worktrees/
 test-results/
 
+# Agent tooling artifacts
+.zcode/
+.codegraph/
+
 # Rust build artifacts
 rust/target/
 rust/**/target/

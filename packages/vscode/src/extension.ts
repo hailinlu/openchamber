@@ -38,7 +38,7 @@ const formatDurationMs = (value: number | null | undefined) => {
 };
 
 export async function activate(context: vscode.ExtensionContext) {
-  outputChannel = vscode.window.createOutputChannel('OpenChamber');
+  outputChannel = vscode.window.createOutputChannel('GridForge');
 
   let moveToRightSidebarScheduled = false;
 

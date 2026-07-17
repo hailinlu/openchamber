@@ -762,7 +762,10 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
     onLineSelected: enableComments ? handleSelectionChange : undefined,
     unsafeCSS: WEBKIT_SCROLL_FIX_CSS,
     renderAnnotation: enableComments ? renderAnnotation : undefined,
-  }), [darkTheme.metadata.id, enableComments, isDark, isLargeContent, lightTheme.metadata.id, renderSideBySide, wrapLines, handleSelectionChange, renderAnnotation]);
+    // Inline layout renders the full diff without virtualizer — disable
+    // the library's internal buffer elements that reserve scroll space.
+    disableVirtualizationBuffers: layout === 'inline',
+  }), [darkTheme.metadata.id, enableComments, isDark, isLargeContent, layout, lightTheme.metadata.id, renderSideBySide, wrapLines, handleSelectionChange, renderAnnotation]);
 
 
   const lineAnnotations = useMemo(() => {
@@ -810,12 +813,12 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
     if (!container) return;
     if (!workerPool) return;
 
-    const preserveDone = preserveScrollPosition(wrapper, container);
-    let sharedVirtualizer = sharedVirtualizerRef.current;
-    if (!sharedVirtualizer) {
-      sharedVirtualizer = acquireSharedVirtualizer(container);
-      sharedVirtualizerRef.current = sharedVirtualizer;
-    }
+	    const preserveDone = preserveScrollPosition(wrapper, container);
+	    let sharedVirtualizer = sharedVirtualizerRef.current;
+	    if (!sharedVirtualizer && layout !== 'inline') {
+	      sharedVirtualizer = acquireSharedVirtualizer(container);
+	      sharedVirtualizerRef.current = sharedVirtualizer;
+	    }
     sharedVirtualizerRef.current = sharedVirtualizer;
     const virtualizer = sharedVirtualizer?.virtualizer ?? null;
 
@@ -912,7 +915,7 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
       cancelReady();
       preserveDone();
     };
-  }, [diffThemeKey, fileDiff, fileName, language, modified, options, original, workerPool]);
+  }, [diffThemeKey, fileDiff, fileName, language, layout, modified, options, original, workerPool]);
 
   useEffect(() => {
     const instance = diffInstanceRef.current;
@@ -1089,15 +1092,15 @@ export const PierreDiffViewer: React.FC<PierreDiffViewerProps> = ({
 
   if (layout === 'fill') {
     return (
-      <div className={cn("flex flex-col relative", "size-full")} data-diff-virtual-root>
+      <div className={cn("flex flex-col relative", "size-full")}>
         <div className="flex-1 relative min-h-0">
           <ScrollableOverlay
             outerClassName="pierre-diff-wrapper size-full"
             disableHorizontal={false}
             fillContainer={true}
-            data-diff-virtual-content
+            data-diff-virtual-root
           >
-            <div ref={diffRootRef} className="size-full relative">
+            <div ref={diffRootRef} className="size-full relative" data-diff-virtual-content>
               <div ref={diffContainerRef} className="size-full" />
             </div>
           </ScrollableOverlay>
