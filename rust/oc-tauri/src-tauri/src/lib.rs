@@ -114,7 +114,24 @@ fn configure_main_window_shell(app: &tauri::AppHandle, background_start: bool) {
         log::warn!("failed to disable Windows window decorations: {}", error);
     }
 
-    // 3. 后台启动 → 立即隐藏 (托盘激活后用 Show GridForge 恢复)
+    // 3. 注入静态全局变量 (提前注入, 不依赖后端端口)
+    //
+    // 设 `window.__OPENCHAMBER_ELECTRON__` / `__OPENCHAMBER_PLATFORM__`。
+    // 这些值在编译期即确定, 不等后端启动: 确保 React hydration 时
+    // `isElectronShell()` / `usesFramelessElectronChrome()` 能正确检测。
+    //
+    // `window.eval()` 在 Tauri 2 的 setup 阶段可能因页面未加载而失败,
+    // 但 UI 侧有 `isTauriShell()` 回退 (`window.__TAURI__`), 此处为
+    // belt-and-suspenders 方案。
+    let static_script = ipc::globals::build_static_globals_script();
+    if let Err(error) = window.eval(&static_script) {
+        log::warn!(
+            "failed to inject static globals (will rely on UI fallback): {}",
+            error,
+        );
+    }
+
+    // 4. 后台启动 → 立即隐藏 (托盘激活后用 Show GridForge 恢复)
     if background_start {
         if let Err(error) = window.hide() {
             log::warn!("failed to hide main window for background launch: {}", error);

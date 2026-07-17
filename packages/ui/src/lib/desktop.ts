@@ -236,6 +236,14 @@ const getDesktopBridge = (): DesktopBridgeGlobal | null => {
 
 export const isElectronShell = (): boolean => getElectronRuntime()?.runtime === 'electron';
 
+/** Tauri 壳检测 — 基于 `withGlobalTauri: true` 注入的 `window.__TAURI__`。
+ *  此全局变量通过 `AddScriptToExecuteOnDocumentCreated` 设置,
+ *  在页面脚本运行前即存在, 因此比 `window.__OPENCHAMBER_ELECTRON__` 更早可用。 */
+export const isTauriShell = (): boolean => {
+  if (typeof window === 'undefined') return false;
+  return typeof (window as unknown as Record<string, unknown>).__TAURI__ !== 'undefined';
+};
+
 export const getElectronPlatform = (): string | null => {
   if (typeof window === 'undefined') return null;
   const platform = (window as unknown as { __OPENCHAMBER_PLATFORM__?: string }).__OPENCHAMBER_PLATFORM__;
@@ -246,10 +254,26 @@ export const getElectronPlatform = (): string | null => {
 export const DESKTOP_WINDOW_CONTROLS_WIDTH_PX = 132;
 
 /** Windows and Linux use frameless windows with in-app minimize/maximize/close controls. */
+/** Windows 和 Linux 使用无边框窗口，需在 UI 中内嵌最小化/最大化/关闭按钮。
+ *
+ *  Electron: 检测 `__OPENCHAMBER_ELECTRON__` + `__OPENCHAMBER_PLATFORM__`。
+ *  Tauri: 检测 `__TAURI__` 全局变量 (由 `withGlobalTauri` 在页面脚本前注入)，
+ *  平台信息从 `__OPENCHAMBER_PLATFORM__` (桥注入后) 或 `navigator.userAgent` (桥注入前) 获取。 */
 export const usesFramelessElectronChrome = (): boolean => {
-  if (!isElectronShell()) return false;
+  if (!isDesktopShell()) return false;
+
   const platform = getElectronPlatform();
-  return platform === 'win32' || platform === 'linux';
+  if (platform) {
+    return platform === 'win32' || platform === 'linux';
+  }
+
+  // Tauri 回退: 桥尚未注入时 (setup 阶段/page 刚加载时),
+  // 用 userAgent 判断平台。
+  if (isTauriShell() && typeof navigator !== 'undefined') {
+    return /Windows|Linux/.test(navigator.userAgent);
+  }
+
+  return false;
 };
 
 export const getDefaultDesktopWindowControlsSide = (platform: string | null = getElectronPlatform()): DesktopWindowControlsSide => {
@@ -270,15 +294,50 @@ export const resolveDesktopWindowControlsSide = (
 };
 
 export const hasDesktopInvoke = (): boolean => {
-  return typeof getDesktopBridge()?.invoke === 'function';
+  if (typeof getDesktopBridge()?.invoke === 'function') return true;
+  // Tauri: 即使桥未注入, `__TAURI__.core.invoke` 始终可用
+  if (isTauriShell()) {
+    try {
+      const tauri = (window as unknown as Record<string, unknown>).__TAURI__ as
+        | { core?: { invoke?: unknown } }
+        | undefined;
+      return typeof tauri?.core?.invoke === 'function';
+    } catch {
+      return false;
+    }
+  }
+  return false;
 };
 
 export const canUseElectronDesktopIPC = (): boolean => isElectronShell() && hasDesktopInvoke();
 
 export const invokeDesktop = async <T = unknown>(command: string, args?: Record<string, unknown>): Promise<T | null> => {
   const bridge = getDesktopBridge();
-  if (typeof bridge?.invoke !== 'function') return null;
-  return bridge.invoke(command, args ?? {}) as Promise<T>;
+  if (typeof bridge?.invoke === 'function') {
+    return bridge.invoke(command, args ?? {}) as Promise<T>;
+  }
+
+  // Tauri 回退: 桥尚未注入时, 直接走 `__TAURI__.core.invoke`。
+  // `__TAURI__` 始终可用 (由 withGlobalTauri 注入, 页面脚本前生效)。
+  // 窗口操作 (minimize/maximize/close) 不依赖后端, 即使 backend 未启动也能工作。
+  if (isTauriShell()) {
+    try {
+      const tauri = (window as unknown as Record<string, unknown>).__TAURI__ as
+        | { core?: { invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> } }
+        | undefined;
+      if (typeof tauri?.core?.invoke === 'function') {
+        return (await tauri.core.invoke('openchamber_invoke', {
+          cmd: command,
+          args: args ?? {},
+        })) as T;
+      }
+    } catch {
+      // 静默忽略 — 调用方会处理 null 返回值
+    }
+    return null;
+  }
+
+  return null;
 };
 
 type LaunchAtLoginStatus = {
@@ -495,7 +554,7 @@ export const isDesktopLocalOriginActive = (): boolean => {
 
 export const isDesktopShell = (): boolean => {
   if (typeof window === 'undefined') return false;
-  return isElectronShell();
+  return isElectronShell() || isTauriShell();
 };
 
 export const startDesktopWindowDrag = async (): Promise<boolean> => {

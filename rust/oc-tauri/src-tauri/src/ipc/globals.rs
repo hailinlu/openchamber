@@ -268,6 +268,48 @@ pub fn build_init_script(ctx: &RuntimeContext) -> String {
     format!("{}\n{}", globals_js, bridge_js)
 }
 
+/// 生成仅含"静态"全局变量的 init 脚本 (不依赖后端端口/运行时上下文)。
+///
+/// 这些变量在窗口创建时即可注入, 无需等后端启动完成:
+/// - `__OPENCHAMBER_ELECTRON__` — 壳身份标识 (`{ runtime: 'electron', … }`)
+/// - `__OPENCHAMBER_PLATFORM__` — 平台字符串 (darwin/win32/linux)
+/// - `__OPENCHAMBER_MACOS_MAJOR__` — macOS 主版本 (仅在 macOS 上)
+///
+/// 适用于 `configure_main_window_shell()` 中提前注入,
+/// 确保 React 首次渲染前 `isElectronShell()` / `usesFramelessElectronChrome()` 能正确检测。
+pub fn build_static_globals_script() -> String {
+    let mut globals = Vec::new();
+
+    // __OPENCHAMBER_PLATFORM__
+    let platform = platform_string();
+    globals.push(format_js_global(
+        "__OPENCHAMBER_PLATFORM__",
+        &json!(platform),
+    ));
+
+    // __OPENCHAMBER_ELECTRON__ (与 build_init_script 保持一致)
+    let mac_vibrancy_supported = cfg!(target_os = "macos");
+    let mac_vibrancy = if mac_vibrancy_supported {
+        crate::settings::SettingsStore::get_bool("desktopVibrancy", true)
+    } else {
+        false
+    };
+    globals.push(format!(
+        "(function(){{window.__OPENCHAMBER_ELECTRON__={{runtime:'electron',macVibrancy:{},macVibrancySupported:{}}};}})();",
+        mac_vibrancy, mac_vibrancy_supported
+    ));
+
+    // __OPENCHAMBER_MACOS_MAJOR__ (macOS 上检测)
+    if let Some(major) = detect_macos_major() {
+        globals.push(format_js_global(
+            "__OPENCHAMBER_MACOS_MAJOR__",
+            &json!(major),
+        ));
+    }
+
+    globals.join("\n")
+}
+
 /// 格式化单个全局变量注入语句: `window.__X__ = <json>;`
 fn format_js_global(name: &str, value: &serde_json::Value) -> String {
     format!(
@@ -333,5 +375,29 @@ mod tests {
         let ctx = RuntimeContext::from_sidecar_port(8080);
         assert_eq!(ctx.local_origin, "http://127.0.0.1:8080");
         assert_eq!(ctx.api_base_url.as_deref(), Some("http://127.0.0.1:8080"));
+    }
+
+    #[test]
+    fn build_static_globals_script_includes_platform_and_electron() {
+        let script = build_static_globals_script();
+        assert!(script.contains("__OPENCHAMBER_PLATFORM__"));
+        assert!(script.contains("__OPENCHAMBER_ELECTRON__"));
+        assert!(script.contains("runtime:'electron'"));
+        assert!(
+            script.contains("\"win32\"")
+                || script.contains("\"darwin\"")
+                || script.contains("\"linux\""),
+            "platform must be one of win32/darwin/linux"
+        );
+    }
+
+    #[test]
+    fn build_static_globals_script_has_no_port_dependent_values() {
+        let script = build_static_globals_script();
+        // 静态脚本不应包含端口/URL 绑定变量
+        assert!(!script.contains("__OPENCHAMBER_API_BASE_URL__"));
+        assert!(!script.contains("__OPENCHAMBER_LOCAL_ORIGIN__"));
+        assert!(!script.contains("__OPENCHAMBER_DESKTOP__"));
+        assert!(!script.contains("http://"));
     }
 }

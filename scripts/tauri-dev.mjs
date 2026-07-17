@@ -107,6 +107,21 @@ function signalChild(child, signal) {
     return;
   }
 
+  // Windows: 用 taskkill /T 杀掉整个进程树, 确保 Vite/nodemon 等孙子进程也被清理。
+  // 不能只 child.kill(signal), 因为 Windows 上那只是 TerminateProcess 立即子进程,
+  // 孙子进程 (Vite, nodemon, 后端 watch 等) 会变成孤儿继续跑。
+  if (process.platform === 'win32') {
+    try {
+      spawnSync('taskkill', ['/F', '/T', '/PID', String(child.pid)], {
+        windowsHide: true,
+        timeout: 3000,
+      });
+      return;
+    } catch {
+      // fall through to child.kill
+    }
+  }
+
   try {
     if (useDetachedChildren) {
       process.kill(-child.pid, signal);
