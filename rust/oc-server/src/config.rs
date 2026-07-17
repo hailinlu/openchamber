@@ -16,9 +16,9 @@ use std::path::PathBuf;
 
 use clap::Parser;
 
-/// OpenChamber Rust 后端配置。
+/// GridForge Rust 后端配置。
 #[derive(Debug, Clone, Parser)]
-#[command(name = "oc-server", about = "OpenChamber Rust 后端 (迁移中)")]
+#[command(name = "oc-server", about = "GridForge Rust 后端 (迁移中)")]
 pub struct Config {
     /// 绑定地址。默认 loopback (安全默认)。
     #[arg(long, env = "OPENCHAMBER_HOST", default_value = "127.0.0.1")]

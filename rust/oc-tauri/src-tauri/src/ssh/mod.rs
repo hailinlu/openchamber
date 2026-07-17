@@ -632,7 +632,7 @@ async fn connect_blocking(app: &AppHandle, instance: &Instance) -> Result<(), St
                 .await
                 .map_err(|e| format!("Remote install failed: {}", e))?;
 
-            log_message(app, id, "Remote OpenChamber installed/updated");
+            log_message(app, id, "Remote GridForge installed/updated");
         }
 
         set_status_and_emit(app, id, Phase::ServerDetecting, None);
@@ -1060,7 +1060,7 @@ async fn install_remote(
         }
     }
 
-    Err("Failed to install OpenChamber on remote (both bun and npm failed)".to_string())
+    Err("Failed to install GridForge on remote (both bun and npm failed)".to_string())
 }
 
 /// 启动远程 OpenChamber server。

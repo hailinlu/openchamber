@@ -35,7 +35,7 @@ fn build_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
 #[cfg(target_os = "macos")]
 fn build_mac_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     // App 菜单 (macOS 标准)
-    let app_name = "OpenChamber";
+    let app_name = "GridForge";
     let about_meta = AboutMetadata {
         name: Some(app_name.to_string()),
         version: Some(app.package_info().version.to_string()),

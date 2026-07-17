@@ -363,7 +363,7 @@ pub async fn create_pairing_session(
                     "pairing": pairing_data,
                     "secret": secret,
                     "server": {
-                        "label": "OpenChamber",
+                        "label": "GridForge",
                         "candidates": candidates,
                     }
                 })),
@@ -391,7 +391,7 @@ pub async fn connection_candidates(
     (
         [("cache-control", "no-store")],
         Json(json!({
-            "label": "OpenChamber",
+            "label": "GridForge",
             "candidates": [],
         })),
     )
@@ -582,7 +582,7 @@ pub async fn redeem_pairing(
             Json(json!({
                 "ok": true,
                 "server": {
-                    "label": "OpenChamber",
+                    "label": "GridForge",
                     "fingerprint": pairing_data.get("fingerprint").cloned().unwrap_or(Value::Null),
                 },
                 "client": client,

@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
-description = "OpenChamber 桌面壳 (Tauri, 替换 packages/electron)"
+description = "GridForge 桌面壳 (Tauri, 替换 packages/electron)"
 
 [lib]
 name = "oc_tauri_lib"

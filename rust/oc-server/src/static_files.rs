@@ -117,7 +117,7 @@ pub async fn headless_fallback() -> impl IntoResponse {
         axum::Json(json!({
             "ok": true,
             "mode": "api-only",
-            "message": "OpenChamber is running in API-only mode. No static files served.",
+            "message": "GridForge is running in API-only mode. No static files served.",
         })),
     )
 }

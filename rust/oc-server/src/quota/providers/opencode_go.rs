@@ -115,7 +115,7 @@ pub async fn fetch_open_code_go_usage_inner(credential: &Value) -> Result<serde_
         .get(&url)
         .header("Accept", "text/html,application/xhtml+xml")
         .header("Cookie", format!("auth={auth_cookie}"))
-        .header("User-Agent", "OpenChamber quota provider")
+        .header("User-Agent", "GridForge quota provider")
         .send()
         .await
         .map_err(|e| e.to_string())?;

@@ -204,7 +204,7 @@ fn create_mini_chat_window(app: &AppHandle, label: &str, url: &str) -> Result<()
     let parsed_url = url::Url::parse(url).map_err(|e| format!("invalid URL: {}", e))?;
 
     let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::External(parsed_url))
-        .title("OpenChamber Mini Chat")
+        .title("GridForge Mini Chat")
         .inner_size(MINI_CHAT_WIDTH, MINI_CHAT_HEIGHT)
         .min_inner_size(MINI_CHAT_MIN_WIDTH, MINI_CHAT_MIN_HEIGHT)
         .resizable(true)

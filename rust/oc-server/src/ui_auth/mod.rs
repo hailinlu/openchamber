@@ -44,7 +44,7 @@ pub const RATE_LIMIT_NO_IP_MAX_ATTEMPTS: u32 = 3;
 /// WebAuthn challenge TTL: 5 分钟。
 pub const DEFAULT_CHALLENGE_TTL_MS: i64 = 5 * 60 * 1000;
 /// WebAuthn RP 名称。
-pub const DEFAULT_RP_NAME: &str = "OpenChamber";
+pub const DEFAULT_RP_NAME: &str = "GridForge";
 
 /// UI 认证控制器。
 ///

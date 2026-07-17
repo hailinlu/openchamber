@@ -251,10 +251,10 @@ fn compute_title(counts: &TrayCounts) -> String {
     String::new()
 }
 
-/// "OpenChamber — N session(s) · ..."。
+/// "GridForge — N session(s) · ..."。
 fn compute_tooltip(counts: &TrayCounts, session_count: usize) -> String {
     if session_count == 0 {
-        return "OpenChamber — no active sessions".to_string();
+        return "GridForge — no active sessions".to_string();
     }
     let mut bits = Vec::new();
     if counts.approvals > 0 {
@@ -276,7 +276,7 @@ fn compute_tooltip(counts: &TrayCounts, session_count: usize) -> String {
     };
     let plural = if session_count == 1 { "" } else { "s" };
     format!(
-        "OpenChamber — {} session{}{}",
+        "GridForge — {} session{}{}",
         session_count, plural, suffix
     )
 }
@@ -456,7 +456,7 @@ fn rebuild_tray_menu(
     let instance_name = snapshot
         .get("instanceName")
         .and_then(|v| v.as_str())
-        .unwrap_or("OpenChamber")
+        .unwrap_or("GridForge")
         .to_string();
 
     // header
@@ -592,9 +592,9 @@ fn rebuild_tray_menu(
     // 快捷操作
     let new_session = MenuItem::with_id(app, "tray_new_session", "New Session", true, Some("CmdOrCtrl+N"))
         .map_err(|e| e.to_string())?;
-    let show = MenuItem::with_id(app, "tray_show", "Show OpenChamber", true, None::<&str>)
+    let show = MenuItem::with_id(app, "tray_show", "Show GridForge", true, None::<&str>)
         .map_err(|e| e.to_string())?;
-    let quit = MenuItem::with_id(app, "tray_quit", "Quit OpenChamber", true, Some("CmdOrCtrl+Q"))
+    let quit = MenuItem::with_id(app, "tray_quit", "Quit GridForge", true, Some("CmdOrCtrl+Q"))
         .map_err(|e| e.to_string())?;
 
     items.push(Box::new(new_session));
@@ -623,7 +623,7 @@ fn create_tray(app: &AppHandle, menu: Menu<tauri::Wry>) -> Result<(), String> {
     let _tray = tauri::tray::TrayIconBuilder::with_id("main_tray")
         .icon(icon)
         .menu(&menu)
-        .tooltip("OpenChamber")
+        .tooltip("GridForge")
         .on_menu_event(|app, event| {
             handle_tray_menu_click(app, &event.id().0);
         })
@@ -817,7 +817,7 @@ mod tests {
         };
         assert_eq!(
             compute_tooltip(&counts, 0),
-            "OpenChamber — no active sessions"
+            "GridForge — no active sessions"
         );
     }
 
@@ -831,7 +831,7 @@ mod tests {
         };
         assert_eq!(
             compute_tooltip(&counts, 1),
-            "OpenChamber — 1 session · idle"
+            "GridForge — 1 session · idle"
         );
     }
 
@@ -845,7 +845,7 @@ mod tests {
         };
         assert_eq!(
             compute_tooltip(&counts, 5),
-            "OpenChamber — 5 sessions · 1 awaiting approval, 2 working"
+            "GridForge — 5 sessions · 1 awaiting approval, 2 working"
         );
     }
 

@@ -85,7 +85,7 @@ pub async fn fetch_ollama_cloud_usage_inner(credential: &Value) -> Result<serde_
     let resp = client
         .get("https://ollama.com/settings")
         .header("Cookie", cookie)
-        .header("User-Agent", "OpenChamber quota provider")
+        .header("User-Agent", "GridForge quota provider")
         .send()
         .await
         .map_err(|e| e.to_string())?;

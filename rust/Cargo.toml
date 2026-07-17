@@ -1,4 +1,4 @@
-# OpenChamber Rust workspace.
+# GridForge Rust workspace.
 #
 # 渐进式迁移目标 (见 docs/plan/rust-migration-plan.md):
 #   - oc-server       → 替换 packages/web/server (Express → axum)

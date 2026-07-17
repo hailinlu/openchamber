@@ -1,4 +1,4 @@
-//! OpenChamber 桌面壳 (Tauri)。
+//! GridForge 桌面壳 (Tauri)。
 //!
 //! 阶段 4A (sidecar 过渡态 + IPC 契约对等):
 //! - Tauri 进程以子进程方式拉起 `@openchamber/web` CLI (`openchamber serve --foreground`)
@@ -42,7 +42,7 @@ static BACKEND: Mutex<Option<BackendState>> = Mutex::new(None);
 /// 编译时嵌入主窗口图标。
 ///
 /// `cargo tauri dev` 不打包 .app bundle, macOS/Linux/Windows 在 dev 模式下不会读
-/// `bundle.icon` 配置, 而是回退到 Tauri 默认图标。这里显式 `set_icon` 把 OpenChamber
+/// `bundle.icon` 配置, 而是回退到 Tauri 默认图标。这里显式 `set_icon` 把 GridForge
 /// 品牌图标注入运行时窗口 (Dock / 任务栏 / 标题栏)。
 /// build 模式下 .icns/.ico 已随 bundle 生效, 此 set_icon 无害 (同源图标)。
 static WINDOW_ICON: LazyLock<Image<'static>> = LazyLock::new(|| {

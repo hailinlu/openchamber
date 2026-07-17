@@ -258,7 +258,7 @@ impl ApnsSendRuntime {
     async fn send_via_relay(&self, device_tokens: &[String], payload: &ApnsPayload, relay: &RelayConfig) {
         let tokens: Vec<String> = device_tokens.iter().take(100).cloned().collect();
         let title = if payload.title.is_empty() {
-            "OpenChamber".to_string()
+            "GridForge".to_string()
         } else {
             payload.title.clone()
         };

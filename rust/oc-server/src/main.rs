@@ -1,4 +1,4 @@
-//! `oc-server` — OpenChamber Rust 后端二进制入口。
+//! `oc-server` — GridForge Rust 后端二进制入口。
 //!
 //! Phase 4B: 瘦壳, 启动编排委托给 `oc_server::OcServer`。
 //! 替换目标: `packages/web/server/index.js` (Express)。
@@ -18,7 +18,7 @@ async fn main() -> anyhow::Result<()> {
     let server = oc_server::OcServer::start(config).await?;
 
     // 就绪行 (供 sidecar/Tauri 解析, 同 Node 的 ready 行)
-    println!("openchamber server listening on {}", server.base_url());
+    println!("gridforge server listening on {}", server.base_url());
 
     // 等待 Ctrl-C (SIGINT) 或 SIGTERM, 任一到达即触发优雅关闭。
     // SIGTERM 对进程管理器 (systemd / launchd / kill <pid>) 很重要:

@@ -981,7 +981,7 @@ impl RelayService {
         snap.relay_url_locked = cfg.relay_url_locked;
         snap.server_id = id.server_id.clone();
         snap.last_error = Some(format!(
-            "relay host is owned by another local OpenChamber process (pid {holder_pid})"
+            "relay host is owned by another local GridForge process (pid {holder_pid})"
         ));
     }
 

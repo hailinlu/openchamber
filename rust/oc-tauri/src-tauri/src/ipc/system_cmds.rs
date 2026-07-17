@@ -113,7 +113,7 @@ pub async fn notify(args: &Value, app: &AppHandle) -> Result<Value, String> {
     let title = args
         .get("title")
         .and_then(|v| v.as_str())
-        .unwrap_or("OpenChamber")
+        .unwrap_or("GridForge")
         .to_string();
     let body = args
         .get("body")
