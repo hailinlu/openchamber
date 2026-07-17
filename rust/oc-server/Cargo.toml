@@ -38,11 +38,8 @@ aes-gcm = { workspace = true }
 hkdf = { workspace = true }
 subtle = { workspace = true }
 thiserror = { workspace = true }
-webauthn-rs = { workspace = true }
-webauthn-rs-proto = { workspace = true }
-# notifications 模块
-p256 = { workspace = true }
-web-push = { workspace = true }
+	# notifications 模块 (p256 — 始终启用, 用于 relay E2EE + APNs)
+	p256 = { workspace = true }
 h2 = { workspace = true }
 pem = { workspace = true }
 serde_yaml = { workspace = true }
@@ -66,6 +63,14 @@ bytes = { workspace = true }
 portable-pty = "0.9"
 # preview 模块: WebSocket 客户端 (代理到上游 dev server WS)
 tokio-tungstenite = { workspace = true }
+
+# webauthn-rs + web-push 依赖 openssl-sys, Windows MSVC 无系统 OpenSSL → 编译失败。
+# 在这些依赖升级到 rustls 分支之前, 仅在非 Windows 平台启用。
+# TODO(rust-migration): 换 rustls 化的库 (web-push 上游 / webauthn-rs 0.6+) 后移除此限制。
+[target.'cfg(not(windows))'.dependencies]
+webauthn-rs = { workspace = true }
+webauthn-rs-proto = { workspace = true }
+web-push = { workspace = true }
 
 # Unix: 进程组 kill
 [target.'cfg(unix)'.dependencies]

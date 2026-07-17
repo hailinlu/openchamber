@@ -200,6 +200,8 @@ async function main() {
 
   // cargo tauri dev 会自己 cargo run, 不需要我们 build。
   // cwd 指向 src-tauri 让 tauri-cli 找到 tauri.conf.json。
+  // Windows 注意: webauthn-rs + web-push 已通过 Cargo.toml 的
+  // `[target.'cfg(not(windows))'.dependencies]` 自动排除, 无需额外参数。
   const tauri = spawnProcess('cargo', ['tauri', 'dev'], {
     cwd: tauriSrcDir,
   });
