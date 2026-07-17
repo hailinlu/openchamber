@@ -334,6 +334,29 @@ pub fn run() {
             let app = window.app_handle();
 
             match event {
+                #[cfg(target_os = "windows")]
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    let policy = close_policy(
+                        true,
+                        window.label() == "main",
+                        settings::SettingsStore::get_bool(
+                            "desktopMinimizeToTrayEnabled",
+                            false,
+                        ),
+                        QUIT_REQUESTED.load(Ordering::SeqCst),
+                    );
+
+                    if policy == ClosePolicy::HideToTray {
+                        match window.hide() {
+                            Ok(()) => api.prevent_close(),
+                            Err(error) => log::error!(
+                                "failed to hide main window during close-to-tray: {}",
+                                error,
+                            ),
+                        }
+                    }
+                }
+
                 // 主窗口关闭时触发后端清理。
                 tauri::WindowEvent::Destroyed => {
                     if app.webview_windows().is_empty() {
@@ -374,6 +397,7 @@ pub fn run() {
             // 因此 rt.block_on(handle.shutdown()) 能完整跑完。
             // 而 RunEvent::Exit 在平台 runtime 调 std::process::exit 前一刻触发, async 清理会被截断。
             if let tauri::RunEvent::ExitRequested { .. } = event {
+                QUIT_REQUESTED.store(true, Ordering::SeqCst);
                 // 停止托盘动画 (清理 tokio 任务)
                 tray::destroy_tray_animation();
                 // 清理 SSH 会话

@@ -677,7 +677,7 @@ fn handle_tray_menu_click(app: &AppHandle, id: &str) {
         }
         "tray_quit" => {
             destroy_tray_animation();
-            app.exit(0);
+            crate::request_quit(app);
             return;
         }
         _ => {}

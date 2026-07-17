@@ -160,7 +160,7 @@ fn build_cross_platform_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>>
 pub fn handle_menu_event(app: &AppHandle, id: &str) {
     match id {
         "menu_quit" => {
-            app.exit(0);
+            crate::request_quit(app);
         }
         "menu_reload" => {
             if let Some(window) = app.get_webview_window("main") {
