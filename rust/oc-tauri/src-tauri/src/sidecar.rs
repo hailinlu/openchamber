@@ -28,6 +28,9 @@ const DEFAULT_READY_TIMEOUT: Duration = Duration::from_secs(30);
 const HEALTH_POLL_INTERVAL: Duration = Duration::from_millis(200);
 /// `/health` 单次请求超时。
 const HEALTH_REQ_TIMEOUT: Duration = Duration::from_secs(2);
+/// SIGTERM 后等 SIGKILL 的宽限期 (对齐 oc-server opencode shutdown 的 KILL_GRACE)。
+/// bun/Node 默认不响应 SIGTERM, 必须有 SIGKILL 兜底, 否则 wait().await 永久阻塞。
+const KILL_GRACE: Duration = Duration::from_millis(2500);
 
 /// 已启动的 sidecar 句柄。`kill()` / Drop 保证整树清理。
 pub struct SidecarHandle {
@@ -49,6 +52,14 @@ impl SidecarHandle {
 
     /// 杀掉整棵 sidecar 进程树 (sidecar + opencode 孙进程)。
     /// 幂等: 多次调用安全。
+    ///
+    /// 关闭时序 (对齐 oc-server opencode shutdown):
+    ///   1. killpg(SIGTERM) 通知整组优雅退出
+    ///   2. 等 KILL_GRACE (2.5s)
+    ///   3. 仍未退出 → killpg(SIGKILL) 强杀 + child.start_kill() 兜底
+    ///   4. child.wait() 回收资源
+    /// 不加超时的话, 若 sidecar (bun/Node) 不响应 SIGTERM, wait().await 会永远阻塞,
+    /// 导致 oc-tauri 主进程卡死无法退出 (SIGTERM 冒烟复现)。
     pub async fn kill(&mut self) -> Result<()> {
         if let Some(mut child) = self.child.take() {
             #[cfg(unix)]
@@ -59,11 +70,8 @@ impl SidecarHandle {
                 if let Some(pid) = pid {
                     // SAFETY: killpg 是 POSIX 标准 libc 调用, 参数为正 pgid。
                     unsafe {
-                        let r = libc::killpg(pid as i32, libc::SIGTERM);
-                        if r != 0 {
-                            // 组可能已退出; 尝试 SIGKILL 兜底。
-                            let _ = libc::killpg(pid as i32, libc::SIGKILL);
-                        }
+                        // 1. 先 SIGTERM 优雅退出
+                        let _ = libc::killpg(pid as i32, libc::SIGTERM);
                     }
                 }
             }
@@ -77,9 +85,29 @@ impl SidecarHandle {
                 }
             }
 
-            // 等待子进程真正退出, 回收资源。
-            // 忽略错误: 进程可能已死。
-            let _ = child.wait().await;
+            // 2-3. 等 KILL_GRACE, 超时则 SIGKILL 强杀。
+            //      bun/Node 默认不处理 SIGTERM, 必须有 SIGKILL 兜底, 否则 wait 永久阻塞。
+            match tokio::time::timeout(KILL_GRACE, child.wait()).await {
+                Ok(_status) => {
+                    // 进程在宽限期内退出, 资源已回收。
+                }
+                Err(_elapsed) => {
+                    log::warn!("sidecar did not exit in {:?}, force killing", KILL_GRACE);
+                    #[cfg(unix)]
+                    {
+                        let pid = child.id();
+                        if let Some(pid) = pid {
+                            unsafe {
+                                let _ = libc::killpg(pid as i32, libc::SIGKILL);
+                            }
+                        }
+                    }
+                    // start_kill 跨平台兜底 (发 SIGKILL/terminate)。
+                    let _ = child.start_kill();
+                    // 4. 回收资源。
+                    let _ = child.wait().await;
+                }
+            }
         }
         Ok(())
     }

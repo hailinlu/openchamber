@@ -164,6 +164,62 @@ pub fn run() {
                 log::warn!("failed to setup menu: {}", e);
             }
 
+            // --- SIGTERM/SIGINT 处理 (Unix) ---
+            // 覆盖路径 A: OS 发 SIGTERM/SIGINT 时, 内核默认处置 = 立即终止进程,
+            // 不展开栈、不跑 Drop、不触发任何 RunEvent。子进程会 reparent 到 init → 孤儿。
+            // 这里装一个显式 handler: 在专用 current-thread rt 上 recv 信号,
+            // 收到后在【独立线程】调 shutdown_backend_public() 完成 cleanup。
+            //
+            // 为什么不能在 rt.block_on 里直接调 shutdown_backend_public():
+            //   shutdown_backend 内部 backend_rt.block_on(...) 会嵌套 runtime
+            //   → "Cannot start a runtime from within a runtime" panic。
+            //   所以 cleanup 必须脱离 signal-rt 上下文, 在裸线程上执行。
+            //
+            // shutdown_backend 幂等: 若 ExitRequested/Destroyed 已清理, 此处 no-op。
+            #[cfg(unix)]
+            {
+                let app_handle = app.handle().clone();
+                std::thread::spawn(move || {
+                    // current_thread rt 只用于 signal recv (轻量)。
+                    let rt = match tokio::runtime::Builder::new_current_thread()
+                        .enable_all()
+                        .build()
+                    {
+                        Ok(rt) => rt,
+                        Err(e) => {
+                            log::error!("failed to build signal-handler runtime: {}", e);
+                            return;
+                        }
+                    };
+                    // 用 LocalSet 驱动 signal stream。
+                    let local = tokio::task::LocalSet::new();
+                    local.block_on(&rt, async {
+                        let sigterm = tokio::signal::unix::signal(
+                            tokio::signal::unix::SignalKind::terminate(),
+                        );
+                        let sigint = tokio::signal::unix::signal(
+                            tokio::signal::unix::SignalKind::interrupt(),
+                        );
+                        let (mut sigterm, mut sigint) = match (sigterm, sigint) {
+                            (Ok(t), Ok(i)) => (t, i),
+                            (Err(e), _) | (_, Err(e)) => {
+                                log::error!("failed to install signal handler: {}", e);
+                                return;
+                            }
+                        };
+                        tokio::select! {
+                            _ = sigterm.recv() => log::info!("received SIGTERM, shutting down backend"),
+                            _ = sigint.recv() => log::info!("received SIGINT, shutting down backend"),
+                        }
+                    });
+                    // rt 已停止 (block_on 返回)。在【裸线程上下文】调 cleanup,
+                    // 避免 backend_rt.block_on 嵌套 panic。
+                    shutdown_backend_public();
+                    // 走 Tauri 正常退出 (触发 ExitRequested → tray/ssh 清理)。
+                    app_handle.exit(0);
+                });
+            }
+
             Ok(())
         })
         // --- IPC invoke_handler 注册 ---
@@ -218,16 +274,22 @@ pub fn run() {
         })
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|_app_handle, event| {
-            if matches!(event, tauri::RunEvent::Exit) {
+        .run(|app_handle, event| {
+            // 在 ExitRequested (而非 Exit) 做清理: ExitRequested 在进程真正退出前同步触发,
+            // wry 事件循环会等本回调返回后再决定是否退出 (tauri-runtime-wry lib.rs:4316-4322),
+            // 因此 rt.block_on(handle.shutdown()) 能完整跑完。
+            // 而 RunEvent::Exit 在平台 runtime 调 std::process::exit 前一刻触发, async 清理会被截断。
+            if let tauri::RunEvent::ExitRequested { .. } = event {
                 // 停止托盘动画 (清理 tokio 任务)
                 tray::destroy_tray_animation();
                 // 清理 SSH 会话
                 #[cfg(desktop)]
                 {
-                    ssh::shutdown_all(_app_handle);
+                    ssh::shutdown_all(app_handle);
                 }
+                // shutdown_backend 幂等: 若 WindowEvent::Destroyed 或 signal handler 已清理, 此处 no-op。
                 shutdown_backend();
+                // 不调 api.prevent_exit() — 清理已完成, 放行正常退出。
             }
         });
 }
@@ -255,8 +317,15 @@ fn apply_vibrancy_if_enabled(window: &tauri::WebviewWindow) {
 }
 
 /// 同步清理后端: 从全局状态取出句柄, 在它的运行时上 block_on shutdown。
+///
+/// 幂等: `guard.take()` 保证多次调用安全 (第二次拿不到 state → no-op)。
+/// 这对 signal handler + ExitRequested + WindowEvent::Destroyed 三处都调本函数
+/// 至关重要 — 先到的完成清理, 后到的 no-op。
+///
+/// poison 容忍: 用 `unwrap_or_else(into_inner)` 而非 `unwrap()`, 避免
+/// 持锁线程 panic 后 signal handler 再调时二次 panic (signal handler panic 是 UB)。
 fn shutdown_backend() {
-    let mut guard = BACKEND.lock().unwrap();
+    let mut guard = BACKEND.lock().unwrap_or_else(|e| e.into_inner());
     if let Some(mut state) = guard.take() {
         if let (Some(rt), Some(handle)) = (state.rt.take(), state.handle.take()) {
             let _ = rt.block_on(async { handle.shutdown().await; });
@@ -268,4 +337,50 @@ fn shutdown_backend() {
 /// 公开的后端清理入口 (供 updater 模块在 on_before_exit 中调用)。
 pub fn shutdown_backend_public() {
     shutdown_backend();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// `shutdown_backend` 幂等性: BACKEND 为 None (未设置或已清理) 时调用不 panic。
+    ///
+    /// 这对三处调用点的安全至关重要:
+    /// - WindowEvent::Destroyed (最后一个窗口销毁)
+    /// - RunEvent::ExitRequested (退出前)
+    /// - SIGTERM/SIGINT handler (信号到达)
+    /// 先到的完成清理 (take 走 state), 后到的进入此分支 no-op。
+    #[test]
+    fn shutdown_backend_noop_when_none() {
+        // 确保 BACKEND 为空 (测试间隔离)。
+        {
+            let mut guard = BACKEND.lock().unwrap();
+            *guard = None;
+        }
+        // 多次调用都应安全。
+        shutdown_backend();
+        shutdown_backend();
+        shutdown_backend();
+    }
+
+    /// poison 容忍: 即使 Mutex 被 poison (模拟持锁线程 panic),
+    /// shutdown_backend 仍能通过 into_inner 取到数据不二次 panic。
+    #[test]
+    fn shutdown_backend_tolerates_poisoned_mutex() {
+        // 注入一个 poison: lock 后主动 panic 让它 poison。
+        // 用单独线程, panic 被 catch_unwind 吞掉, 但 poison 已注入。
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _guard = BACKEND.lock().unwrap();
+            // 先重置为干净状态 (None), 这样后续 into_inner 拿到的也是 None。
+            // guard drop 时会 poison (因为线程 panic)。
+            tx.send(()).unwrap();
+            panic!("intentional poison for test");
+        })
+        .join()
+        .ok();
+        let _ = rx.recv();
+        // 此时 Mutex 已 poison。shutdown_backend 必须 tolerate。
+        shutdown_backend(); // 不 panic 即通过
+    }
 }
