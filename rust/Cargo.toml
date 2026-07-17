@@ -102,6 +102,15 @@ oc-core = { path = "oc-core" }
 oc-opencode-sdk = { path = "oc-opencode-sdk" }
 oc-server = { path = "oc-server" }
 
+[profile.dev]
+# 压缩调试符号 — 完整 debug=true 是 target/ 体积爆炸的主因 (4.9万 .o 文件累积)。
+# line-tables-only 保留 panic 栈回溯的行号 (最有用的信息), 剔除变量/类型详情,
+# 单独产物体积约降 60-70%。
+debug = "line-tables-only"
+# 把调试符号拆到独立的 .dwo 文件 — rlib/.o 主产物不再内嵌完整符号表,
+# rust-analyzer 增量 check 时减少重写大文件的开销。
+split-debuginfo = "unpacked"
+
 [profile.release]
 lto = "thin"
 codegen-units = 1
