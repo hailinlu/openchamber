@@ -4,7 +4,7 @@
 //! 由 `ipc/mod.rs::dispatch` 的 match 分支调用。
 
 use serde_json::{json, Value};
-use tauri::{AppHandle, Manager, WebviewWindow};
+use tauri::{AppHandle, WebviewWindow};
 
 use crate::settings::SettingsStore;
 
@@ -111,11 +111,66 @@ pub async fn set_vibrancy(args: &Value, _app: &AppHandle) -> Result<Value, Strin
 }
 
 /// `desktop_focus_main_window` — 聚焦 (show + unminimize + focus) 主窗口。
+///
+/// 共用 `crate::tray::restore_main_window` 的 unminimize → show → set_focus 顺序,
+/// 与托盘左键点击 / `tray_show` 行为完全一致, 防止最小化窗口先 `show()` 后
+/// 再 `unminimize()` 的二次恢复抖动。
+///
+/// 响应形状固定为 `{ "focused": bool }`, 与 Electron `main.mjs:4136,4147`
+/// 始终返回 `{ focused: true }` 保持一致; 主窗口缺失时返回 `{ focused: false }`
+/// 而不是 `null`, 以便消费方 (`MiniChatLayout.tsx:244-250`) 用
+/// `result?.focused === true` 单值判断 `desktop_close_current_window` 的触发条件。
+fn focus_main_window_response(focused: bool) -> Value {
+    json!({ "focused": focused })
+}
+
 pub async fn focus_main_window(_args: &Value, app: &AppHandle) -> Result<Value, String> {
-    if let Some(window) = app.get_webview_window("main") {
-        let _ = window.show();
-        let _ = window.unminimize();
-        let _ = window.set_focus();
+    let focused = crate::tray::restore_main_window(app);
+    Ok(focus_main_window_response(focused))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn focus_main_window_response_reports_success() {
+        // Happy path: 主窗口存在 → `{ focused: true }`, 与 Electron main.mjs:4136,4147
+        // 始终返回的形状一致。 MiniChatLayout.tsx:246 的 `result?.focused === true`
+        // 触发 `desktop_close_current_window`。
+        assert_eq!(focus_main_window_response(true), json!({ "focused": true }));
     }
-    Ok(Value::Null)
+
+    #[test]
+    fn focus_main_window_response_reports_missing_window() {
+        // 主窗口缺失 → `{ focused: false }` (而不是 `Value::Null` 或空对象),
+        // 保证消费方的 `result?.focused === true` 单值判断可靠。
+        assert_eq!(focus_main_window_response(false), json!({ "focused": false }));
+    }
+
+    #[test]
+    fn focus_main_window_response_never_returns_null_or_empty_object() {
+        // 防回归: 响应形状必须始终是 `{ focused: bool }`, 任何分支都不能
+        // 退化为 `null` / `{}` (会破坏 MiniChatLayout 的 gated close 逻辑)。
+        for focused in [true, false] {
+            let response = focus_main_window_response(focused);
+            assert!(
+                response.is_object(),
+                "response must be a JSON object, got {:?}",
+                response
+            );
+            let obj = response.as_object().expect("object");
+            assert!(
+                obj.contains_key("focused"),
+                "response object must have `focused` key, got {:?}",
+                obj
+            );
+            assert_eq!(obj.len(), 1, "response object must have exactly one key");
+            assert_eq!(
+                obj["focused"].as_bool(),
+                Some(focused),
+                "focused value must match input bool"
+            );
+        }
+    }
 }

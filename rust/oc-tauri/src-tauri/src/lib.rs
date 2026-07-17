@@ -187,6 +187,14 @@ pub fn run() {
             let background_start = should_start_in_background(std::env::args());
             configure_main_window_shell(app.handle(), background_start);
 
+            // --- 创建系统托盘 (在后端启动之前) ---
+            // 必须在 `SidecarBuilder::start()` / `OcServer::start()` 之前调用,
+            // 这样后台启动或冷启动时托盘立即可见, 用户可在 UI hydration 完成前
+            // 通过托盘菜单 (New Session / Show GridForge / Quit) 操作应用。
+            if let Err(error) = tray::setup_tray(app.handle()) {
+                log::error!("failed to create tray during setup: {}", error);
+            }
+
             // --- 启动后端 (仅桌面端) ---
             #[cfg(desktop)]
             {

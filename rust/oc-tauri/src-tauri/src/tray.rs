@@ -164,7 +164,7 @@ pub async fn handle_tray_update(args: &Value, app: &AppHandle) -> Result<Value, 
 
     // tooltip
     let tooltip = compute_tooltip(&counts, session_count);
-    if let Some(tray) = app.tray_by_id("main_tray") {
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
         let _ = tray.set_tooltip(Some(&tooltip));
     }
 
@@ -304,14 +304,14 @@ fn apply_icon_state(app: &AppHandle, next_state: &str) {
             // Windows: breath frames = [icon.ico] 单元素 → 不动画, 设静态
             if BREATH_FRAMES.len() > 1 {
                 start_animation(app);
-            } else if let Some(tray) = app.tray_by_id("main_tray") {
+            } else if let Some(tray) = app.tray_by_id(TRAY_ID) {
                 let frame = BREATH_FRAMES.first().unwrap_or(&*IDLE_ICON);
                 let _ = tray.set_icon(Some(frame.clone()));
             }
         }
         "unseen" => {
             stop_animation();
-            if let Some(tray) = app.tray_by_id("main_tray") {
+            if let Some(tray) = app.tray_by_id(TRAY_ID) {
                 let _ = tray.set_icon(Some((*UNSEEN_ICON).clone()));
                 #[cfg(target_os = "macos")]
                 {
@@ -322,7 +322,7 @@ fn apply_icon_state(app: &AppHandle, next_state: &str) {
         _ => {
             // idle
             stop_animation();
-            if let Some(tray) = app.tray_by_id("main_tray") {
+            if let Some(tray) = app.tray_by_id(TRAY_ID) {
                 let _ = tray.set_icon(Some((*IDLE_ICON).clone()));
                 #[cfg(target_os = "macos")]
                 {
@@ -353,7 +353,7 @@ fn start_animation(app: &AppHandle) {
             }
 
             // 设当前帧
-            if let Some(tray) = app_handle.tray_by_id("main_tray") {
+            if let Some(tray) = app_handle.tray_by_id(TRAY_ID) {
                 let frame = BREATH_FRAMES.get(index).unwrap_or(&*IDLE_ICON);
                 let _ = tray.set_icon(Some(frame.clone()));
                 #[cfg(target_os = "macos")]
@@ -400,7 +400,7 @@ fn set_title_if_changed(app: &AppHandle, title: &str) {
     *last = title.to_string();
     drop(last);
 
-    if let Some(tray) = app.tray_by_id("main_tray") {
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
         // macOS: set_title 设菜单栏图标旁的文字
         let _ = tray.set_title(Some(title));
     }
@@ -446,6 +446,120 @@ fn status_icon_for(key: &str) -> &'static Image<'static> {
 // ============================================================================
 // 菜单重建
 // ============================================================================
+
+/// 托盘图标 ID — 所有 `tray_by_id` / `TrayIconBuilder::with_id` 都必须用此常量,
+/// 否则 `setup_tray` 的幂等守卫 (`tray_by_id(TRAY_ID).is_some()`) 会失效。
+const TRAY_ID: &str = "main_tray";
+
+/// 托盘菜单项 action ID — 与 `build_initial_menu` 和 `handle_tray_menu_click` 一一对应。
+const ACTION_NEW_SESSION: &str = "tray_new_session";
+const ACTION_NEW_MINI_CHAT: &str = "tray_new_mini_chat";
+const ACTION_SHOW: &str = "tray_show";
+const ACTION_QUIT: &str = "tray_quit";
+
+/// 托盘动作 → menu-action channel payload 决策 (pure helper)。
+///
+/// 与 `menu.rs::handle_menu_event` 中自定义项的 fallthrough 保持一致:
+/// emit `openchamber:menu-action`, detail = 去掉 `tray_` 前缀后的 action 名。
+/// UI 侧 `useMenuActions.handleAction` 收到 `"new_mini_chat"` / `"new_session"`
+/// 等 detail 后走与文件菜单相同的分发路径, 避免引入新事件名。
+///
+/// 返回 `None` 表示该动作不走 menu-action channel (例如 `show` / `quit`
+/// 在本地处理, 不需要 UI 介入)。
+fn tray_menu_action_payload(action_id: &str) -> Option<Value> {
+    // 去掉 `tray_` 前缀; 不能剥前缀的 id (例如 `session_*` / `approval_*`)
+    // 不属于本 helper 的范围, 调用方应自行处理。
+    let action = action_id.strip_prefix("tray_")?;
+    if action.is_empty() {
+        return None;
+    }
+    Some(json!({
+        "event": "openchamber:menu-action",
+        "detail": action,
+    }))
+}
+
+/// 构建初始 (UI hydration 前可用) 托盘菜单:
+/// GridForge header → separator → New Session → New Mini Chat → Show GridForge → separator → Quit GridForge。
+///
+/// 与 `rebuild_tray_menu` 在 live 状态下重建的菜单结构保持一致 (header + 快捷操作),
+/// 便于用户在 UI 加载完成前立即看到 tray 并触发基本动作。
+fn build_initial_menu(app: &AppHandle) -> Result<Menu<tauri::Wry>, String> {
+    let header = MenuItem::with_id(app, "tray_header", "GridForge", false, None::<&str>)
+        .map_err(|error| error.to_string())?;
+    let new_session = MenuItem::with_id(
+        app,
+        ACTION_NEW_SESSION,
+        "New Session",
+        true,
+        Some("CmdOrCtrl+N"),
+    )
+    .map_err(|error| error.to_string())?;
+    let new_mini_chat = MenuItem::with_id(
+        app,
+        ACTION_NEW_MINI_CHAT,
+        "New Mini Chat",
+        true,
+        None::<&str>,
+    )
+    .map_err(|error| error.to_string())?;
+    let show = MenuItem::with_id(app, ACTION_SHOW, "Show GridForge", true, None::<&str>)
+        .map_err(|error| error.to_string())?;
+    let quit = MenuItem::with_id(app, ACTION_QUIT, "Quit GridForge", true, Some("CmdOrCtrl+Q"))
+        .map_err(|error| error.to_string())?;
+
+    let sep1 = PredefinedMenuItem::separator(app).map_err(|error| error.to_string())?;
+    let sep2 = PredefinedMenuItem::separator(app).map_err(|error| error.to_string())?;
+
+    Menu::with_items(
+        app,
+        &[
+            &header,
+            &sep1,
+            &new_session,
+            &new_mini_chat,
+            &show,
+            &sep2,
+            &quit,
+        ],
+    )
+    .map_err(|error| error.to_string())
+}
+
+/// 幂等的托盘初始化入口 — 在后端启动之前调用, 确保 tray 在 UI hydration 完成前已可见。
+///
+/// 如果 tray 已经存在 (再次 setup 或 live 状态 `rebuild_tray_menu` 已创建), 直接返回 Ok
+/// 不重复创建, 避免 Tauri 抛 "tray already exists"。
+pub fn setup_tray(app: &AppHandle) -> Result<(), String> {
+    if app.tray_by_id(TRAY_ID).is_some() {
+        return Ok(());
+    }
+
+    let menu = build_initial_menu(app)?;
+    create_tray(app, menu)
+}
+
+/// 恢复并聚焦主窗口 (unminimize → show → set_focus)。
+///
+/// 托盘左键点击 / `tray_show` / `desktop_focus_main_window` 共用此恢复顺序,
+/// 防止最小化窗口被 `show()` 提前唤起后, `unminimize()` 再触发第二次恢复抖动。
+pub(crate) fn restore_main_window(app: &AppHandle) -> bool {
+    let Some(window) = app.get_webview_window("main") else {
+        log::warn!("[tray] main window not found");
+        return false;
+    };
+
+    if let Err(error) = window.unminimize() {
+        log::warn!("[tray] failed to unminimize main window: {}", error);
+    }
+    if let Err(error) = window.show() {
+        log::warn!("[tray] failed to show main window: {}", error);
+    }
+    if let Err(error) = window.set_focus() {
+        log::warn!("[tray] failed to focus main window: {}", error);
+    }
+    true
+}
 
 /// 重建托盘菜单 (含状态行图标)。
 fn rebuild_tray_menu(
@@ -590,11 +704,11 @@ fn rebuild_tray_menu(
     }
 
     // 快捷操作
-    let new_session = MenuItem::with_id(app, "tray_new_session", "New Session", true, Some("CmdOrCtrl+N"))
+    let new_session = MenuItem::with_id(app, ACTION_NEW_SESSION, "New Session", true, Some("CmdOrCtrl+N"))
         .map_err(|e| e.to_string())?;
-    let show = MenuItem::with_id(app, "tray_show", "Show GridForge", true, None::<&str>)
+    let show = MenuItem::with_id(app, ACTION_SHOW, "Show GridForge", true, None::<&str>)
         .map_err(|e| e.to_string())?;
-    let quit = MenuItem::with_id(app, "tray_quit", "Quit GridForge", true, Some("CmdOrCtrl+Q"))
+    let quit = MenuItem::with_id(app, ACTION_QUIT, "Quit GridForge", true, Some("CmdOrCtrl+Q"))
         .map_err(|e| e.to_string())?;
 
     items.push(Box::new(new_session));
@@ -607,7 +721,7 @@ fn rebuild_tray_menu(
     let menu = Menu::with_items(app, &item_refs).map_err(|e| e.to_string())?;
 
     // 设置到托盘 (如果托盘已存在则更新, 否则创建)
-    if let Some(tray) = app.tray_by_id("main_tray") {
+    if let Some(tray) = app.tray_by_id(TRAY_ID) {
         tray.set_menu(Some(menu)).map_err(|e| e.to_string())?;
     } else {
         create_tray(app, menu)?;
@@ -620,7 +734,7 @@ fn rebuild_tray_menu(
 fn create_tray(app: &AppHandle, menu: Menu<tauri::Wry>) -> Result<(), String> {
     let icon = (*IDLE_ICON).clone();
 
-    let _tray = tauri::tray::TrayIconBuilder::with_id("main_tray")
+    let _tray = tauri::tray::TrayIconBuilder::with_id(TRAY_ID)
         .icon(icon)
         .menu(&menu)
         .tooltip("GridForge")
@@ -634,12 +748,9 @@ fn create_tray(app: &AppHandle, menu: Menu<tauri::Wry>) -> Result<(), String> {
                 ..
             } = event
             {
-                // 左键点击 → 显示主窗口
+                // 左键点击 → 恢复并聚焦主窗口
                 let app = tray.app_handle();
-                if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.show();
-                    let _ = window.set_focus();
-                }
+                restore_main_window(app);
             }
         })
         .build(app)
@@ -648,7 +759,7 @@ fn create_tray(app: &AppHandle, menu: Menu<tauri::Wry>) -> Result<(), String> {
     // macOS: 首次创建后设 template
     #[cfg(target_os = "macos")]
     {
-        if let Some(tray) = app.tray_by_id("main_tray") {
+        if let Some(tray) = app.tray_by_id(TRAY_ID) {
             let _ = tray.set_icon_as_template(true);
         }
     }
@@ -660,22 +771,22 @@ fn create_tray(app: &AppHandle, menu: Menu<tauri::Wry>) -> Result<(), String> {
 fn handle_tray_menu_click(app: &AppHandle, id: &str) {
     // 快捷操作
     match id {
-        "tray_new_session" => {
-            let _ = app.emit(
-                "openchamber:emit",
-                json!({ "event": "openchamber:open-draft-session", "detail": {} }),
-            );
-            return;
-        }
-        "tray_show" => {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.show();
-                let _ = window.unminimize();
-                let _ = window.set_focus();
+        ACTION_NEW_SESSION | ACTION_NEW_MINI_CHAT => {
+            // 走与 `menu.rs::handle_menu_event` 自定义项一致的
+            // `openchamber:menu-action` channel: emit 一个 DOM CustomEvent,
+            // UI 侧 `useMenuActions.handleAction` 收到 detail (例如
+            // `"new_session"` / `"new_mini_chat"`) 后按 menu action 处理。
+            // 不引入新事件名, 与文件菜单的 `menu_new_mini_chat` 行为对齐。
+            if let Some(payload) = tray_menu_action_payload(id) {
+                let _ = app.emit("openchamber:emit", payload);
             }
             return;
         }
-        "tray_quit" => {
+        ACTION_SHOW => {
+            restore_main_window(app);
+            return;
+        }
+        ACTION_QUIT => {
             destroy_tray_animation();
             crate::request_quit(app);
             return;
@@ -877,5 +988,68 @@ mod tests {
     fn status_icon_key_blank() {
         let session = json!({ "status": "idle" });
         assert_eq!(status_icon_key(&session), "blank");
+    }
+
+    // ------------------------------------------------------------------------
+    // 菜单 action → menu-action channel payload 决策 (pure helper)
+    // ------------------------------------------------------------------------
+
+    #[test]
+    fn tray_menu_action_payload_new_session_uses_menu_action_channel() {
+        // tray_new_session → 去掉 `tray_` 前缀 → detail = "new_session",
+        // 与 menu.rs 中 menu_new_session 的 fallthrough 行为一致 (line 201-208)。
+        let payload = tray_menu_action_payload(ACTION_NEW_SESSION).expect("payload");
+        assert_eq!(
+            payload,
+            json!({
+                "event": "openchamber:menu-action",
+                "detail": "new_session",
+            })
+        );
+    }
+
+    #[test]
+    fn tray_menu_action_payload_new_mini_chat_uses_menu_action_channel() {
+        // 关键 review 修复: 不再 emit `openchamber:open-mini-chat` 这一新事件,
+        // 改为 emit `openchamber:menu-action` + detail "new_mini_chat",
+        // 与 menu.rs:71 (menu_new_mini_chat) + menu.rs:201-208 fallthrough
+        // 行为完全一致。
+        let payload = tray_menu_action_payload(ACTION_NEW_MINI_CHAT).expect("payload");
+        assert_eq!(
+            payload,
+            json!({
+                "event": "openchamber:menu-action",
+                "detail": "new_mini_chat",
+            })
+        );
+        // 防回归: 不再使用旧的 `openchamber:open-mini-chat` 事件名。
+        assert_ne!(payload["event"], "openchamber:open-mini-chat");
+    }
+
+    #[test]
+    fn tray_menu_action_payload_rejects_non_tray_prefixed_ids() {
+        // session_* / approval_* 这类 id 没有 `tray_` 前缀, 不属于本 helper
+        // 的范围 (调用方走自己的分支)。 必须返回 None。
+        assert!(tray_menu_action_payload("session_0_abc").is_none());
+        assert!(tray_menu_action_payload("approval_0_abc_once").is_none());
+        assert!(tray_menu_action_payload("approval_focus_0_abc").is_none());
+    }
+
+    #[test]
+    fn tray_menu_action_payload_local_actions_still_have_valid_payload() {
+        // tray_show / tray_quit 也属于 `tray_` 前缀, helper 会返回合法 payload
+        // (用于测试纯函数), 但调用方 `handle_tray_menu_click` 选择本地处理
+        // 而非走 menu-action channel。本测试固定 helper 的"只看前缀"语义。
+        let show = tray_menu_action_payload("tray_show").expect("payload");
+        assert_eq!(show["detail"], "show");
+        let quit = tray_menu_action_payload("tray_quit").expect("payload");
+        assert_eq!(quit["detail"], "quit");
+    }
+
+    #[test]
+    fn tray_menu_action_payload_rejects_empty_after_prefix_strip() {
+        // 防御性: 如果未来有人加 "tray_" 但不带 action, 必须返回 None
+        // 而不是 emit 一个空 detail 的 menu-action。
+        assert!(tray_menu_action_payload("tray_").is_none());
     }
 }
