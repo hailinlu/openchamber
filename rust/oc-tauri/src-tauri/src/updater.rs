@@ -18,7 +18,8 @@
 use std::sync::Mutex;
 
 use serde_json::{json, Value};
-use tauri::{AppHandle, Emitter};
+use tauri::window::{ProgressBarState, ProgressBarStatus};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_updater::UpdaterExt;
 
 /// 暂存的待安装更新 (版本号 + downloaded 标志)。
@@ -118,7 +119,10 @@ pub async fn download_and_install(_args: &Value, app: &AppHandle) -> Result<Valu
     #[cfg(target_os = "windows")]
     {
         if let Some(window) = app.get_webview_window("main") {
-            let _ = window.set_progress_bar(0.01);
+            let _ = window.set_progress_bar(ProgressBarState {
+                status: Some(ProgressBarStatus::Normal),
+                progress: Some(1),
+            });
         }
     }
 
@@ -146,7 +150,10 @@ pub async fn download_and_install(_args: &Value, app: &AppHandle) -> Result<Valu
                     if let Some(window) = app_handle.get_webview_window("main") {
                         if total > 0 {
                             let progress = (downloaded as f64 / total as f64).clamp(0.0, 1.0);
-                            let _ = window.set_progress_bar(progress);
+                            let _ = window.set_progress_bar(ProgressBarState {
+                                status: Some(ProgressBarStatus::Normal),
+                                progress: Some((progress * 100.0) as u64),
+                            });
                         }
                     }
                 }
@@ -163,7 +170,10 @@ pub async fn download_and_install(_args: &Value, app: &AppHandle) -> Result<Valu
     #[cfg(target_os = "windows")]
     {
         if let Some(window) = app.get_webview_window("main") {
-            let _ = window.set_progress_bar(-1.0);
+            let _ = window.set_progress_bar(ProgressBarState {
+                status: Some(ProgressBarStatus::None),
+                progress: None,
+            });
         }
     }
 
@@ -188,7 +198,10 @@ pub async fn download_and_install(_args: &Value, app: &AppHandle) -> Result<Valu
             #[cfg(target_os = "windows")]
             {
                 if let Some(window) = app.get_webview_window("main") {
-                    let _ = window.set_progress_bar(-1.0);
+                    let _ = window.set_progress_bar(ProgressBarState {
+                status: Some(ProgressBarStatus::None),
+                progress: None,
+            });
                 }
             }
             let _ = app.emit(

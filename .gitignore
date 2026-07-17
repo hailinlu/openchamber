@@ -77,6 +77,10 @@ test-results/
 rust/target/
 rust/**/target/
 
+# Rust 本机 Cargo 配置 (含 OpenSSL 路径等机器特定设置, 不可提交)
+# 详见 rust/.cargo/config.toml 内说明
+rust/.cargo/config.toml
+
 # Tauri mobile icon build artifacts (desktop shell only; iOS/Android not built)
 rust/oc-tauri/src-tauri/icons/android/
 rust/oc-tauri/src-tauri/icons/ios/

@@ -144,9 +144,14 @@ impl PidProbe for SystemPidProbe {
             // implies the process is at least alive enough to be queried.
             // We never need to keep the handle — exit code is read once
             // and discarded.
+            //
+            // CloseHandle + STILL_ACTIVE 属于 Win32::Foundation (windows-sys 0.59
+            // 实际定义位置, 见 src/Windows/Win32/Foundation/mod.rs); 之前错误地从
+            // Threading 导入, 靠 workspace feature unification 掩盖了路径错误。
+            // 单包编译 (cargo build -p oc-server) 时 unification 不发生, bug 暴露。
+            use windows_sys::Win32::Foundation::{CloseHandle, STILL_ACTIVE};
             use windows_sys::Win32::System::Threading::{
-                OpenProcess, GetExitCodeProcess, CloseHandle, PROCESS_QUERY_LIMITED_INFORMATION,
-                STILL_ACTIVE,
+                OpenProcess, GetExitCodeProcess, PROCESS_QUERY_LIMITED_INFORMATION,
             };
             // SAFETY: `OpenProcess` reads the kernel handle table by PID. The
             // returned HANDLE is valid only for the synchronous lifetime of
@@ -162,7 +167,8 @@ impl PidProbe for SystemPidProbe {
                     GetExitCodeProcess(handle, &mut exit_code)
                 };
                 unsafe { CloseHandle(handle); }
-                ok != 0 && exit_code == STILL_ACTIVE
+                // STILL_ACTIVE (NTSTATUS = i32, 值 0x103) 与 exit_code (u32) 比较
+                ok != 0 && exit_code == STILL_ACTIVE as u32
             }
         }
     }

@@ -21,7 +21,7 @@
 //   UI:  OPENCHAMBER_HMR_UI_PORT  (默认 5180, 必须与 tauri.conf.json devUrl 一致)
 //   API: OPENCHAMBER_HMR_API_PORT (默认 3902)
 
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -39,16 +39,44 @@ const useDetachedChildren = process.platform !== 'win32';
 // 避免在 detached 子进程里 PATH 解析不到 `node` (nvm 等场景)。
 const nodeBin = process.execPath;
 
+// Windows 下 spawn() 配合 shell:true 会把命令交给 cmd.exe, 而 cmd.exe 会在空格处
+// 切分命令名 —— 若 command 是含空格的绝对路径 (例如 process.execPath = "C:\Program Files\nodejs\node.exe"),
+// 就会变成 `'C:\Program' is not recognized`。这里复用 packages/electron/scripts/electron-dev.mjs
+// 已验证的模式: 解析命令 → 仅对 .cmd/.bat shim 走显式 cmd.exe + 正确引号, 其余直接 spawn。
+const quoteWindowsCommandArg = (value) => `"${String(value).replace(/"/g, '""')}"`;
+
+function resolveWindowsCommand(command) {
+  if (process.platform !== 'win32' || path.isAbsolute(command)) {
+    return command;
+  }
+
+  const result = spawnSync('where.exe', [command], { encoding: 'utf8', windowsHide: true });
+  if (result.error || result.status !== 0) {
+    return command;
+  }
+
+  const candidates = String(result.stdout || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  return candidates.find((entry) => /\.(exe|cmd|bat)$/i.test(entry)) || candidates[0] || command;
+}
+
 function spawnProcess(command, args, options = {}) {
-  const { env: extraEnv = {}, ...rest } = options;
-  return spawn(command, args, {
-    cwd: repoRoot,
+  const { env: extraEnv = {}, cwd: cwdOverride, ...rest } = options;
+
+  const resolvedCommand = resolveWindowsCommand(command);
+  const isWindowsCommandScript = process.platform === 'win32' && /\.(cmd|bat)$/i.test(resolvedCommand);
+  const spawnCommand = isWindowsCommandScript ? (process.env.ComSpec || 'cmd.exe') : resolvedCommand;
+  const spawnArgs = isWindowsCommandScript
+    ? ['/d', '/s', '/c', ['call', quoteWindowsCommandArg(resolvedCommand), ...args.map(quoteWindowsCommandArg)].join(' ')]
+    : args;
+
+  return spawn(spawnCommand, spawnArgs, {
+    cwd: cwdOverride || repoRoot,
     stdio: 'inherit',
     // 注意: extraEnv 必须展开合并, 不能让整个 options.env 覆盖掉 process.env
     // (否则子进程丢失 PATH → spawn bun/node ENOENT)。
     env: { ...process.env, OPENCHAMBER_TAURI_DEV: '1', ...extraEnv },
     detached: useDetachedChildren,
-    shell: process.platform === 'win32',
+    windowsVerbatimArguments: isWindowsCommandScript,
     ...rest,
   });
 }
