@@ -37,6 +37,9 @@ pub mod text;
 pub mod tts;
 pub mod tunnels;
 pub mod behavior;
+pub mod mcp_auth;
+pub mod provider_routes;
+pub mod resolution_routes;
 pub mod ui_auth;
 
 // --- 便捷 re-export ---
@@ -482,6 +485,13 @@ fn build_router(state: Arc<state::AppState>, config: &Config) -> Router {
         // Behavior 设置 (Tauri 模式下 Node 后端不可达)
         .route("/api/config/settings", get(behavior::get_settings).put(behavior::put_settings))
         .route("/api/behavior/agents-md", get(behavior::get_agents_md).put(behavior::put_agents_md))
+        // MCP OAuth pending auth (Tauri 模式下 Node 后端不可达, 复现 Node routes.js 的 Map 内存状态)
+        .route("/api/mcp/auth/pending", get(mcp_auth::get_mcp_auth_pending).post(mcp_auth::post_mcp_auth_pending).delete(mcp_auth::delete_mcp_auth_pending))
+        // OpenCode resolution (Tauri 模式下 Node 后端不可达, 复现 Node routes.js:145)
+        .route("/api/config/opencode-resolution", get(resolution_routes::get_opencode_resolution))
+        // Provider source + auth (Tauri 模式下 Node 后端不可达, 复现 Node routes.js:377-473)
+        .route("/api/provider/{provider_id}/source", get(provider_routes::get_provider_source))
+        .route("/api/provider/{provider_id}/auth", delete(provider_routes::delete_provider_auth))
         // SSE 透传代理 (具体路由, 优先于 catch-all)
         .route("/api/global/event", get(realtime::sse_proxy::sse_proxy_handler))
         .route("/api/event", get(realtime::sse_proxy::sse_proxy_handler))
@@ -531,9 +541,10 @@ fn build_router(state: Arc<state::AppState>, config: &Config) -> Router {
             post(relay::routes::post_disable_handler),
         )
         // OpenCode 反向代理 (/api/* catch-all)
-        // nest 会剥离 /api 前缀, proxy_handler 收到的 path 是去掉 /api 后的部分。
+        // nest 剥离 /api 前缀, {*rest} 捕获剩余路径给 proxy_handler (单段如 /api/path
+        // /api/project 也能匹配; 用 .fallback() 会因 Path<String> 找不到占位符报 500)。
         // 具体路由 (fs/text/SSE/WS/version/system-info) 已在上面注册, axum 优先匹配。
-        .nest("/api", Router::new().fallback(any(proxy::proxy_handler)))
+        .nest("/api", Router::new().route("/{*rest}", any(proxy::proxy_handler)))
         // 全局认证中间件 — 覆盖以上所有路由 (含 SSE/WS/proxy catch-all)。
         // 对齐 Node `app.use('/api', requireApiAuth)` (core-routes.js:997)。
         // 公开路由 (health/version/auth-session 等) 由中间件内 is_public_path 放行。

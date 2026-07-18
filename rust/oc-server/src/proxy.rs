@@ -83,15 +83,18 @@ pub async fn proxy_handler(
             .into_response();
     }
 
-    // 2. 构造目标 URL: {base_url}/{path}?{query}
+    // 2. 构造目标 URL: {base_url}/{path}[?{query}]
     //    path 已去掉 /api 前缀 (axum nest 自动剥离)。
+    //    query 直接拼到 URL, 避开 reqwest `.query(&str)` 的 serde_urlencoded
+    //    序列化陷阱 (会把 "archived=true&limit=500" 错误编码为单个 value)。
     let base = state.opencode_base_url.trim_end_matches('/');
     let target_path = if path.starts_with('/') {
         path.as_str()
     } else {
         &format!("/{}", path)
     };
-    let target_url = format!("{}{}", base, target_path);
+    let query_part = parts.uri.query().map(|q| format!("?{}", q)).unwrap_or_default();
+    let target_url = format!("{}{}{}", base, target_path, query_part);
 
     // 3. 构造请求头: 过滤 + 注入 auth + identity encoding
     let mut req_headers = reqwest::header::HeaderMap::new();
@@ -117,12 +120,7 @@ pub async fn proxy_handler(
     let body_bytes = axum::body::to_bytes(body, 10 * 1024 * 1024) // 10MB max
         .await
         .unwrap_or_default();
-    let mut req_builder = client.request(method, &target_url).headers(req_headers);
-
-    // 处理 query string
-    if let Some(query) = parts.uri.query() {
-        req_builder = req_builder.query(query);
-    }
+    let req_builder = client.request(method, &target_url).headers(req_headers);
 
     let upstream_req = match req_builder.body(body_bytes).build() {
         Ok(r) => r,
