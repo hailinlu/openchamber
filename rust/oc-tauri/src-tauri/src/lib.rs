@@ -49,12 +49,11 @@ enum ClosePolicy {
 }
 
 fn close_policy(
-    is_windows: bool,
     is_main_window: bool,
     minimize_to_tray: bool,
     quit_requested: bool,
 ) -> ClosePolicy {
-    if is_windows && is_main_window && minimize_to_tray && !quit_requested {
+    if is_main_window && minimize_to_tray && !quit_requested {
         ClosePolicy::HideToTray
     } else {
         ClosePolicy::AllowClose
@@ -404,10 +403,8 @@ pub fn run() {
             let app = window.app_handle();
 
             match event {
-                #[cfg(target_os = "windows")]
                 tauri::WindowEvent::CloseRequested { api, .. } => {
                     let policy = close_policy(
-                        true,
                         window.label() == "main",
                         settings::SettingsStore::get_bool(
                             "desktopMinimizeToTrayEnabled",
@@ -573,9 +570,9 @@ mod tests {
     }
 
     #[test]
-    fn windows_main_close_hides_when_enabled() {
+    fn main_window_close_hides_when_enabled() {
         assert_eq!(
-            close_policy(true, true, true, false),
+            close_policy(true, true, false),
             ClosePolicy::HideToTray,
         );
     }
@@ -583,7 +580,7 @@ mod tests {
     #[test]
     fn disabled_minimize_to_tray_allows_close() {
         assert_eq!(
-            close_policy(true, true, false, false),
+            close_policy(true, false, false),
             ClosePolicy::AllowClose,
         );
     }
@@ -591,19 +588,15 @@ mod tests {
     #[test]
     fn explicit_quit_bypasses_close_to_tray() {
         assert_eq!(
-            close_policy(true, true, true, true),
+            close_policy(true, true, true),
             ClosePolicy::AllowClose,
         );
     }
 
     #[test]
-    fn non_windows_or_non_main_windows_are_not_intercepted() {
+    fn non_main_windows_are_not_intercepted() {
         assert_eq!(
-            close_policy(false, true, true, false),
-            ClosePolicy::AllowClose,
-        );
-        assert_eq!(
-            close_policy(true, false, true, false),
+            close_policy(false, true, false),
             ClosePolicy::AllowClose,
         );
     }
