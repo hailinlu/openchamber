@@ -268,6 +268,40 @@ pub fn build_init_script(ctx: &RuntimeContext) -> String {
     format!("{}\n{}", globals_js, bridge_js)
 }
 
+/// 生成早期全局变量脚本 (在窗口创建后、后端启动前注入)。
+///
+/// 包含 `build_static_globals_script` 的全部内容, 额外基于环境变量
+/// `OPENCHAMBER_PORT` 注入 `__OPENCHAMBER_API_BASE_URL__` 和
+/// `__OPENCHAMBER_LOCAL_ORIGIN__`, 使页面从加载第一刻起就能用绝对
+/// API base URL, 避免 WebSocket 走 Vite proxy 导致的 ECONNRESET。
+///
+/// 后端启动后 `inject_main_window_runtime` 会用实际端口覆盖这些值。
+pub fn build_early_globals_script() -> String {
+    let mut script = build_static_globals_script();
+
+    // 仅在 OPENCHAMBER_PORT 环境变量已设置时注入基于 env 的 base URL。
+    // Dev 模式 (tauri-dev.mjs) 设 `OPENCHAMBER_PORT=3001` → 注入。
+    // Production 模式无此 env → 跳过, 由后端启动后注入。
+    if let Ok(port) = std::env::var("OPENCHAMBER_PORT") {
+        if let Ok(port_num) = port.trim().parse::<u16>() {
+            if port_num > 0 {
+                let origin = format!("http://127.0.0.1:{}", port_num);
+                script.push_str(&format_js_global(
+                    "__OPENCHAMBER_LOCAL_ORIGIN__",
+                    &serde_json::json!(origin),
+                ));
+                script.push_str(&format_js_global(
+                    "__OPENCHAMBER_API_BASE_URL__",
+                    &serde_json::json!(origin),
+                ));
+                script.push('\n');
+            }
+        }
+    }
+
+    script
+}
+
 /// 生成仅含"静态"全局变量的 init 脚本 (不依赖后端端口/运行时上下文)。
 ///
 /// 这些变量在窗口创建时即可注入, 无需等后端启动完成:

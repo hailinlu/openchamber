@@ -27,7 +27,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use backend::BackendHandle;
-use ipc::globals::{build_init_script, RuntimeContext};
+use ipc::globals::{build_early_globals_script, build_init_script, RuntimeContext};
 use sidecar::SidecarBuilder;
 use tauri::Manager;
 
@@ -119,13 +119,18 @@ fn configure_main_window_shell(app: &tauri::AppHandle, background_start: bool) {
     // 这些值在编译期即确定, 不等后端启动: 确保 React hydration 时
     // `isElectronShell()` / `usesFramelessElectronChrome()` 能正确检测。
     //
+    // 同时注入 `__OPENCHAMBER_API_BASE_URL__` 和 `__OPENCHAMBER_LOCAL_ORIGIN__`
+    // (基于 OPENCHAMBER_PORT env), 以防页面加载快于后端启动导致 WS 请求
+    // 走相对路径经 Vite proxy 转发时 ECONNRESET。
+    // 后端启动后 `inject_main_window_runtime` 会用实际端口覆盖。
+    //
     // `window.eval()` 在 Tauri 2 的 setup 阶段可能因页面未加载而失败,
     // 但 UI 侧有 `isTauriShell()` 回退 (`window.__TAURI__`), 此处为
     // belt-and-suspenders 方案。
-    let static_script = ipc::globals::build_static_globals_script();
-    if let Err(error) = window.eval(&static_script) {
+    let early_script = build_early_globals_script();
+    if let Err(error) = window.eval(&early_script) {
         log::warn!(
-            "failed to inject static globals (will rely on UI fallback): {}",
+            "failed to inject early globals (will rely on UI fallback): {}",
             error,
         );
     }
