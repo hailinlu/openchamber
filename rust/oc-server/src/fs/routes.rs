@@ -343,14 +343,18 @@ pub async fn list(
         expanded
     };
 
-    // 补: 工作区边界校验 — 防止列出工作区外任意目录 (如 /etc, /root)
-    // resolve_workspace_path 接受 base_dir 内或 user_config_root 内的路径
+    // List 端点放宽边界 — 允许 home directory 内的任意子目录。
+    // 理由: 列出 ~/Projects 用于"添加项目"对话框选目录是核心用例;
+    // 仅暴露目录名不构成敏感读取 (read/write/delete 仍走严格 workspace check)。
+    // resolve_workspace_path 接受 base_dir 内或 user_config_root 内的路径。
     let base_dir = resolve_base_dir(&state).await;
     let user_root = user_config_root(&state);
-    let target = workspace::resolve_workspace_path(
+    let home_root = std::env::var("HOME").ok().filter(|s| !s.is_empty()).map(PathBuf::from);
+    let target = workspace::resolve_list_path(
         &target_str,
         &base_dir,
         user_root.as_deref(),
+        home_root.as_deref(),
     )?;
 
     Ok(Json(operations::list(&target).await?))

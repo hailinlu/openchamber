@@ -45,6 +45,29 @@ pub fn resolve_workspace_path(
     base_directory: &Path,
     user_config_root: Option<&Path>,
 ) -> Result<PathBuf, oc_core::Error> {
+    resolve_with_extra_roots(target_path, base_directory, user_config_root, None)
+}
+
+/// 解析 list-only 路径 — 额外允许 home directory。
+///
+/// 用于 `GET /api/fs/list`: 列出 home 是"添加项目"对话框的合法用例,
+/// 暴露目录名 (不带文件内容) 不构成敏感读取。read/write/delete 仍走
+/// `resolve_workspace_path`, 不放行 home。
+pub fn resolve_list_path(
+    target_path: &str,
+    base_directory: &Path,
+    user_config_root: Option<&Path>,
+    home_directory: Option<&Path>,
+) -> Result<PathBuf, oc_core::Error> {
+    resolve_with_extra_roots(target_path, base_directory, user_config_root, home_directory)
+}
+
+fn resolve_with_extra_roots(
+    target_path: &str,
+    base_directory: &Path,
+    user_config_root: Option<&Path>,
+    home_directory: Option<&Path>,
+) -> Result<PathBuf, oc_core::Error> {
     let trimmed = target_path.trim();
     if trimmed.is_empty() {
         return Err(oc_core::Error::BadRequest("Path is required".into()));
@@ -68,6 +91,13 @@ pub fn resolve_workspace_path(
 
     if let Some(config_root) = user_config_root {
         if is_path_within_root(&canonical, config_root) {
+            return Ok(canonical);
+        }
+    }
+
+    // List-only: 额外允许 home directory, 让"添加项目"对话框能浏览 ~/Projects 等。
+    if let Some(home) = home_directory {
+        if is_path_within_root(&canonical, home) {
             return Ok(canonical);
         }
     }
