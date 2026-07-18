@@ -59,6 +59,10 @@ fn is_public_path(method: &str, path: &str) -> bool {
         | "/auth/passkey/authenticate/verify"
         // pairing redeem — 无预认证, 靠 pairingId+secret 一次性兑换
         | "/api/client-auth/pairing/redeem"
+        // WebSocket 端点 (Tauri/local 模式下认证已在 UI 页面级别)
+        | "/api/terminal/ws"
+        | "/api/global/event/ws"
+        | "/api/event/ws"
     )
 }
 
@@ -311,8 +315,14 @@ mod tests {
         assert!(!is_public_path("GET", "/api/fs/read"));
         assert!(!is_public_path("POST", "/api/git/commit"));
         assert!(!is_public_path("GET", "/api/event"));
-        assert!(!is_public_path("GET", "/api/event/ws"));
         assert!(!is_public_path("POST", "/api/scheduled-tasks"));
+    }
+
+    #[test]
+    fn ws_endpoints_are_public() {
+        assert!(is_public_path("GET", "/api/terminal/ws"));
+        assert!(is_public_path("GET", "/api/global/event/ws"));
+        assert!(is_public_path("GET", "/api/event/ws"));
     }
 
     #[test]
