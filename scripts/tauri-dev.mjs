@@ -219,6 +219,9 @@ async function main() {
   // `[target.'cfg(not(windows))'.dependencies]` 自动排除, 无需额外参数。
   const tauri = spawnProcess('cargo', ['tauri', 'dev'], {
     cwd: tauriSrcDir,
+    env: {
+      OPENCHAMBER_HMR_UI_URL: `http://127.0.0.1:${uiPort}`,
+    },
   });
 
   tauri.on('error', (error) => {

@@ -248,8 +248,19 @@ fn create_mini_chat_window(app: &AppHandle, label: &str, url: &str) -> Result<()
     Ok(())
 }
 
-/// 从全局 backend port 获取 → 构造 origin。
+/// 从全局 backend port 或 HMR UI URL 获取 → 构造 origin。
+///
+/// 优先级:
+///   1. `OPENCHAMBER_HMR_UI_URL` 环境变量 (Tauri dev 模式, Vite HMR 地址)
+///   2. 全局 BACKEND_PORT (生产模式, oc-server 嵌入地址)
 fn resolve_origin(app: &AppHandle) -> Result<String, String> {
+    // Dev 模式: 从环境变量读取 Vite 地址 (tauri-dev.mjs 注入)
+    if let Ok(hmr_url) = std::env::var("OPENCHAMBER_HMR_UI_URL") {
+        let trimmed = hmr_url.trim().trim_end_matches('/');
+        if !trimmed.is_empty() {
+            return Ok(trimmed.to_string());
+        }
+    }
     let port = get_backend_port(app).ok_or("backend not ready")?;
     Ok(format!("http://127.0.0.1:{}", port))
 }
