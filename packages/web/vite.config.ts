@@ -38,6 +38,28 @@ export default defineConfig({
         ];
       },
     },
+    {
+      // 在 index.html 注入 API base URL (在 main.tsx 加载前执行)。
+      // Tauri dev 模式: OPENCHAMBER_PORT=3001 → __OPENCHAMBER_API_BASE_URL__="http://127.0.0.1:3001"
+      // 使得 WS 直连 oc-server 不走 Vite proxy, 避免 ECONNRESET。
+      // 比 Tauri 的 window.eval() 更可靠: 脚本同步执行于 HTML 解析阶段。
+      name: 'inject-api-base-url',
+      transformIndexHtml() {
+        const apiPort = process.env.OPENCHAMBER_PORT || '3001';
+        const origin = `http://127.0.0.1:${apiPort}`;
+        return [
+          {
+            tag: 'script',
+            attrs: { type: 'text/javascript' },
+            children: [
+              `window.__OPENCHAMBER_API_BASE_URL__=${JSON.stringify(origin)};`,
+              `window.__OPENCHAMBER_LOCAL_ORIGIN__=${JSON.stringify(origin)};`,
+            ].join('\n'),
+            injectTo: 'head',
+          },
+        ];
+      },
+    },
     themeStoragePlugin(),
     VitePWA({
       strategies: 'injectManifest',
