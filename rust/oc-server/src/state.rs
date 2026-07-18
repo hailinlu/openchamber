@@ -233,6 +233,13 @@ pub struct AppState {
     /// 优先读取这个覆盖. 生产路径忽略此字段.
     #[cfg(test)]
     pub relay_service_override: std::sync::Mutex<Option<Arc<crate::relay::service::RelayService>>>,
+
+    // -----------------------------------------------------------------------
+    // MCP auth 模块 — OAuth 状态暂存
+    // -----------------------------------------------------------------------
+    /// MCP OAuth pending auth context store (in-memory HashMap with TTL).
+    #[allow(dead_code)]
+    pub mcp_auth: Arc<crate::mcp_auth::McpAuthStore>,
 }
 
 impl AppState {
@@ -387,6 +394,9 @@ impl AppState {
             dictation_service: crate::dictation::service::DictationService::new(
                 crate::github::settings::user_config_root().join("speech-models"),
             ),
+
+            // MCP auth store — in-memory pending auth contexts
+            mcp_auth: Arc::new(crate::mcp_auth::McpAuthStore::new()),
 
             // Relay 模块 — 由 main.rs 在启动时通过 `install_relay_service`
             // 注入一个带 host-lock + host_factory 的实例。当前为 None;
