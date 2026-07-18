@@ -2,16 +2,12 @@
 // 一键启动 Tauri 桌面壳开发环境 (对标 packages/electron/scripts/electron-dev.mjs)。
 //
 // 流程:
-//   1. 起 web dev server (scripts/dev-web-hmr.mjs) → UI HMR + Node 后端 on :5180
+//   1. 起 Vite HMR 开发服务器 (不启动 Node Express 后端)
+//      → UI HMR on :5180, 由 Rust oc-server 处理所有 API 请求
 //   2. 等 :5180 就绪
 //   3. 起 `cargo tauri dev` (默认进程内嵌 oc-server; OPENCHAMBER_SIDECAR=1 走 sidecar 回退)
+//      → Rust oc-server 负责管理 OpenCode + 处理所有 API
 //   4. 退出时整树清理 (SIGINT/SIGTERM/SIGHUP 或任一子进程退出)
-//
-// 已知良性噪音 (非 bug):
-//   Ctrl+C 停止时, 终端可能打印 `error: script "dev:server:watch" exited with code 130`。
-//   这是 bun 的固有行为 —— teardown 链 (tauri:dev → dev-web-hmr.mjs → nodemon) 把 SIGINT
-//   逐级转发, nodemon 被信号杀死后以 130 退出, bun run 把非零退出码当 error 报。
-//   属于用户主动停止的正常副作用, 不影响清理完整性 (stopChildTree 保证进程树回收)。
 //
 // 用法:
 //   node scripts/tauri-dev.mjs              # 默认 (进程内嵌 oc-server)
@@ -19,9 +15,10 @@
 //
 // 端口:
 //   UI:  OPENCHAMBER_HMR_UI_PORT  (默认 5180, 必须与 tauri.conf.json devUrl 一致)
-//   API: OPENCHAMBER_HMR_API_PORT (默认 3902)
+//   API: OPENCHAMBER_HMR_API_PORT (默认 3902, Tauri 模式下仅 Rust 侧使用)
 
 import { spawn, spawnSync } from 'node:child_process';
+import { rmSync } from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -30,9 +27,15 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
 const tauriSrcDir = path.join(repoRoot, 'rust/oc-tauri/src-tauri');
+const webRoot = path.join(repoRoot, 'packages/web');
 
-// dev-web-hmr 默认 5180, 必须与 tauri.conf.json 的 devUrl 对齐。
+// 默认 5180, 必须与 tauri.conf.json 的 devUrl 对齐。
 const uiPort = process.env.OPENCHAMBER_HMR_UI_PORT || '5180';
+const hmrHost = process.env.OPENCHAMBER_HMR_HOST || '127.0.0.1';
+// Rust oc-server 绑定端口。与 Vite proxy target 一致：
+// Vite 的 proxy 把 /api/* /auth/* /health 转发到此端口，
+// Rust oc-server 通过 OPENCHAMBER_PORT 环境变量绑定同一端口。
+const apiPort = process.env.OPENCHAMBER_PORT || '3001';
 const useDetachedChildren = process.platform !== 'win32';
 
 // 用当前 node 的绝对路径 (process.execPath) 起 node 子进程,
@@ -156,7 +159,6 @@ async function stopChildTree(child) {
 }
 
 // 轮询端口就绪: vite 启动后 :uiPort 才会监听。
-// 不依赖子进程 stdout 解析 (dev-web-hmr.mjs 输出格式可能变)。
 function isPortListening(port) {
   return new Promise((resolve) => {
     const socket = new net.Socket();
@@ -189,38 +191,50 @@ async function waitForPort(port, timeoutMs = 60_000) {
 }
 
 async function main() {
-  console.log(`[tauri:dev] starting web dev server (UI on :${uiPort})...`);
-  const devServer = spawnProcess(nodeBin, ['./scripts/dev-web-hmr.mjs'], {
+  // 清除 Vite 缓存 (同 dev-web-hmr.mjs 的行为)
+  const cacheDirs = [
+    path.join(webRoot, 'node_modules/.vite'),
+    path.join(webRoot, 'node_modules/.vite-temp'),
+  ];
+  for (const dir of cacheDirs) {
+    try { rmSync(dir, { recursive: true, force: true }); } catch {}
+  }
+
+  console.log(`[tauri:dev] starting Vite dev server (UI on :${uiPort})...`);
+  // Tauri 模式下只起 Vite HMR, 不走 dev-web-hmr.mjs (后者还会启动 Node Express 后端 + OpenCode)。
+  // Rust oc-server 将处理所有 API 请求并管理 OpenCode。
+  const vite = spawnProcess('bun', ['x', 'vite', '--force', '--host', hmrHost, '--port', uiPort, '--strictPort'], {
+    cwd: webRoot,
     env: {
       OPENCHAMBER_DISABLE_PWA_DEV: '1',
+      OPENCHAMBER_PORT: apiPort,
     },
   });
 
-  devServer.on('error', (error) => {
-    console.error('[tauri:dev] failed to start dev server:', error);
+  vite.on('error', (error) => {
+    console.error('[tauri:dev] failed to start Vite:', error);
     process.exit(1);
   });
 
-  console.log(`[tauri:dev] waiting for UI on :${uiPort} (up to 60s)...`);
+  console.log(`[tauri:dev] waiting for Vite on :${uiPort} (up to 60s)...`);
   const ready = await waitForPort(Number(uiPort), 60_000);
   if (!ready) {
-    console.error(`[tauri:dev] UI did not come up on :${uiPort} within 60s, aborting.`);
-    await stopChildTree(devServer);
+    console.error(`[tauri:dev] Vite did not come up on :${uiPort} within 60s, aborting.`);
+    await stopChildTree(vite);
     process.exit(1);
   }
-  console.log(`[tauri:dev] UI ready on :${uiPort}, launching tauri...`);
+  console.log(`[tauri:dev] Vite ready on :${uiPort}, launching tauri...`);
 
   const backendMode = process.env.OPENCHAMBER_SIDECAR === '1' ? 'sidecar' : 'in-process';
   console.log(`[tauri:dev] backend mode: ${backendMode}`);
 
   // cargo tauri dev 会自己 cargo run, 不需要我们 build。
   // cwd 指向 src-tauri 让 tauri-cli 找到 tauri.conf.json。
-  // Windows 注意: webauthn-rs + web-push 已通过 Cargo.toml 的
-  // `[target.'cfg(not(windows))'.dependencies]` 自动排除, 无需额外参数。
   const tauri = spawnProcess('cargo', ['tauri', 'dev'], {
     cwd: tauriSrcDir,
     env: {
       OPENCHAMBER_HMR_UI_URL: `http://127.0.0.1:${uiPort}`,
+      OPENCHAMBER_PORT: apiPort,
     },
   });
 
@@ -230,14 +244,11 @@ async function main() {
 
   let cleaning = false;
   const teardown = async (code) => {
-    if (cleaning) {
-      return;
-    }
+    if (cleaning) return;
     cleaning = true;
-    // 先停 tauri (它持有后端句柄), 再停 dev server。
-    // tauri 内部的 cleanup 已由本次修复保证 (ExitRequested + signal handler)。
+    // 先停 tauri (它持有后端句柄), 再停 Vite。
     await stopChildTree(tauri);
-    await stopChildTree(devServer);
+    await stopChildTree(vite);
     process.exit(typeof code === 'number' ? code : 0);
   };
 
@@ -249,7 +260,7 @@ async function main() {
     void teardown(code ?? 1);
   };
 
-  devServer.on('exit', onChildExit('dev server'));
+  vite.on('exit', onChildExit('Vite'));
   tauri.on('exit', onChildExit('tauri'));
 
   for (const [signal, exitCode] of Object.entries({ SIGINT: 130, SIGTERM: 143, SIGHUP: 129 })) {

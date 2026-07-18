@@ -19,6 +19,11 @@ use tauri::{AppHandle, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder}
 
 use crate::ipc::globals::{build_init_script, RuntimeContext};
 
+/// Tauri managed state: 后端端口号。
+/// 替代旧的 `static BACKEND_PORT: Mutex` — Tauri state 不会被 poison,
+/// 且 setup 阶段通过 `app.manage()` 注册后, 在任何 IPC 上下文中都能可靠读取。
+pub struct BackendPort(pub u16);
+
 /// Mini-chat 窗口去重管理器。作为 Tauri State。
 pub struct MiniChatManager {
     /// key = (api_base_url, session_id), value = window label。
@@ -200,15 +205,45 @@ pub async fn get_window_pinned(_args: &Value, window: &WebviewWindow) -> Result<
 // --- 内部辅助 ---
 
 /// 创建 mini-chat 窗口并注入 init_script。
+///
+/// init_script 会注入 `__OPENCHAMBER_CLIENT_TOKEN__` (从 SettingsStore 读取的
+/// `desktopLocalClientToken`), 使窗口内的 JS 能认证 HTTP API 请求。
 fn create_mini_chat_window(app: &AppHandle, label: &str, url: &str) -> Result<(), String> {
     let parsed_url = url::Url::parse(url).map_err(|e| format!("invalid URL: {}", e))?;
 
+    // 先读取 client token 和 runtime headers (SettingsStore 是同步的)
+    let client_token = crate::settings::SettingsStore::get("desktopLocalClientToken")
+        .and_then(|v| v.as_str().map(|s| s.to_string()));
+    let runtime_headers = crate::settings::SettingsStore::get("desktopRuntimeHeaders")
+        .and_then(|v| if v.is_object() { Some(v.clone()) } else { None });
+
+    // 构建 init_script (与主窗口一致的桥 + client token + runtime headers)
+    //
+    // 当 BackendPort 不可用时 (managed OpenCode 启动失败等场景), 不设
+    // __OPENCHAMBER_API_BASE_URL__, UI 会自动退到同源 API 请求 (页面 origin
+    // 即 Vite dev server / Node 后端)。这比硬编码 port 0 更健壮 —— port 0
+    // 会导致所有 API 请求走到 `http://127.0.0.1:0` 而失败 ("无法连接服务器")。
+    let (port, api_base_url) = match get_backend_port(app) {
+        Some(p) => (p, Some(format!("http://127.0.0.1:{}", p))),
+        None => (0, None),
+    };
+    let mut ctx = RuntimeContext::from_sidecar_port(port);
+    ctx.api_base_url = api_base_url;
+    ctx.client_token = client_token;
+    ctx.runtime_headers = runtime_headers;
+    let init_script = build_init_script(&ctx);
+
+    // 用 initialization_script 注入 init script, 在页面 JS 执行前运行。
+    // 这比 `window.eval()` (窗口创建后再注入) 更可靠:
+    // eval 可能因页面未加载而失败, 或页面模块脚本跑在注入之前导致
+    // `__OPENCHAMBER_CLIENT_TOKEN__` 等全局变量未被 `createConfiguredWebAPIs` 读到。
     let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::External(parsed_url))
         .title("GridForge Mini Chat")
         .inner_size(MINI_CHAT_WIDTH, MINI_CHAT_HEIGHT)
         .min_inner_size(MINI_CHAT_MIN_WIDTH, MINI_CHAT_MIN_HEIGHT)
         .resizable(true)
-        .visible(true);
+        .visible(true)
+        .initialization_script(&init_script);
 
     // 平台 chrome (与主窗口一致):
     // - macOS: 原生 frame + hidden title bar + traffic lights at {16,17}
@@ -225,11 +260,6 @@ fn create_mini_chat_window(app: &AppHandle, label: &str, url: &str) -> Result<()
     }
 
     let window = builder.build().map_err(|e| e.to_string())?;
-
-    // 注入 init_script (与主窗口一致的桥)
-    let ctx = RuntimeContext::from_sidecar_port(get_backend_port(app).unwrap_or(0));
-    let init_script = build_init_script(&ctx);
-    let _ = window.eval(&init_script);
 
     // 窗口关闭时从去重 map 清理
     let app_handle = app.clone();
@@ -252,7 +282,7 @@ fn create_mini_chat_window(app: &AppHandle, label: &str, url: &str) -> Result<()
 ///
 /// 优先级:
 ///   1. `OPENCHAMBER_HMR_UI_URL` 环境变量 (Tauri dev 模式, Vite HMR 地址)
-///   2. 全局 BACKEND_PORT (生产模式, oc-server 嵌入地址)
+///   2. BackendPort managed state (生产模式, oc-server 嵌入地址)
 fn resolve_origin(app: &AppHandle) -> Result<String, String> {
     // Dev 模式: 从环境变量读取 Vite 地址 (tauri-dev.mjs 注入)
     if let Ok(hmr_url) = std::env::var("OPENCHAMBER_HMR_UI_URL") {
@@ -265,22 +295,23 @@ fn resolve_origin(app: &AppHandle) -> Result<String, String> {
     Ok(format!("http://127.0.0.1:{}", port))
 }
 
-/// 从全局 BACKEND_PORT static 获取 port。
-fn get_backend_port(_app: &AppHandle) -> Option<u16> {
-    // 从全局 BACKEND_PORT static 读取 (lib.rs setup 时写入, 进程内嵌和 sidecar 两路径共用)。
-    let guard = BACKEND_PORT.lock().ok()?;
-    guard.as_ref().copied()
+/// 从 Tauri managed state 获取后端 port。
+///
+/// 这是个进程级值, setup 时由 `set_backend_port` 写入 `BackendPort` state。
+/// 用 Tauri state 而非 static Mutex 是为了避免 Mutex poison 导致静默失败
+/// (static Mutex 被 poison 后 `lock()` 返回 `Err`, 而 `ok()?` 返回 None,
+/// 使得 `unwrap_or(0)` 错误地给出端口 0)。
+fn get_backend_port(app: &AppHandle) -> Option<u16> {
+    app.try_state::<BackendPort>().map(|s| s.0)
 }
 
-/// 全局 backend port 存储 (lib.rs setup 时写入)。
-/// 用单独的 static 而非直接访问 BACKEND, 因为后者包含非 Send 的 runtime。
-static BACKEND_PORT: Mutex<Option<u16>> = Mutex::new(None);
-
-/// 供 lib.rs 在 setup 时调用，注册 backend port。
-pub fn set_backend_port(port: u16) {
-    if let Ok(mut guard) = BACKEND_PORT.lock() {
-        *guard = Some(port);
-    }
+/// 供 lib.rs 在 setup 时调用，注册 backend port 到 Tauri managed state。
+///
+/// 同时保留旧的 `set_backend_port_cb` 符号供现有调用方使用。
+/// state 注册后, 在任意 IPC handler / 窗口创建函数中均可通过 `app.try_state::<BackendPort>()`
+/// 可靠读取, 不会因 Mutex poison 而静默失败。
+pub fn set_backend_port(app: &AppHandle, port: u16) {
+    app.manage(BackendPort(port));
 }
 
 /// 简易 URL 编码 (不依赖外部 crate)。

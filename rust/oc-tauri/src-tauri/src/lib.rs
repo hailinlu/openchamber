@@ -276,7 +276,7 @@ pub fn run() {
                         Ok(h) => {
                             let port = h.port();
                             log::info!("sidecar ready on port {}", port);
-                            mini_chat::set_backend_port(port);
+                            mini_chat::set_backend_port(app.handle(), port);
 
                             let ctx = RuntimeContext::from_sidecar_port(port);
                             let init_script = build_init_script(&ctx);
@@ -303,7 +303,7 @@ pub fn run() {
                             let base_url = server.base_url().to_string();
                             let port = backend::parse_port(&base_url);
                             log::info!("oc-server (in-process) ready on port {}", port);
-                            mini_chat::set_backend_port(port);
+                            mini_chat::set_backend_port(app.handle(), port);
 
                             let ctx = RuntimeContext::from_sidecar_port(port);
                             let init_script = build_init_script(&ctx);

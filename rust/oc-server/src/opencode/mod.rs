@@ -54,6 +54,15 @@ pub struct OpenCodeHandle {
 }
 
 impl OpenCodeHandle {
+    /// 创建一个无子进程的 NOOP 句柄 (skip-start 模式)。
+    fn new_noop() -> Self {
+        Self {
+            child: None,
+            #[cfg(windows)]
+            job: None,
+        }
+    }
+
     /// 优雅关闭: SIGTERM 进程组 → 等待 → SIGKILL 兜底。
     /// external 模式无子进程, 直接返回。
     pub async fn shutdown(&mut self) {
@@ -114,13 +123,30 @@ impl Drop for OpenCodeHandle {
     }
 }
 
-/// 启动 OpenCode: managed spawn 或 external attach。
+/// 启动 OpenCode: managed spawn / external attach / skip。
 ///
 /// 返回 `(base_url, auth_header, handle)`。
 /// handle 用于后续 shutdown; base_url/auth_header 供 proxy 使用。
+///
+/// 决策顺序:
+///   1. `OPENCODE_HOST` 或 `OPENCODE_PORT` 设置了 → 连接外部实例 (start_external)
+///   2. `OPENCODE_SKIP_START=true` 但没有 HOST/PORT → 不挂 OpenCode, 只警告
+///   3. 否则 → managed spawn (start_managed)
 pub async fn start(config: &Config) -> Result<(String, String, OpenCodeHandle)> {
-    if config.is_external_opencode() {
+    if config.opencode_host.is_some() || config.opencode_port.is_some() {
+        // 有明确的外部 OpenCode URL → 连接已有实例
         start_external(config).await
+    } else if config.opencode_skip_start {
+        // OPENCODE_SKIP_START=true 但没有外部地址 → 不启动 OpenCode。
+        // 这允许用户在 dev 环境下只配 OPENCODE_SKIP_START=true 而不必配
+        // OPENCODE_HOST/PORT, oc-server 仍能正常启动 (只是 OpenCode 代理
+        // 端点的请求会失败, 这是预期行为)。
+        tracing::warn!(
+            "OPENCODE_SKIP_START is set but neither OPENCODE_HOST nor OPENCODE_PORT is configured — \
+             running oc-server without OpenCode. OpenCode proxy routes will return errors."
+        );
+        // 用畸零端口作 dummy base_url, 只用于日志/指标, 不会真正连接。
+        Ok(("http://127.0.0.1:1".to_string(), String::new(), OpenCodeHandle::new_noop()))
     } else {
         start_managed(config).await
     }
@@ -276,11 +302,7 @@ async fn start_external(config: &Config) -> Result<(String, String, OpenCodeHand
         tracing::warn!(%base_url, "external opencode health check failed (continuing anyway)");
     }
 
-    let handle = OpenCodeHandle {
-        child: None,
-        #[cfg(windows)]
-        job: None,
-    };
+    let handle = OpenCodeHandle::new_noop();
 
     Ok((base_url, auth_header, handle))
 }
