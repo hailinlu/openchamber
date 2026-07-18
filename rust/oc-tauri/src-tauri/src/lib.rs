@@ -211,19 +211,17 @@ pub fn run() {
                 log::error!("failed to create tray during setup: {}", error);
             }
 
-            // --- 设置应用数据目录 (对齐 Electron GridForge/GridForge Dev) ---
-            // Electron (main.mjs:65-70):
-            //   app.setName('GridForge');
-            //   Dev:  userData = ~/Library/Application Support/GridForge Dev
-            //   Prod: userData = ~/Library/Application Support/GridForge
-            // Tauri 也用同样目录名, 使 settings.json 可在两壳间共享。
+            // --- 设置应用数据目录 ---
+            // 仅 production 模式覆盖为 macOS 标准 userData 位置
+            // (~/Library/Application Support/GridForge) 对齐 Electron。
+            // Dev 模式 (cargo tauri dev) **不**覆盖, 让 Rust oc-server 走默认的
+            // ~/.config/openchamber/ 路径 —— 与 Node 模式同位置, 用户已有的
+            // projects 能直接被 Tauri dev 读到, 不会每次启动都弹"添加项目"对话框。
             // 用户仍可通过显式设置 OPENCHAMBER_DATA_DIR 覆盖。
-            if !std::env::var("OPENCHAMBER_DATA_DIR").is_ok_and(|v| !v.trim().is_empty()) {
-                let dir_name = if cfg!(debug_assertions) {
-                    "GridForge Dev"
-                } else {
-                    "GridForge"
-                };
+            if !cfg!(debug_assertions)
+                && !std::env::var("OPENCHAMBER_DATA_DIR").is_ok_and(|v| !v.trim().is_empty())
+            {
+                let dir_name = "GridForge";
                 // 借用 Tauri 的 app_data_dir 父目录 (平台自适应:
                 //   macOS:   ~/Library/Application Support
                 //   Windows: %APPDATA%
