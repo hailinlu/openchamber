@@ -212,6 +212,51 @@ pub fn run() {
                 log::error!("failed to create tray during setup: {}", error);
             }
 
+            // --- 设置应用数据目录 (对齐 Electron GridForge/GridForge Dev) ---
+            // Electron (main.mjs:65-70):
+            //   app.setName('GridForge');
+            //   Dev:  userData = ~/Library/Application Support/GridForge Dev
+            //   Prod: userData = ~/Library/Application Support/GridForge
+            // Tauri 也用同样目录名, 使 settings.json 可在两壳间共享。
+            // 用户仍可通过显式设置 OPENCHAMBER_DATA_DIR 覆盖。
+            if !std::env::var("OPENCHAMBER_DATA_DIR").is_ok_and(|v| !v.trim().is_empty()) {
+                let dir_name = if cfg!(debug_assertions) {
+                    "GridForge Dev"
+                } else {
+                    "GridForge"
+                };
+                // 借用 Tauri 的 app_data_dir 父目录 (平台自适应:
+                //   macOS:   ~/Library/Application Support
+                //   Windows: %APPDATA%
+                //   Linux:   ~/.local/share
+                // ), 但用 GridForge 作为目录名而非 bundle identifier。
+                let dir = app.path().app_data_dir()
+                    .ok()
+                    .and_then(|p| p.parent().map(|parent| parent.join(dir_name)))
+                    .unwrap_or_else(|| {
+                        // fallback: 不应发生, 仅兜底
+                        let home = std::env::var("HOME")
+                            .or_else(|_| std::env::var("USERPROFILE"))
+                            .unwrap_or_else(|_| "/tmp".to_string());
+                        std::path::PathBuf::from(home)
+                            .join(if cfg!(target_os = "macos") {
+                                "Library/Application Support"
+                            } else if cfg!(target_os = "windows") {
+                                "AppData/Roaming"
+                            } else {
+                                ".local/share"
+                            })
+                            .join(dir_name)
+                    });
+                if let Err(e) = std::fs::create_dir_all(&dir) {
+                    log::error!("failed to create app data dir {:?}: {}", dir, e);
+                } else {
+                    let dir_str = dir.to_string_lossy().to_string();
+                    log::info!("setting OPENCHAMBER_DATA_DIR={}", dir_str);
+                    std::env::set_var("OPENCHAMBER_DATA_DIR", &dir_str);
+                }
+            }
+
             // --- 启动后端 (仅桌面端) ---
             #[cfg(desktop)]
             {
