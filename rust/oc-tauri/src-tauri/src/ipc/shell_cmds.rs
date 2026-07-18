@@ -17,7 +17,7 @@ use tauri_plugin_shell::ShellExt;
 /// `desktop_open_external_url` — args: `{ url: string }`
 ///
 /// 仅允许 http/https (与 Electron 一致)。
-#[allow(deprecated)] // shell::open deprecated in favor of opener plugin; 保留 shell 实现一致性
+#[allow(deprecated)]
 pub async fn open_external_url(args: &Value, _window: &WebviewWindow) -> Result<Value, String> {
     let url = args
         .get("url")
@@ -214,4 +214,29 @@ pub async fn get_app_version(_args: &Value, app: &AppHandle) -> Result<Value, St
         .version
         .to_string();
     Ok(json!(version))
+}
+
+/// `desktop_open_in_app` — args: `{ path: string }`
+///
+/// 用系统默认应用打开文件路径。复现 Electron `shell.openPath()`。
+#[allow(deprecated)]
+pub async fn open_in_app(args: &Value, window: &WebviewWindow) -> Result<Value, String> {
+    let path = args
+        .get("path")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "path is required".to_string())?
+        .trim()
+        .to_string();
+
+    if path.is_empty() {
+        return Err("path is required".to_string());
+    }
+
+    window
+        .app_handle()
+        .shell()
+        .open(path, None)
+        .map_err(|e| format!("failed to open path: {}", e))?;
+
+    Ok(Value::Null)
 }

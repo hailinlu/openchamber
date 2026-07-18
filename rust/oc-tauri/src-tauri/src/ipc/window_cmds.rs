@@ -110,6 +110,16 @@ pub async fn set_vibrancy(args: &Value, _app: &AppHandle) -> Result<Value, Strin
     }
 }
 
+/// `desktop_show_app_menu` — macOS 原生应用菜单弹出。
+///
+/// Tauri 2 在 macOS 上使用原生菜单栏，不需要手动弹出菜单。
+/// 此命令保留作为兼容桩，在当前窗口上下文返回 OK。
+pub async fn show_app_menu(_args: &Value, _window: &WebviewWindow) -> Result<Value, String> {
+    // macOS: 菜单栏已由系统渲染。无需额外操作。
+    // Win/Linux: 无框架窗口的应用菜单由 UI 侧控制。
+    Ok(json!({}))
+}
+
 /// `desktop_focus_main_window` — 聚焦 (show + unminimize + focus) 主窗口。
 ///
 /// 共用 `crate::tray::restore_main_window` 的 unminimize → show → set_focus 顺序,
@@ -127,6 +137,87 @@ fn focus_main_window_response(focused: bool) -> Value {
 pub async fn focus_main_window(_args: &Value, app: &AppHandle) -> Result<Value, String> {
     let focused = crate::tray::restore_main_window(app);
     Ok(focus_main_window_response(focused))
+}
+
+/// `desktop_new_window_at_url` — args: `{ url, clientToken?, requestHeaders? }`
+///
+/// 创建新窗口加载指定 URL。复现 Electron main.mjs `createNewWindow`。
+/// 新窗口不注入 init_script (远程实例, 加载自己的桥)。
+pub async fn new_window_at_url(args: &Value, app: &AppHandle) -> Result<Value, String> {
+    let url = args
+        .get("url")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "url is required".to_string())?;
+
+    let label = format!("remote-{}", std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0));
+
+    let parsed_url = url::Url::parse(url).map_err(|e| format!("invalid URL: {}", e))?;
+
+    let _window = tauri::WebviewWindowBuilder::new(app, &label, tauri::WebviewUrl::External(parsed_url))
+        .title("GridForge")
+        .inner_size(1200.0, 800.0)
+        .resizable(true)
+        .visible(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    Ok(json!({ "label": label }))
+}
+
+/// `desktop_new_window_for_host` — args: `{ hostId }`
+///
+/// 从 `desktopHosts` 查找 host, 用其 URL 创建新窗口。
+/// 复现 Electron `openNewWindowForHost` (main.mjs)。
+pub async fn new_window_for_host(args: &Value, app: &AppHandle) -> Result<Value, String> {
+    let host_id = args
+        .get("hostId")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| "hostId is required".to_string())?;
+
+    // 读 hosts 列表
+    let root = crate::settings::SettingsStore::read();
+    let hosts = root.get("desktopHosts").and_then(|v| v.as_array()).cloned().unwrap_or_default();
+
+    // 查找匹配的 host
+    let host = hosts.iter().find(|h| {
+        h.get("id").and_then(|v| v.as_str()) == Some(host_id)
+            || h.get("apiUrl").and_then(|v| v.as_str()).map(|u| u.contains(host_id)).unwrap_or(false)
+    }).cloned();
+
+    let host_url = match host {
+        Some(ref h) => {
+            h.get("apiUrl")
+                .or_else(|| h.get("url"))
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string()
+        }
+        None => return Err(format!("Host '{}' not found", host_id)),
+    };
+
+    if host_url.is_empty() {
+        return Err("Host has no URL".to_string());
+    }
+
+    let parsed_url = url::Url::parse(&host_url).map_err(|e| format!("invalid URL: {}", e))?;
+
+    let label = format!("host-{}-{}", host_id, std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0));
+
+    let _window = tauri::WebviewWindowBuilder::new(app, &label, tauri::WebviewUrl::External(parsed_url))
+        .title("GridForge")
+        .inner_size(1200.0, 800.0)
+        .resizable(true)
+        .visible(true)
+        .build()
+        .map_err(|e| e.to_string())?;
+
+    Ok(json!({ "label": label }))
 }
 
 #[cfg(test)]

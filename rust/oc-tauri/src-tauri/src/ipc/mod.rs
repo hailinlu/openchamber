@@ -87,6 +87,9 @@ async fn dispatch(
         "desktop_set_window_theme" => window_cmds::set_window_theme(args, window).await,
         "desktop_set_vibrancy" => window_cmds::set_vibrancy(args, app).await,
         "desktop_focus_main_window" => window_cmds::focus_main_window(args, app).await,
+        "desktop_show_app_menu" => window_cmds::show_app_menu(args, window).await,
+        "desktop_new_window_at_url" => window_cmds::new_window_at_url(args, app).await,
+        "desktop_new_window_for_host" => window_cmds::new_window_for_host(args, app).await,
 
         // --- mini-chat ---
         "desktop_open_session_mini_chat_window" => {
@@ -105,6 +108,7 @@ async fn dispatch(
         "desktop_save_markdown_file" => shell_cmds::save_markdown_file(args, app).await,
         "desktop_clear_cache" => shell_cmds::clear_cache(args, app).await,
         "desktop_get_app_version" => shell_cmds::get_app_version(args, app).await,
+        "desktop_open_in_app" => shell_cmds::open_in_app(args, window).await,
 
         // --- 系统 ---
         "desktop_get_lan_address" => system_cmds::get_lan_address(args, app).await,
@@ -147,18 +151,14 @@ async fn dispatch(
         "desktop_tray_update" => crate::tray::handle_tray_update(args, app).await,
 
         // --- 未实现的命令: 明确 error ---
-        "desktop_show_app_menu"
-        | "desktop_open_in_app"
-        | "desktop_open_file_in_app"
+        "desktop_open_file_in_app"
         | "desktop_read_file"
         | "desktop_filter_installed_apps"
         | "desktop_fetch_app_icons"
         | "desktop_get_installed_apps"
         | "desktop_capture_page_rect"
         | "desktop_browser_capture_page"
-        | "desktop_new_window"
-        | "desktop_new_window_for_host"
-        | "desktop_new_window_at_url" => {
+        | "desktop_new_window" => {
             Err(format!("Command '{}' not yet implemented in Tauri shell", cmd))
         }
 
