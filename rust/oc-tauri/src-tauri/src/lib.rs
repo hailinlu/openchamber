@@ -267,13 +267,21 @@ pub fn run() {
                     .build()?;
 
                 if backend::use_sidecar() {
-                    // —— 回退路径: sidecar 子进程 (现状不变) ——
+                    // —— 回退路径: sidecar 子进程 ——
+                    let mut builder = SidecarBuilder::new()
+                        .ready_timeout(std::time::Duration::from_secs(45))
+                        .arg("--api-only");
+                    // Dev 模式: 如果 OPENCHAMBER_PORT 已设置，使用固定端口确保
+                    // Vite early injection、proxy 和 sidecar 使用同一个端口。
+                    if cfg!(debug_assertions) {
+                        if let Ok(port_str) = std::env::var("OPENCHAMBER_PORT") {
+                            if let Ok(port) = port_str.parse::<u16>() {
+                                builder = builder.port(port);
+                            }
+                        }
+                    }
                     let handle = rt.block_on(async {
-                        SidecarBuilder::new()
-                            .ready_timeout(std::time::Duration::from_secs(45))
-                            .arg("--api-only")
-                            .start()
-                            .await
+                        builder.start().await
                     });
                     match handle {
                         Ok(h) => {

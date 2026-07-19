@@ -263,7 +263,7 @@ async function main() {
   vite.on('exit', onChildExit('Vite'));
   tauri.on('exit', onChildExit('tauri'));
 
-  for (const [signal, exitCode] of Object.entries({ SIGINT: 130, SIGTERM: 143, SIGHUP: 129 })) {
+  for (const [signal, exitCode] of Object.entries({ SIGINT: 0, SIGTERM: 143, SIGHUP: 129 })) {
     process.on(signal, () => {
       void teardown(exitCode);
     });

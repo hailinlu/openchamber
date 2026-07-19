@@ -69,6 +69,7 @@ interface TerminalStore {
   removeProjectActionRun: (runKey: string) => void;
 
   removeDirectory: (directory: string) => void;
+  resetForRuntimeSwitch: () => void;
   clearAll: () => void;
 }
 
@@ -617,6 +618,25 @@ export const useTerminalStore = create<TerminalStore>()(
 
         clearAll: () => {
           set({ sessions: new Map(), projectActionRuns: {}, nextChunkId: 1, nextTabId: 1 });
+        },
+
+        resetForRuntimeSwitch: () => {
+          const newSessions = new Map<string, DirectoryTerminalState>();
+          for (const [key, dirState] of get().sessions.entries()) {
+            const tabs = dirState.tabs.map((tab) => ({
+              ...tab,
+              terminalSessionId: null,
+              lifecycle: 'idle' as TerminalTabLifecycle,
+              bufferChunks: [],
+              bufferLength: 0,
+              isConnecting: false,
+              previewUrl: null,
+              previewAutoOpened: false,
+              previewUrlLocked: false,
+            }));
+            newSessions.set(key, { tabs, activeTabId: dirState.activeTabId });
+          }
+          set({ sessions: newSessions, projectActionRuns: {} });
         },
       }),
       {

@@ -9,18 +9,23 @@
 use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex as StdMutex};
 use std::time::Duration;
 
 use portable_pty::{native_pty_system, Child, ChildKiller, CommandBuilder, MasterPty, PtySize};
 use tokio::sync::{broadcast, Mutex};
 use tracing::warn;
 
+use super::replay_buffer::ReplayBuffer;
+use super::TERMINAL_OUTPUT_REPLAY_MAX_BYTES;
+
 /// PTY 输出事件 (broadcast 载荷)。
 #[derive(Clone, Debug)]
 pub struct PtyOutput {
-    /// 输出数据 (UTF-8 lossy, 与 Node `.onData(data)` 字符串语义一致)。
+    /// PTY 输出内容。
     pub data: String,
+    /// Producer replay buffer 中对应的 chunk id。
+    pub replay_id: Option<u64>,
 }
 
 /// PTY 退出事件。
@@ -56,6 +61,10 @@ pub struct TerminalPty {
     output_tx: broadcast::Sender<PtyOutput>,
     /// 退出 broadcast (exit watcher task 发送)。
     exit_tx: broadcast::Sender<PtyExit>,
+    /// 输出 replay (在任何客户端订阅前也持续记录)。
+    replay_buffer: Arc<ReplayBuffer>,
+    /// 最近一次退出状态 (供晚到的客户端读取)。
+    exit_snapshot: Arc<StdMutex<Option<PtyExit>>>,
     /// 后端名 (对齐 Node `ptyBackend`, 当前固定 `"portable-pty"`)。
     pub backend: &'static str,
     /// 实际使用的 shell 路径。
@@ -112,18 +121,28 @@ impl TerminalPty {
         let killer: Arc<dyn ChildKiller + Send + Sync> = Arc::from(killer);
         let child = Arc::new(Mutex::new(Some(child)));
 
-        // reader task: 阻塞读取 → broadcast。
+        let replay_buffer = Arc::new(ReplayBuffer::new());
+        let exit_snapshot = Arc::new(StdMutex::new(None));
+
+        // reader task: 阻塞读取 → replay + broadcast。
         let output_tx_clone = output_tx.clone();
         let child_for_reader = child.clone();
+        let replay_buffer_for_reader = replay_buffer.clone();
         tokio::task::spawn_blocking(move || {
-            run_reader_loop(reader, output_tx_clone, child_for_reader);
+            run_reader_loop(
+                reader,
+                output_tx_clone,
+                replay_buffer_for_reader,
+                child_for_reader,
+            );
         });
 
-        // exit watcher task: 阻塞 wait → broadcast。
+        // exit watcher task: 阻塞 wait → snapshot + broadcast。
         let exit_tx_clone = exit_tx.clone();
         let child_for_exit = child.clone();
+        let exit_snapshot_for_watcher = exit_snapshot.clone();
         tokio::task::spawn_blocking(move || {
-            run_exit_watcher(child_for_exit, exit_tx_clone);
+            run_exit_watcher(child_for_exit, exit_tx_clone, exit_snapshot_for_watcher);
         });
 
         Ok(Self {
@@ -133,6 +152,8 @@ impl TerminalPty {
             pid,
             output_tx,
             exit_tx,
+            replay_buffer,
+            exit_snapshot,
             backend: "portable-pty",
             shell,
             child,
@@ -194,6 +215,16 @@ impl TerminalPty {
     pub fn subscribe_exit(&self) -> broadcast::Receiver<PtyExit> {
         self.exit_tx.subscribe()
     }
+
+    /// 获取 PTY 输出 replay 缓冲。
+    pub fn replay_buffer(&self) -> Arc<ReplayBuffer> {
+        self.replay_buffer.clone()
+    }
+
+    /// 获取最近一次退出状态，供晚到的客户端补发。
+    pub fn latest_exit(&self) -> Option<PtyExit> {
+        self.exit_snapshot.lock().ok().and_then(|snapshot| snapshot.clone())
+    }
 }
 
 impl Drop for TerminalPty {
@@ -203,13 +234,15 @@ impl Drop for TerminalPty {
     }
 }
 
-/// reader 阻塞循环: 读 PTY → broadcast 输出。
+/// reader 阻塞循环: 读 PTY → replay + broadcast 输出。
 ///
-/// 读到 EOF 或 broadcast 全部 receiver 关闭时退出。
+/// replay 由 producer 侧写入，因此客户端晚订阅时仍能拿到启动 prompt。
+/// 没有 broadcast receiver 只是暂时没有实时消费者，不应停止 reader。
 /// `child` 引用仅用于延长 child 生命周期 (避免 reader 仍在读时 child 被 drop)。
 fn run_reader_loop(
     mut reader: Box<dyn Read + Send>,
     output_tx: broadcast::Sender<PtyOutput>,
+    replay_buffer: Arc<ReplayBuffer>,
     _child: Arc<Mutex<Option<Box<dyn Child + Send + Sync>>>>,
 ) {
     let mut buf = [0u8; 8192];
@@ -218,11 +251,7 @@ fn run_reader_loop(
             Ok(0) => break, // EOF
             Ok(n) => {
                 let data = String::from_utf8_lossy(&buf[..n]).into_owned();
-                let output = PtyOutput { data };
-                if output_tx.send(output).is_err() {
-                    // 没有 receiver, 退出
-                    break;
-                }
+                publish_output(&data, &output_tx, &replay_buffer);
             }
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(_) => break,
@@ -230,32 +259,59 @@ fn run_reader_loop(
     }
 }
 
-/// exit watcher 阻塞循环: wait child → broadcast 退出事件。
+fn publish_output(
+    data: &str,
+    output_tx: &broadcast::Sender<PtyOutput>,
+    replay_buffer: &ReplayBuffer,
+) {
+    let replay_id = replay_buffer
+        .append(data, TERMINAL_OUTPUT_REPLAY_MAX_BYTES)
+        .map(|chunk| chunk.id);
+    let _ = output_tx.send(PtyOutput {
+        data: data.to_string(),
+        replay_id,
+    });
+}
+
+/// exit watcher 阻塞循环: wait child → snapshot + broadcast 退出事件。
 fn run_exit_watcher(
     child: Arc<Mutex<Option<Box<dyn Child + Send + Sync>>>>,
     exit_tx: broadcast::Sender<PtyExit>,
+    exit_snapshot: Arc<StdMutex<Option<PtyExit>>>,
 ) {
     // 拿走 child 所有权 (wait 需要可变借用)。
     let mut child_opt = child.blocking_lock().take();
     let Some(mut child) = child_opt.take() else {
         return;
     };
-    match child.wait() {
-        Ok(status) => {
-            let _ = exit_tx.send(PtyExit {
-                exit_code: status.exit_code(),
-                signal: status.signal().map(|s| s.to_string()),
-            });
-        }
+
+    let exit = match child.wait() {
+        Ok(status) => PtyExit {
+            exit_code: status.exit_code(),
+            signal: status.signal().map(|s| s.to_string()),
+        },
         Err(e) => {
             warn!("terminal pty wait failed: {e}");
-            let _ = exit_tx.send(PtyExit {
+            PtyExit {
                 exit_code: 1,
                 signal: Some(format!("wait error: {e}")),
-            });
+            }
         }
-    }
+    };
+
+    publish_exit(&exit, &exit_tx, &exit_snapshot);
     // child 已 wait 完成 (退出), drop 是 no-op。
+}
+
+fn publish_exit(
+    exit: &PtyExit,
+    exit_tx: &broadcast::Sender<PtyExit>,
+    exit_snapshot: &StdMutex<Option<PtyExit>>,
+) {
+    if let Ok(mut snapshot) = exit_snapshot.lock() {
+        *snapshot = Some(exit.clone());
+    }
+    let _ = exit_tx.send(exit.clone());
 }
 
 // =========================================================================
@@ -427,3 +483,50 @@ pub fn build_pty_env(cols: u16, rows: u16) -> HashMap<String, String> {
 pub const IDLE_TIMEOUT: Duration = Duration::from_secs(30 * 60);
 /// idle sweep 间隔 (对齐 Node `5min`)。
 pub const IDLE_SWEEP_INTERVAL: Duration = Duration::from_secs(5 * 60);
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::terminal::replay_buffer::ReplayBuffer;
+
+    #[test]
+    fn publishes_output_to_replay_without_subscribers() {
+        let (output_tx, _) = broadcast::channel(4);
+        let replay_buffer = ReplayBuffer::new();
+
+        publish_output("prompt$ ", &output_tx, &replay_buffer);
+
+        let chunks = replay_buffer.list_since(0);
+        assert_eq!(chunks.len(), 1);
+        assert_eq!(chunks[0].data, "prompt$ ");
+    }
+
+    #[test]
+    fn continues_publishing_after_subscriber_attaches_late() {
+        let (output_tx, _) = broadcast::channel(4);
+        let replay_buffer = ReplayBuffer::new();
+
+        publish_output("prompt$ ", &output_tx, &replay_buffer);
+        let mut receiver = output_tx.subscribe();
+        publish_output("echo ok\\r\\n", &output_tx, &replay_buffer);
+
+        let output = receiver.try_recv().expect("late subscriber receives live output");
+        assert_eq!(output.data, "echo ok\\r\\n");
+        assert_eq!(replay_buffer.list_since(0).len(), 2);
+    }
+
+    #[test]
+    fn caches_exit_without_subscribers() {
+        let (exit_tx, _) = broadcast::channel(1);
+        let exit_snapshot = StdMutex::new(None);
+        let exit = PtyExit {
+            exit_code: 130,
+            signal: Some("SIGINT".to_string()),
+        };
+
+        publish_exit(&exit, &exit_tx, &exit_snapshot);
+
+        assert_eq!(exit_snapshot.lock().unwrap().as_ref().map(|value| value.exit_code), Some(130));
+        assert_eq!(exit_snapshot.lock().unwrap().as_ref().and_then(|value| value.signal.clone()).as_deref(), Some("SIGINT"));
+    }
+}

@@ -427,6 +427,17 @@ export const TerminalView: React.FC = () => {
                             return;
                         }
 
+                        // SESSION_NOT_FOUND：后端已丢弃此 session（例如 endpoint 切换后）。
+                        // 清空旧 session ID 并回到 idle，让 ensureSession 效果自动创建新 PTY。
+                        if (error.message === 'Terminal session not found') {
+                            setConnecting(directory, tabId, false);
+                            clearBuffer(directory, tabId);
+                            setTabLifecycle(directory, tabId, 'idle');
+                            setTabSessionId(directory, tabId, null);
+                            disconnectStream();
+                            return;
+                        }
+
                         if (!fatal) {
                             setConnectionError(null);
                             setIsFatalError(false);

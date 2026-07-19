@@ -171,25 +171,35 @@ impl OcServer {
     }
 
     /// 优雅关闭 (顺序与原 main.rs 一致, 不可漂移):
-    /// 1. 触发 axum graceful shutdown (shutdown_tx)
-    /// 2. 等 serve task 退出 (join_handle)
-    /// 3. global_hub.stop() (停上游 SSE reader)
-    /// 4. terminal_sessions.kill_all() (杀终端会话)
+    /// 1. 取消 terminal SSE/WS handler 共享 token, 并 kill terminal session
+    ///    (否则长连接会阻塞 Axum graceful shutdown, 触发 Tauri 130)。
+    /// 2. 触发 axum graceful shutdown (shutdown_tx)
+    /// 3. 带预算等待 serve task 退出 (超时后记录 warning 并继续)。
+    /// 4. global_hub.stop() (停上游 SSE reader)
     /// 5. oc_handle.shutdown() (杀 OpenCode 子进程)
     pub async fn shutdown(mut self) {
-        // 1. 触发 axum graceful shutdown
+        // 1. 取消 terminal stream 并杀 PTY 进程组。
+        tracing::info!("cancelling terminal handlers and killing sessions");
+        self.state.terminal_sessions.cancel_shutdown();
+        self.state.terminal_sessions.kill_all().await;
+
+        // 2. 触发 axum graceful shutdown
         if let Some(tx) = self.shutdown_tx.take() {
             let _ = tx.send(());
         }
-        // 2. 等 serve task 退出
+        // 3. 等 serve task 退出，超过预算后强制继续 (Tauri 退出流程不能再等)。
         if let Some(join) = self.join_handle.take() {
-            let _ = join.await;
+            match tokio::time::timeout(SERVE_SHUTDOWN_BUDGET, join).await {
+                Ok(_) => {}
+                Err(_) => tracing::warn!(
+                    "axum serve task did not exit in {:?}, continuing shutdown",
+                    SERVE_SHUTDOWN_BUDGET
+                ),
+            }
         }
-        // 3. 关闭全局 hub (停止上游 SSE reader)
+        // 4. 关闭全局 hub (停止上游 SSE reader)
         tracing::info!("shutting down global event hub");
         self.state.global_hub.stop().await;
-        // 4. 杀所有终端会话 (对齐 Node `shutdown`)
-        self.state.terminal_sessions.kill_all().await;
         // 5. 关闭 OpenCode 子进程
         if let Some(mut h) = self.oc_handle.take() {
             tracing::info!("shutting down opencode process");
@@ -198,6 +208,10 @@ impl OcServer {
         tracing::info!("oc-server stopped");
     }
 }
+
+/// Axum serve task 在 graceful shutdown 后的最大等待时间。
+const SERVE_SHUTDOWN_BUDGET: std::time::Duration = std::time::Duration::from_secs(5);
+
 
 // =========================================================================
 // 路由构建 (从 main.rs 移入)

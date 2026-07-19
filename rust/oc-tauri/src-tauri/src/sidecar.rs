@@ -149,6 +149,7 @@ pub struct SidecarBuilder {
     ready_timeout: Duration,
     extra_env: Vec<(String, String)>,
     extra_args: Vec<String>,
+    port: Option<u16>,
 }
 
 #[allow(dead_code)]
@@ -161,6 +162,7 @@ impl SidecarBuilder {
             ready_timeout: DEFAULT_READY_TIMEOUT,
             extra_env: Vec::new(),
             extra_args: Vec::new(),
+            port: None,
         }
     }
 
@@ -188,12 +190,24 @@ impl SidecarBuilder {
         self
     }
 
+    /// 设置固定端口。不调用此方法时，sidecar 将使用 OS 分配的随机端口。
+    /// 生产环境不设置此值；dev 模式可通过 `OPENCHAMBER_PORT` 环境变量设置固定端口，
+    /// 使 Vite early injection、proxy 和 sidecar 使用同一个端口。
+    pub fn port(mut self, port: u16) -> Self {
+        self.port = Some(port);
+        self
+    }
+
     /// 启动 sidecar: 分配端口 → spawn → 进程树归组 → 轮询 /health 就绪门。
     pub async fn start(self) -> Result<SidecarHandle> {
-        // 1. 端口分配: 绑 127.0.0.1:0, 让 OS 分配空闲端口, 立即释放给 CLI 用。
-        let port = allocate_port(&self.host)
-            .await
-            .with_context(|| format!("failed to allocate port on {}", self.host))?;
+        // 1. 端口分配: 若设置了固定端口则直接使用，否则绑 127.0.0.1:0 让 OS 分配。
+        let port = if let Some(p) = self.port {
+            p
+        } else {
+            allocate_port(&self.host)
+                .await
+                .with_context(|| format!("failed to allocate port on {}", self.host))?
+        };
 
         // 2. 构造命令: openchamber serve --foreground --port <p> [--host h] [extra...]
         //    --foreground 让 CLI 进程本身成为 web server (in-process), 不 detach,
@@ -527,5 +541,19 @@ mod tests {
         assert_eq!(b.ready_timeout, Duration::from_secs(5));
         assert_eq!(b.extra_env, vec![("FOO".to_string(), "bar".to_string())]);
         assert_eq!(b.extra_args, vec!["--extra".to_string()]);
+    }
+
+    // 默认不设置固定端口。
+    #[test]
+    fn builder_default_port_is_none() {
+        let b = SidecarBuilder::new();
+        assert!(b.port.is_none());
+    }
+
+    // 设置固定端口后生效。
+    #[test]
+    fn builder_port_override() {
+        let b = SidecarBuilder::new().port(9999);
+        assert_eq!(b.port, Some(9999));
     }
 }

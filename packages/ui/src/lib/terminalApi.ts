@@ -394,13 +394,15 @@ class TerminalTransportManager {
           }
         };
 
-        socket.onclose = () => {
+        socket.onclose = (event) => {
           if (this.socket === socket) {
             this.socket = null;
             this.boundSessionId = null;
             this.stopKeepalive();
             if (!this.closed) {
-              this.scheduleReconnect(new Error('Terminal stream connection error'));
+              const reason = `Terminal WS closed: code=${event?.code ?? 'unknown'} reason=${event?.reason ?? ''}`;
+              if (console?.debug) console.debug('[terminal]', reason);
+              this.scheduleReconnect(new Error(reason));
             }
           }
           settle(null);
@@ -929,7 +931,35 @@ export function connectTerminalStream(
   }
 
   manager.configure(socketUrl);
-  return manager.subscribe(sessionId, onEvent, onError, options);
+
+  // 先试 WS, 如果重试耗尽 (fatal) 则降级到 SSE。
+  let fallbackCleanup: (() => void) | null = null;
+  let detached = false;
+
+  const wrappedOnError = (error: Error, fatal?: boolean) => {
+    if (fatal) {
+      detached = true;
+      manager.close();
+      // streamCapability 标记为不支持 WS, 使 fallback 不走 WS。
+      globalState.streamCapability = {
+        preferred: 'sse',
+        transports: ['sse', 'http'],
+      };
+      fallbackCleanup = connectTerminalStreamViaSse(sessionId, onEvent, onError, options);
+      return;
+    }
+    onError?.(error, fatal);
+  };
+
+  const cleanup = manager.subscribe(sessionId, onEvent, wrappedOnError, options);
+
+  return () => {
+    if (!detached) {
+      cleanup();
+    } else if (fallbackCleanup) {
+      fallbackCleanup();
+    }
+  };
 }
 
 export async function sendTerminalInput(

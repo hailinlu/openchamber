@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use tokio::sync::Mutex;
+use tokio_util::sync::CancellationToken;
 
 use super::pty::{TerminalPty, IDLE_SWEEP_INTERVAL, IDLE_TIMEOUT};
 use super::replay_buffer::ReplayBuffer;
@@ -30,13 +31,19 @@ pub struct TerminalSession {
 impl TerminalSession {
     pub fn new(pty: TerminalPty, cwd: PathBuf) -> Self {
         let backend = pty.backend.to_string();
+        let replay_buffer = pty.replay_buffer();
         Self {
             pty: Arc::new(pty),
             cwd,
             pty_backend: backend,
             last_activity: Mutex::new(Instant::now()),
-            replay_buffer: Arc::new(ReplayBuffer::new()),
+            replay_buffer,
         }
+    }
+
+    /// 返回最近一次 PTY 退出状态，供晚到的 stream 客户端补发。
+    pub fn latest_exit(&self) -> Option<super::pty::PtyExit> {
+        self.pty.latest_exit()
     }
 
     /// 更新最后活动时间为现在。
@@ -48,6 +55,7 @@ impl TerminalSession {
 /// 终端会话存储 (线程安全)。
 pub struct TerminalSessionStore {
     sessions: Mutex<HashMap<String, Arc<TerminalSession>>>,
+    shutdown_token: CancellationToken,
 }
 
 impl Default for TerminalSessionStore {
@@ -60,7 +68,18 @@ impl TerminalSessionStore {
     pub fn new() -> Self {
         Self {
             sessions: Mutex::new(HashMap::new()),
+            shutdown_token: CancellationToken::new(),
         }
+    }
+
+    /// 返回 shutdown token 的 clone，用于让 SSE/WS handler 监听。
+    pub fn shutdown_token(&self) -> CancellationToken {
+        self.shutdown_token.clone()
+    }
+
+    /// 取消所有 terminal stream handler。
+    pub fn cancel_shutdown(&self) {
+        self.shutdown_token.cancel();
     }
 
     /// 当前会话数。
@@ -185,5 +204,16 @@ mod tests {
         assert!(store.get("nonexistent").await.is_none());
         assert!(store.remove("nonexistent").await.is_none());
         store.kill_all().await; // 不应 panic
+    }
+
+    #[tokio::test]
+    async fn store_shutdown_cancels_terminal_streams() {
+        let store = TerminalSessionStore::new();
+        let token = store.shutdown_token();
+        assert!(!token.is_cancelled());
+
+        store.cancel_shutdown();
+
+        assert!(token.is_cancelled());
     }
 }

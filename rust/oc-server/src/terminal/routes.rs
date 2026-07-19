@@ -26,7 +26,7 @@ use super::protocol::{
     create_control_frame, is_rebind_rate_limited, prune_rebind_timestamps, read_control_frame,
 };
 use super::{
-    MAX_TERMINAL_SESSIONS, TERMINAL_OUTPUT_REPLAY_MAX_BYTES, TERMINAL_SSE_HEARTBEAT_INTERVAL_MS,
+    MAX_TERMINAL_SESSIONS, TERMINAL_SSE_HEARTBEAT_INTERVAL_MS,
     TERMINAL_WS_HEARTBEAT_INTERVAL_MS, TERMINAL_WS_MAX_INVALID_FRAMES, TERMINAL_WS_MAX_PAYLOAD_BYTES,
     TERMINAL_WS_MAX_REBINDS_PER_WINDOW, TERMINAL_WS_REBIND_WINDOW_MS,
 };
@@ -140,71 +140,99 @@ pub async fn stream(
 
     let mut output_rx = session.pty.subscribe_output();
     let mut exit_rx = session.pty.subscribe_exit();
+    let cached_exit = session.latest_exit();
 
     let (tx, stream_rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(64);
 
-    // 连接事件
+    // 连接事件 + producer-side replay。receiver 已先建立，避免 replay 期间丢 live output。
     let connected = Bytes::from(format!(
         "data: {}\n\n",
         json!({ "type": "connected", "runtime": RUNTIME_NAME, "ptyBackend": pty_backend })
     ));
     let _ = tx.send(Ok(connected)).await;
+    for frame in build_sse_replay_frames(&session.replay_buffer) {
+        if tx.send(Ok(frame)).await.is_err() {
+            return StatusCode::GONE.into_response();
+        }
+    }
 
-    // 转发 task: PTY 输出 → SSE data 帧
+    let has_cached_exit = cached_exit.is_some();
+
+    // 已退出的 session 也要让晚到的客户端收到 exit，而不是永久挂起。
+    if let Some(ref exit) = cached_exit {
+        let frame = Bytes::from(format!(
+            "data: {}\n\n",
+            terminal_exit_payload(exit)
+        ));
+        let _ = tx.send(Ok(frame)).await;
+    }
+
+    // 转发 task: PTY 输出 → SSE data 帧。
     let tx2 = tx.clone();
-    tokio::spawn(async move {
-        loop {
-            tokio::select! {
-                output = output_rx.recv() => {
-                    match output {
-                        Ok(PtyOutput { data }) => {
+    if !has_cached_exit {
+        let shutdown_token = state.terminal_sessions.shutdown_token();
+        tokio::spawn(async move {
+            loop {
+                tokio::select! {
+                    output = output_rx.recv() => {
+                        match output {
+                            Ok(PtyOutput { data, .. }) => {
+                                let frame = Bytes::from(format!(
+                                    "data: {}\n\n",
+                                    json!({ "type": "data", "data": data })
+                                ));
+                                if tx2.send(Ok(frame)).await.is_err() {
+                                    break;
+                                }
+                            }
+                            Err(_) => break,
+                        }
+                    }
+                    exit = exit_rx.recv() => {
+                        if let Ok(exit) = exit {
                             let frame = Bytes::from(format!(
                                 "data: {}\n\n",
-                                json!({ "type": "data", "data": data })
+                                terminal_exit_payload(&exit)
                             ));
-                            if tx2.send(Ok(frame)).await.is_err() {
-                                break;
-                            }
+                            let _ = tx2.send(Ok(frame)).await;
+                            break;
                         }
-                        Err(_) => break,
                     }
-                }
-                exit = exit_rx.recv() => {
-                    if let Ok(PtyExit { exit_code, signal }) = exit {
-                        let frame = Bytes::from(format!(
-                            "data: {}\n\n",
-                            json!({ "type": "exit", "exitCode": exit_code, "signal": signal })
-                        ));
-                        let _ = tx2.send(Ok(frame)).await;
+                    _ = shutdown_token.cancelled() => {
                         break;
                     }
                 }
             }
-        }
-    });
+        });
+    }
 
-    // 心跳 task
+    // 心跳 task；cached exit 路径不启动 heartbeat，让响应在 exit 后自然结束。
     let (heartbeat_tx, heartbeat_rx) = mpsc::channel::<Result<Bytes, std::io::Error>>(4);
-    tokio::spawn(async move {
-        let mut interval = time::interval(std::time::Duration::from_millis(
-            TERMINAL_SSE_HEARTBEAT_INTERVAL_MS,
-        ));
-        interval.tick().await;
-        loop {
+    if !has_cached_exit {
+        tokio::spawn(async move {
+            let mut interval = time::interval(std::time::Duration::from_millis(
+                TERMINAL_SSE_HEARTBEAT_INTERVAL_MS,
+            ));
             interval.tick().await;
-            let hb = Bytes::from_static(b": heartbeat\n\n");
-            if heartbeat_tx.send(Ok(hb)).await.is_err() {
-                break;
+            loop {
+                interval.tick().await;
+                let hb = Bytes::from_static(b": heartbeat\n\n");
+                if heartbeat_tx.send(Ok(hb)).await.is_err() {
+                    break;
+                }
             }
-        }
-    });
+        });
+    } else {
+        drop(heartbeat_tx);
+        drop(tx);
+    }
 
     let output_stream = tokio_stream::wrappers::ReceiverStream::new(stream_rx);
     let heartbeat_stream = tokio_stream::wrappers::ReceiverStream::new(heartbeat_rx);
     let merged = stream::select(output_stream, heartbeat_stream);
     let body = Body::from_stream(merged);
-
     let mut response = Response::new(body);
+
     *response.status_mut() = StatusCode::OK;
     response.headers_mut().insert(
         "content-type",
@@ -483,6 +511,8 @@ async fn run_terminal_bridge(socket: WebSocket, state: Arc<AppState>) {
     let mut exit_rx: Option<tokio::sync::broadcast::Receiver<PtyExit>> = None;
     let mut bound_session: Option<Arc<TerminalSession>> = None;
 
+    let shutdown_token = state.terminal_sessions.shutdown_token();
+
     loop {
         tokio::select! {
             // WS 接收
@@ -565,6 +595,7 @@ async fn run_terminal_bridge(socket: WebSocket, state: Arc<AppState>) {
                                 output_rx = Some(session.pty.subscribe_output());
                                 exit_rx = Some(session.pty.subscribe_exit());
 
+                                let cached_exit = session.latest_exit();
                                 let _ = send_control(&mut sender, &json!({
                                     "t": "bok", "v": 2, "s": session_id,
                                     "runtime": RUNTIME_NAME,
@@ -582,6 +613,16 @@ async fn run_terminal_bridge(socket: WebSocket, state: Arc<AppState>) {
                                         break;
                                     }
                                     replay_cursor_by_session.insert(session_id.clone(), chunk.id);
+                                }
+
+                                // PTY 可能在客户端绑定前已经退出，补发一次退出帧。
+                                if let Some(exit) = cached_exit {
+                                    let _ = send_control(&mut sender, &json!({
+                                        "t": "x", "v": 2, "s": bound_session_id,
+                                        "exitCode": exit.exit_code,
+                                        "signal": exit.signal,
+                                    })).await;
+                                    exit_rx = None;
                                 }
 
                                 let _ = session.touch().await;
@@ -627,30 +668,18 @@ async fn run_terminal_bridge(socket: WebSocket, state: Arc<AppState>) {
                     None => continue,
                 };
                 match output {
-                    Ok(PtyOutput { data }) => {
-                        let session = match &bound_session {
-                            Some(s) => s.clone(),
-                            None => continue,
-                        };
-                        let chunk = session.replay_buffer.append(
-                            &data, TERMINAL_OUTPUT_REPLAY_MAX_BYTES,
-                        );
-                        if let Some(ref chunk) = chunk {
-                            let frame = create_control_frame(&json!({
-                                "t": "d", "s": session_id, "i": chunk.id, "d": data,
-                            }));
-                            if sender.send(Message::Binary(frame.into())).await.is_err() {
-                                break;
-                            }
-                            replay_cursor_by_session.insert(session_id.clone(), chunk.id);
+                    Ok(PtyOutput { data, replay_id }) => {
+                        let payload = if let Some(replay_id) = replay_id {
+                            json!({ "t": "d", "s": session_id, "i": replay_id, "d": data })
                         } else {
-                            // 空 chunk (data 为空或超大 trim 后空), 仍发不带 id 的 d 帧
-                            let frame = create_control_frame(&json!({
-                                "t": "d", "s": session_id, "d": data,
-                            }));
-                            if sender.send(Message::Binary(frame.into())).await.is_err() {
-                                break;
-                            }
+                            json!({ "t": "d", "s": session_id, "d": data })
+                        };
+                        let frame = create_control_frame(&payload);
+                        if sender.send(Message::Binary(frame.into())).await.is_err() {
+                            break;
+                        }
+                        if let Some(replay_id) = replay_id {
+                            replay_cursor_by_session.insert(session_id.clone(), replay_id);
                         }
                     }
                     Err(_) => { /* reader 关闭, 不再收输出 */ }
@@ -666,9 +695,10 @@ async fn run_terminal_bridge(socket: WebSocket, state: Arc<AppState>) {
             } => {
                 let session_id = bound_session_id.clone();
                 if let Ok(PtyExit { exit_code, signal }) = exit {
+                    let payload = terminal_exit_payload(&PtyExit { exit_code, signal });
                     let frame = create_control_frame(&json!({
                         "t": "x", "v": 2, "s": session_id,
-                        "exitCode": exit_code, "signal": signal,
+                        "exitCode": payload["exitCode"], "signal": payload["signal"],
                     }));
                     let _ = sender.send(Message::Binary(frame.into())).await;
                     // 清除绑定 (session 可能已被 store 删除)
@@ -681,6 +711,10 @@ async fn run_terminal_bridge(socket: WebSocket, state: Arc<AppState>) {
             // 心跳
             _ = heartbeat.tick() => {
                 let _ = sender.send(Message::Ping(Bytes::new())).await;
+            }
+            // shutdown 取消
+            _ = shutdown_token.cancelled() => {
+                break;
             }
         }
     }
@@ -705,4 +739,60 @@ fn now_millis() -> u128 {
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_millis())
         .unwrap_or(0)
+}
+fn build_sse_replay_frames(replay_buffer: &super::replay_buffer::ReplayBuffer) -> Vec<Bytes> {
+    replay_buffer
+        .list_since(0)
+        .into_iter()
+        .map(|chunk| {
+            Bytes::from(format!(
+                "data: {}\\n\\n",
+                json!({ "type": "data", "data": chunk.data })
+            ))
+        })
+        .collect()
+}
+
+
+fn terminal_exit_payload(exit: &PtyExit) -> Value {
+    json!({
+        "type": "exit",
+        "exitCode": exit.exit_code,
+        "signal": exit.signal,
+    })
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::terminal::replay_buffer::ReplayBuffer;
+
+    #[test]
+    fn sse_replay_frames_preserve_recorded_order() {
+        let replay = ReplayBuffer::new();
+        replay.append("first", 1024);
+        replay.append("second", 1024);
+
+        let frames = build_sse_replay_frames(&replay);
+        let text = frames
+            .iter()
+            .map(|frame| String::from_utf8_lossy(frame).into_owned())
+            .collect::<String>();
+
+        assert!(text.find("first").unwrap() < text.find("second").unwrap());
+        assert_eq!(text.matches("\"type\":\"data\"").count(), 2);
+    }
+
+    #[test]
+    fn exit_payload_matches_live_and_cached_delivery() {
+        let payload = terminal_exit_payload(&PtyExit {
+            exit_code: 130,
+            signal: Some("2".to_string()),
+        });
+
+        assert_eq!(payload["type"], "exit");
+        assert_eq!(payload["exitCode"], 130);
+        assert_eq!(payload["signal"], "2");
+    }
 }
