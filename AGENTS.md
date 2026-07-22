@@ -276,6 +276,12 @@ Note: `tauri:dev` Ctrl+C may print `error: script "dev:server:watch" exited with
 - Do not modify `../opencode` (separate repo).
 - Do not run git/GitHub commands unless explicitly asked.
 - Keep baseline green (run `bun run type-check`, `bun run lint` before finalizing changes).
+- **Session scope (this session only) — skip Electron / Mobile / VS Code checks and builds.** Do not run any check or build that scans, builds, or packages `packages/electron`, `packages/mobile`, or `packages/vscode` for the remainder of this session. Concretely, do not run: `bun run type-check`, `bun run lint`, `bun run build`, `bun run dead-code`, `bun run release:prepare`, `bun run release:test`, `bun run electron:*`, `bun run mobile:*`, `bun run vscode:*`, `bun run type-check:electron`, `bun run type-check:mobile`, `bun run lint:electron`, `bun run lint:mobile`, `bun run build:electron`, `bun run build:mobile`, or `bun run --filter '*' …` (which fans out to those packages). Tauri/Rust (`cargo build`, `cargo test`, `bun run tauri:*`) is **not** in this skip scope. When validation is needed, use the narrowly scoped commands instead:
+  - UI: `bun run type-check:ui`, `bun run lint:ui`
+  - Web: `bun run type-check:web`, `bun run lint:web`
+  - Workspace filters: `bun run --filter @openchamber/ui …`, `bun run --filter @openchamber/web …`
+  - Rust: `cargo build` / `cargo test` (inside `rust/`), `cargo tauri build` (inside `rust/oc-tauri/src-tauri`)
+  - This constraint is **session-only** and does **not** alter the build/dev commands catalogue above, the validation expectations, or any project-skill triggers. Re-evaluate on the next session.
 
 ## Agent code of conduct
 
