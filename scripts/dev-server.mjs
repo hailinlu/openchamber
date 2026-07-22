@@ -3,7 +3,7 @@
  * Cross-platform dev server runner.
  *
  * Bypasses the shell variable expansion issue in npm scripts on Windows:
- * `${OPENCHAMBER_PORT:-3001}` works in bash/sh but not in cmd.exe.
+ * `${GRIDFORGE_PORT:-${OPENCHAMBER_PORT:-3001}}` works in bash/sh but not in cmd.exe.
  * This script resolves the port in JS and runs nodemon directly.
  *
  * Uses the platform shell explicitly to ensure PATH resolution and
@@ -17,7 +17,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const repoRoot = path.resolve(__dirname, '..');
 const webRoot = path.join(repoRoot, 'packages/web');
-const port = process.env.OPENCHAMBER_PORT || '3001';
+// GRIDFORGE_PORT 是 dev launcher / Vite / Rust 三方约定的统一环境变量。
+// OPENCHAMBER_PORT 保留为旧用户脚本的兼容回退。
+const port = process.env.GRIDFORGE_PORT ?? process.env.OPENCHAMBER_PORT ?? '3001';
 const serverDir = path.join(webRoot, 'server');
 const serverEntry = path.join(webRoot, 'server/index.js');
 
@@ -33,7 +35,8 @@ const cmdLine = `bun x nodemon --watch "${serverDir}" --ext js --exec "bun ${ser
 const child = spawn(shell.command, [shell.arg, cmdLine], {
   cwd: webRoot,
   stdio: 'inherit',
-  env: { ...process.env, OPENCHAMBER_PORT: port },
+  // 端口已通过 --port 传给 nodemon,无需再用 env 重复。
+  env: process.env,
 });
 
 child.on('exit', (code, signal) => {

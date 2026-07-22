@@ -269,7 +269,7 @@ async function serveCommand(options) {
       stdio: ['ignore', logFd, logFd, 'ipc'],
       env: {
         ...process.env,
-        OPENCHAMBER_PORT: String(targetPort),
+        // 端口已通过 serverArgs 的 --port 参数传递,无需再用 env 重复。
         OPENCHAMBER_RUNTIME: 'web',
         OPENCODE_BINARY: opencodeBinary,
         GRIDFORGE_HOST: effectiveHost,

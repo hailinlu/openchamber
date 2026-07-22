@@ -33,10 +33,11 @@ const webRoot = path.join(repoRoot, 'packages/web');
 // 默认 5180, 必须与 tauri.conf.json 的 devUrl 对齐。
 const uiPort = process.env.OPENCHAMBER_HMR_UI_PORT || '5180';
 const hmrHost = process.env.OPENCHAMBER_HMR_HOST || '127.0.0.1';
-// Rust oc-server 绑定端口。与 Vite proxy target 一致：
-// Vite 的 proxy 把 /api/* /auth/* /health 转发到此端口，
-// Rust oc-server 通过 OPENCHAMBER_PORT 环境变量绑定同一端口。
-const apiPort = process.env.OPENCHAMBER_PORT || '3001';
+// Rust oc-server 与 Vite proxy 共用的 API 端口。dev launcher 统一透传
+// GRIDFORGE_PORT：Vite proxy target 与 Rust oc-server 绑定都读这个名字。
+// OPENCHAMBER_PORT 保留为旧用户脚本的兼容回退。值与 Vite proxy target
+// 必须一致，否则 /api 请求会 ECONNREFUSED。
+const apiPort = process.env.GRIDFORGE_PORT ?? process.env.OPENCHAMBER_PORT ?? '3001';
 const useDetachedChildren = process.platform !== 'win32';
 
 // 用当前 node 的绝对路径 (process.execPath) 起 node 子进程,
@@ -251,7 +252,7 @@ async function main() {
     cwd: webRoot,
     env: {
       OPENCHAMBER_DISABLE_PWA_DEV: '1',
-      OPENCHAMBER_PORT: apiPort,
+      GRIDFORGE_PORT: apiPort,
     },
   });
 
@@ -284,7 +285,10 @@ async function main() {
     cwd: tauriSrcDir,
     env: {
       GRIDFORGE_HMR_UI_URL: `http://127.0.0.1:${uiPort}`,
-      OPENCHAMBER_PORT: apiPort,
+      // Rust 早期注入 (ipc/globals.rs) 与 oc-server (oc-server/src/config.rs)
+      // 都读 GRIDFORGE_PORT 来绑定端口 / 注入 base URL。值必须与上方 Vite
+      // proxy target 一致，否则 /api 请求会 ECONNREFUSED。
+      GRIDFORGE_PORT: apiPort,
       OPENCODE_BINARY: opencodeBinary || 'opencode',
     },
   });

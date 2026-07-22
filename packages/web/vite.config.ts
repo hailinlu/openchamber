@@ -40,12 +40,13 @@ export default defineConfig({
     },
     {
       // 在 index.html 注入 API base URL (在 main.tsx 加载前执行)。
-      // Tauri dev 模式: OPENCHAMBER_PORT=3001 → __OPENCHAMBER_API_BASE_URL__="http://127.0.0.1:3001"
+      // Tauri dev 模式: GRIDFORGE_PORT=3001 → __OPENCHAMBER_API_BASE_URL__="http://127.0.0.1:3001"
       // 使得 WS 直连 oc-server 不走 Vite proxy, 避免 ECONNRESET。
       // 比 Tauri 的 window.eval() 更可靠: 脚本同步执行于 HTML 解析阶段。
+      // OPENCHAMBER_PORT 保留为回退兼容旧用户脚本。
       name: 'inject-api-base-url',
       transformIndexHtml() {
-        const apiPort = process.env.OPENCHAMBER_PORT || '3001';
+        const apiPort = process.env.GRIDFORGE_PORT ?? process.env.OPENCHAMBER_PORT ?? '3001';
         const origin = `http://127.0.0.1:${apiPort}`;
         return [
           {
@@ -104,15 +105,15 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/auth': {
-        target: `http://127.0.0.1:${process.env.OPENCHAMBER_PORT || 3001}`,
+        target: `http://127.0.0.1:${process.env.GRIDFORGE_PORT ?? process.env.OPENCHAMBER_PORT ?? 3001}`,
         changeOrigin: true,
       },
       '/health': {
-        target: `http://127.0.0.1:${process.env.OPENCHAMBER_PORT || 3001}`,
+        target: `http://127.0.0.1:${process.env.GRIDFORGE_PORT ?? process.env.OPENCHAMBER_PORT ?? 3001}`,
         changeOrigin: true,
       },
       '/api': {
-        target: `http://127.0.0.1:${process.env.OPENCHAMBER_PORT || 3001}`,
+        target: `http://127.0.0.1:${process.env.GRIDFORGE_PORT ?? process.env.OPENCHAMBER_PORT ?? 3001}`,
         changeOrigin: true,
         ws: true,
       },

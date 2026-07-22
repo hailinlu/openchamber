@@ -114,14 +114,14 @@ function clearViteCache() {
 clearViteCache();
 
 const api = run('api', 'node', ['scripts/dev-server.mjs'], {
-  OPENCHAMBER_PORT: backendPort,
+  GRIDFORGE_PORT: backendPort,
 });
 const vite = run(
   'vite',
   'bun',
   ['x', 'vite', '--force', '--host', hmrHost, '--port', uiPort, '--strictPort'],
   {
-    OPENCHAMBER_PORT: backendPort,
+    GRIDFORGE_PORT: backendPort,
     OPENCHAMBER_DISABLE_PWA_DEV: '1',
   },
   { cwd: webRoot },
