@@ -54,6 +54,9 @@ uuid = { workspace = true }
 regex = { workspace = true }
 fancy-regex = { workspace = true }
 mime_guess = { workspace = true }
+# 文件读取编码兜底: UTF-8 → GBK (CJK), 与 Node 版 routes.js 一致。
+# encoding_rs 已是传递依赖 (Cargo.lock 0.8.35), 此处仅为显式引用。
+encoding_rs = "0.8"
 once_cell = { workspace = true }
 futures-util = { workspace = true }
 async-stream = { workspace = true }

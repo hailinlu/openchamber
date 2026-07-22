@@ -3723,6 +3723,7 @@ dependencies = [
  "chrono-tz",
  "clap",
  "cron",
+ "encoding_rs",
  "fancy-regex",
  "futures-util",
  "h2",
