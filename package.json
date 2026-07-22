@@ -178,5 +178,8 @@
   },
   "patchedDependencies": {
     "@tanstack/virtual-core@3.17.3": "patches/@tanstack%2Fvirtual-core@3.17.3.patch"
-  }
+  },
+  "workspaces": [
+    "packages/*"
+  ]
 }
