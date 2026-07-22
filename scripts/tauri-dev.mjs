@@ -272,6 +272,12 @@ async function main() {
   const backendMode = process.env.OPENCHAMBER_SIDECAR === '1' ? 'sidecar' : 'in-process';
   console.log(`[tauri:dev] backend mode: ${backendMode}`);
 
+  // 自动探测 OpenCode binary 路径 (Windows npm 全局 / Unix 常见位置)。
+  // 仅在用户没显式设 OPENCODE_BINARY 时探测,探测失败回退到 'opencode' 让 Rust 报原本的错误。
+  const opencodeBinary = resolveOpencodeBinary();
+  const opencodeSource = (process.env.OPENCODE_BINARY || '').trim() ? '(from env)' : '(auto-detected)';
+  console.log(`[tauri:dev] opencode binary: ${opencodeBinary || 'opencode'}${opencodeBinary ? ' ' + opencodeSource : ''}`);
+
   // cargo tauri dev 会自己 cargo run, 不需要我们 build。
   // cwd 指向 src-tauri 让 tauri-cli 找到 tauri.conf.json。
   const tauri = spawnProcess('cargo', ['tauri', 'dev'], {
@@ -279,6 +285,7 @@ async function main() {
     env: {
       GRIDFORGE_HMR_UI_URL: `http://127.0.0.1:${uiPort}`,
       OPENCHAMBER_PORT: apiPort,
+      OPENCODE_BINARY: opencodeBinary || 'opencode',
     },
   });
 
