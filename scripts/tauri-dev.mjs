@@ -18,8 +18,9 @@
 //   API: OPENCHAMBER_HMR_API_PORT (默认 3902, Tauri 模式下仅 Rust 侧使用)
 
 import { spawn, spawnSync } from 'node:child_process';
-import { rmSync } from 'node:fs';
+import { existsSync, rmSync } from 'node:fs';
 import net from 'node:net';
+import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -60,6 +61,49 @@ function resolveWindowsCommand(command) {
 
   const candidates = String(result.stdout || '').split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   return candidates.find((entry) => /\.(exe|cmd|bat)$/i.test(entry)) || candidates[0] || command;
+}
+
+// Resolve the OpenCode binary path. Only auto-detects when OPENCODE_BINARY
+// is unset. Returns null when no candidate is found — caller falls back to
+// the Rust default "opencode" and lets oc-server report its own spawn error.
+function resolveOpencodeBinary() {
+  const explicit = (process.env.OPENCODE_BINARY || '').trim();
+  if (explicit) return explicit;
+
+  if (process.platform === 'win32') {
+    // npm global root → node_modules\opencode-ai\bin\opencode.exe
+    const npmRoot = spawnSync('npm', ['root', '-g'], {
+      encoding: 'utf8',
+      windowsHide: true,
+      shell: true,
+    });
+    if (npmRoot.status === 0) {
+      const candidate = path.join(
+        (npmRoot.stdout || '').trim(),
+        'opencode-ai',
+        'bin',
+        'opencode.exe'
+      );
+      if (existsSync(candidate)) return candidate;
+    }
+    return null;
+  }
+
+  // Unix: match the precedence used by scripts/oc-dev.mjs REMOTE_RUNTIME_ENV
+  const unixCandidates = [
+    path.join(os.homedir(), '.opencode', 'bin', 'opencode'),
+    path.join(os.homedir(), '.local', 'bin', 'opencode'),
+    path.join(os.homedir(), '.bun', 'bin', 'opencode'),
+  ];
+  for (const candidate of unixCandidates) {
+    if (existsSync(candidate)) return candidate;
+  }
+  // Final PATH fallback (matches today's behavior — Rust still does its own lookup)
+  const which = spawnSync('which', ['opencode'], { encoding: 'utf8' });
+  if (which.status === 0 && which.stdout) {
+    return which.stdout.trim().split(/\r?\n/)[0] || null;
+  }
+  return null;
 }
 
 function spawnProcess(command, args, options = {}) {
