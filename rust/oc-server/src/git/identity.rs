@@ -21,11 +21,11 @@ pub struct ProfilesData {
     profiles: Vec<Value>,
 }
 
-/// 存储文件路径: ~/.config/openchamber/git-identities.json
+/// 存储文件路径: ~/.config/gridforge/git-identities.json
 fn storage_file() -> PathBuf {
     home_dir()
         .join(".config")
-        .join("openchamber")
+        .join("gridforge")
         .join("git-identities.json")
 }
 

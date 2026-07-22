@@ -59,23 +59,23 @@ const MANAGED_LOCAL_TUNNEL_DOC_URL = 'https://developers.cloudflare.com/cloudfla
 const TUNNEL_MODE_OPTIONS: Array<{ value: TunnelMode; labelKey: string; tooltipKey: string }> = [
   {
     value: 'quick',
-    labelKey: 'settings.openchamber.tunnel.option.mode.quick.label',
-    tooltipKey: 'settings.openchamber.tunnel.option.mode.quick.tooltip',
+    labelKey: 'settings.gridforge.tunnel.option.mode.quick.label',
+    tooltipKey: 'settings.gridforge.tunnel.option.mode.quick.tooltip',
   },
   {
     value: 'managed-remote',
-    labelKey: 'settings.openchamber.tunnel.option.mode.managedRemote.label',
-    tooltipKey: 'settings.openchamber.tunnel.option.mode.managedRemote.tooltip',
+    labelKey: 'settings.gridforge.tunnel.option.mode.managedRemote.label',
+    tooltipKey: 'settings.gridforge.tunnel.option.mode.managedRemote.tooltip',
   },
   {
     value: 'managed-local',
-    labelKey: 'settings.openchamber.tunnel.option.mode.managedLocal.label',
-    tooltipKey: 'settings.openchamber.tunnel.option.mode.managedLocal.tooltip',
+    labelKey: 'settings.gridforge.tunnel.option.mode.managedLocal.label',
+    tooltipKey: 'settings.gridforge.tunnel.option.mode.managedLocal.tooltip',
   },
 ];
 
 const MANAGED_LOCAL_CONFIG_ALLOWED_EXTENSIONS = ['.yml', '.yaml', '.json'];
-const MANAGED_LOCAL_CONFIG_EXTENSION_ERROR_KEY = 'settings.openchamber.tunnel.error.invalidConfigExtension';
+const MANAGED_LOCAL_CONFIG_EXTENSION_ERROR_KEY = 'settings.gridforge.tunnel.error.invalidConfigExtension';
 
 const hasAllowedManagedLocalConfigExtension = (filePath: string): boolean => {
   const normalized = filePath.trim().toLowerCase();
@@ -167,8 +167,8 @@ interface TunnelDependencyInstallInfo {
 const getProviderDependencyName = (provider: string): string => (provider === 'ngrok' ? 'ngrok' : 'cloudflared');
 
 const getClientInstallPlatform = (): string => {
-  if (typeof window !== 'undefined' && typeof window.__OPENCHAMBER_PLATFORM__ === 'string') {
-    const platform = window.__OPENCHAMBER_PLATFORM__;
+  if (typeof window !== 'undefined' && typeof window.__GRIDFORGE_PLATFORM__ === 'string') {
+    const platform = window.__GRIDFORGE_PLATFORM__;
     if (platform === 'win32' || platform === 'darwin' || platform === 'linux') {
       return platform;
     }
@@ -399,10 +399,10 @@ export const TunnelSettings: React.FC = () => {
         ? formatRemaining(record.expiresAt - nowTs)
         : (record.inactiveReason === 'expired' || isExpired ? 'expired' : 'inactive');
       const inactiveLabel = remainingTextForSession === 'expired'
-        ? t('settings.openchamber.tunnel.state.expired')
+        ? t('settings.gridforge.tunnel.state.expired')
         : (record.inactiveReason === 'tunnel-revoked'
-          ? t('settings.openchamber.tunnel.state.revoked')
-          : t('settings.openchamber.tunnel.state.inactive'));
+          ? t('settings.gridforge.tunnel.state.revoked')
+          : t('settings.gridforge.tunnel.state.inactive'));
 
       const mode = toUiTunnelMode(record.mode);
       return {
@@ -496,7 +496,7 @@ export const TunnelSettings: React.FC = () => {
 
   const refreshTunnelDependencyCheck = React.useCallback(async (provider: string, signal?: AbortSignal): Promise<boolean | null> => {
     try {
-      const checkRes = await runtimeFetch('/api/openchamber/tunnel/check', {
+      const checkRes = await runtimeFetch('/api/gridforge/tunnel/check', {
         query: { provider },
         ...(signal ? { signal } : {}),
       });
@@ -523,10 +523,10 @@ export const TunnelSettings: React.FC = () => {
   const checkAvailabilityAndStatus = React.useCallback(async (signal: AbortSignal) => {
     try {
       const [checkRes, statusRes, settingsRes, providersRes] = await Promise.all([
-        runtimeFetch('/api/openchamber/tunnel/check', { signal }),
-        runtimeFetch('/api/openchamber/tunnel/status', { signal }),
+        runtimeFetch('/api/gridforge/tunnel/check', { signal }),
+        runtimeFetch('/api/gridforge/tunnel/status', { signal }),
         runtimeFetch('/api/config/settings', { signal, headers: { Accept: 'application/json' } }),
-        runtimeFetch('/api/openchamber/tunnel/providers', { signal }),
+        runtimeFetch('/api/gridforge/tunnel/providers', { signal }),
       ]);
 
       const checkData = (await checkRes.json()) as TunnelCheckResponse;
@@ -602,7 +602,7 @@ export const TunnelSettings: React.FC = () => {
     } catch {
       if (!signal.aborted) {
         setState('error');
-        setErrorMessage(t('settings.openchamber.tunnel.toast.checkAvailabilityFailed'));
+        setErrorMessage(t('settings.gridforge.tunnel.toast.checkAvailabilityFailed'));
       }
     }
   }, [applyDependencyCheck, t]);
@@ -641,7 +641,7 @@ export const TunnelSettings: React.FC = () => {
 
   React.useEffect(() => {
     if (!tunnelInfo?.bootstrapExpiresAt) {
-      setRemainingText(t('settings.openchamber.tunnel.state.noExpiry'));
+      setRemainingText(t('settings.gridforge.tunnel.state.noExpiry'));
       return;
     }
 
@@ -651,7 +651,7 @@ export const TunnelSettings: React.FC = () => {
     const updateRemaining = () => {
       const remaining = tunnelInfo.bootstrapExpiresAt ? tunnelInfo.bootstrapExpiresAt - Date.now() : 0;
       if (remaining <= 0) {
-        setRemainingText(t('settings.openchamber.tunnel.state.expired'));
+        setRemainingText(t('settings.gridforge.tunnel.state.expired'));
       } else {
         setRemainingText(formatRemaining(remaining));
       }
@@ -740,7 +740,7 @@ export const TunnelSettings: React.FC = () => {
     let cancelled = false;
     const refreshSessions = async () => {
       try {
-        const statusRes = await runtimeFetch('/api/openchamber/tunnel/status');
+        const statusRes = await runtimeFetch('/api/gridforge/tunnel/status');
         if (!statusRes.ok || cancelled) {
           return;
         }
@@ -795,7 +795,7 @@ export const TunnelSettings: React.FC = () => {
         setManagedRemoteTunnelPresets(payload.managedRemoteTunnelPresets);
       }
     } catch {
-      toast.error(t('settings.openchamber.tunnel.toast.saveSettingsFailed'));
+      toast.error(t('settings.gridforge.tunnel.toast.saveSettingsFailed'));
     } finally {
       setIsSavingMode(false);
     }
@@ -809,7 +809,7 @@ export const TunnelSettings: React.FC = () => {
         tunnelSessionTtlMs: nextSessionTtlMs,
       });
     } catch {
-      toast.error(t('settings.openchamber.tunnel.toast.saveTtlFailed'));
+      toast.error(t('settings.gridforge.tunnel.toast.saveTtlFailed'));
     } finally {
       setIsSavingTtl(false);
     }
@@ -840,7 +840,7 @@ export const TunnelSettings: React.FC = () => {
         return next;
       });
     } catch {
-      toast.error(t('settings.openchamber.tunnel.toast.saveTokenFailed'));
+      toast.error(t('settings.gridforge.tunnel.toast.saveTokenFailed'));
     }
   }, [sessionTokensByPresetId, t]);
 
@@ -931,8 +931,8 @@ export const TunnelSettings: React.FC = () => {
       if (tunnelMode === 'managed-remote') {
         if (!selectedPreset) {
           setState('idle');
-          setManagedRemoteValidationError(t('settings.openchamber.tunnel.toast.selectOrAddManagedRemoteFirst'));
-          toast.error(t('settings.openchamber.tunnel.toast.selectOrAddManagedRemoteFirst'));
+          setManagedRemoteValidationError(t('settings.gridforge.tunnel.toast.selectOrAddManagedRemoteFirst'));
+          toast.error(t('settings.gridforge.tunnel.toast.selectOrAddManagedRemoteFirst'));
           return;
         }
 
@@ -945,7 +945,7 @@ export const TunnelSettings: React.FC = () => {
         });
       }
 
-      const res = await runtimeFetch('/api/openchamber/tunnel/start', {
+      const res = await runtimeFetch('/api/gridforge/tunnel/start', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -965,21 +965,21 @@ export const TunnelSettings: React.FC = () => {
       if (!res.ok || !data.ok) {
         if (tunnelMode === 'managed-remote' && typeof data.error === 'string' && data.error.includes('Managed remote tunnel token is required')) {
           setState('idle');
-          setManagedRemoteValidationError(t('settings.openchamber.tunnel.toast.managedRemoteTokenRequiredBeforeStarting'));
-          toast.error(t('settings.openchamber.tunnel.toast.addManagedRemoteTokenBeforeStarting'));
+          setManagedRemoteValidationError(t('settings.gridforge.tunnel.toast.managedRemoteTokenRequiredBeforeStarting'));
+          toast.error(t('settings.gridforge.tunnel.toast.addManagedRemoteTokenBeforeStarting'));
           return;
         }
         setState('error');
-        setErrorMessage(data.error || t('settings.openchamber.tunnel.toast.startFailed'));
-        toast.error(data.error || t('settings.openchamber.tunnel.toast.startFailed'));
+        setErrorMessage(data.error || t('settings.gridforge.tunnel.toast.startFailed'));
+        toast.error(data.error || t('settings.gridforge.tunnel.toast.startFailed'));
         return;
       }
 
       const startedUrl = typeof data.url === 'string' ? data.url : '';
       if (!startedUrl) {
         setState('error');
-        setErrorMessage(t('settings.openchamber.tunnel.toast.startedButNoPublicUrl'));
-        toast.error(t('settings.openchamber.tunnel.toast.startedButNoPublicUrl'));
+        setErrorMessage(t('settings.gridforge.tunnel.toast.startedButNoPublicUrl'));
+        toast.error(t('settings.gridforge.tunnel.toast.startedButNoPublicUrl'));
         return;
       }
 
@@ -1008,21 +1008,21 @@ export const TunnelSettings: React.FC = () => {
         const revokedBootstrapCount = typeof data.revokedBootstrapCount === 'number' ? data.revokedBootstrapCount : 0;
         const invalidatedSessionCount = typeof data.invalidatedSessionCount === 'number' ? data.invalidatedSessionCount : 0;
         if (revokedBootstrapCount === 1 && invalidatedSessionCount === 1) {
-          toast.warning(t('settings.openchamber.tunnel.toast.replacedTunnelSingleSingle'));
+          toast.warning(t('settings.gridforge.tunnel.toast.replacedTunnelSingleSingle'));
         } else if (revokedBootstrapCount === 1) {
-          toast.warning(t('settings.openchamber.tunnel.toast.replacedTunnelSingleManySessions', { invalidatedSessionCount }));
+          toast.warning(t('settings.gridforge.tunnel.toast.replacedTunnelSingleManySessions', { invalidatedSessionCount }));
         } else if (invalidatedSessionCount === 1) {
-          toast.warning(t('settings.openchamber.tunnel.toast.replacedTunnelManyLinksSingleSession', { revokedBootstrapCount }));
+          toast.warning(t('settings.gridforge.tunnel.toast.replacedTunnelManyLinksSingleSession', { revokedBootstrapCount }));
         } else {
-          toast.warning(t('settings.openchamber.tunnel.toast.replacedTunnelManyMany', { revokedBootstrapCount, invalidatedSessionCount }));
+          toast.warning(t('settings.gridforge.tunnel.toast.replacedTunnelManyMany', { revokedBootstrapCount, invalidatedSessionCount }));
         }
       } else {
-        toast.success(t('settings.openchamber.tunnel.toast.linkReady'));
+        toast.success(t('settings.gridforge.tunnel.toast.linkReady'));
       }
     } catch {
       setState('error');
-      setErrorMessage(t('settings.openchamber.tunnel.toast.startFailed'));
-      toast.error(t('settings.openchamber.tunnel.toast.startFailed'));
+      setErrorMessage(t('settings.gridforge.tunnel.toast.startFailed'));
+      toast.error(t('settings.gridforge.tunnel.toast.startFailed'));
     }
   }, [
     managedLocalConfigExtensionError,
@@ -1040,8 +1040,8 @@ export const TunnelSettings: React.FC = () => {
     setState('stopping');
 
     try {
-      await runtimeFetch('/api/openchamber/tunnel/stop', { method: 'POST' });
-      const statusRes = await runtimeFetch('/api/openchamber/tunnel/status');
+      await runtimeFetch('/api/gridforge/tunnel/stop', { method: 'POST' });
+      const statusRes = await runtimeFetch('/api/gridforge/tunnel/status');
       if (statusRes.ok) {
         const statusData = (await statusRes.json()) as TunnelStatusResponse;
         setSessionRecords(Array.isArray(statusData.activeSessions) ? statusData.activeSessions : []);
@@ -1052,11 +1052,11 @@ export const TunnelSettings: React.FC = () => {
       setActiveTunnelMode(null);
       setQrDataUrl(null);
       setState('idle');
-      toast.success(t('settings.openchamber.tunnel.toast.stopped'));
+      toast.success(t('settings.gridforge.tunnel.toast.stopped'));
     } catch {
       setState('error');
-      setErrorMessage(t('settings.openchamber.tunnel.toast.stopFailed'));
-      toast.error(t('settings.openchamber.tunnel.toast.stopFailed'));
+      setErrorMessage(t('settings.gridforge.tunnel.toast.stopFailed'));
+      toast.error(t('settings.gridforge.tunnel.toast.stopFailed'));
     }
   }, [t]);
 
@@ -1068,10 +1068,10 @@ export const TunnelSettings: React.FC = () => {
     try {
       await navigator.clipboard.writeText(tunnelInfo.connectUrl);
       setCopied(true);
-      toast.success(t('settings.openchamber.tunnel.toast.connectLinkCopied'));
+      toast.success(t('settings.gridforge.tunnel.toast.connectLinkCopied'));
       setTimeout(() => setCopied(false), 2000);
     } catch {
-      toast.error(t('settings.openchamber.tunnel.toast.copyUrlFailed'));
+      toast.error(t('settings.gridforge.tunnel.toast.copyUrlFailed'));
     }
   }, [t, tunnelInfo?.connectUrl]);
 
@@ -1112,7 +1112,7 @@ export const TunnelSettings: React.FC = () => {
         managedRemoteTunnelPresets: presets,
       });
     } catch {
-      toast.error(t('settings.openchamber.tunnel.toast.saveSelectedManagedRemoteFailed'));
+      toast.error(t('settings.gridforge.tunnel.toast.saveSelectedManagedRemoteFailed'));
     }
   }, [t]);
 
@@ -1133,20 +1133,20 @@ export const TunnelSettings: React.FC = () => {
     const token = newPresetToken.trim();
 
     if (!name) {
-      toast.error(t('settings.openchamber.tunnel.toast.tunnelNameRequired'));
+      toast.error(t('settings.gridforge.tunnel.toast.tunnelNameRequired'));
       return;
     }
     if (!hostname) {
-      toast.error(t('settings.openchamber.tunnel.toast.managedRemoteHostnameRequired'));
+      toast.error(t('settings.gridforge.tunnel.toast.managedRemoteHostnameRequired'));
       return;
     }
     if (!token) {
-      toast.error(t('settings.openchamber.tunnel.toast.managedRemoteTokenRequired'));
+      toast.error(t('settings.gridforge.tunnel.toast.managedRemoteTokenRequired'));
       return;
     }
 
     if (managedRemoteTunnelPresets.some((preset) => preset.hostname === hostname)) {
-      toast.error(t('settings.openchamber.tunnel.toast.hostnameAlreadyExists'));
+      toast.error(t('settings.gridforge.tunnel.toast.hostnameAlreadyExists'));
       return;
     }
 
@@ -1181,7 +1181,7 @@ export const TunnelSettings: React.FC = () => {
       hostname: nextPreset.hostname,
       token,
     });
-    toast.success(t('settings.openchamber.tunnel.toast.managedRemoteSaved'));
+    toast.success(t('settings.gridforge.tunnel.toast.managedRemoteSaved'));
   }, [managedRemoteTunnelPresets, newPresetHostname, newPresetName, newPresetToken, persistManagedRemoteTunnelToken, saveTunnelSettings, sessionTokensByPresetId, t]);
 
   const handleRemovePreset = React.useCallback(async (presetId: string) => {
@@ -1222,7 +1222,7 @@ export const TunnelSettings: React.FC = () => {
       managedRemoteTunnelPresetTokens: nextTokenMap,
     });
 
-    toast.success(t('settings.openchamber.tunnel.toast.managedRemoteRemoved'));
+    toast.success(t('settings.gridforge.tunnel.toast.managedRemoteRemoved'));
   }, [managedRemoteTunnelPresets, saveTunnelSettings, selectedPresetId, sessionTokensByPresetId, t]);
 
   const primaryCtaClass = 'gap-2 border-[var(--primary-base)] bg-[var(--primary-base)] text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)] hover:text-[var(--primary-foreground)]';
@@ -1230,7 +1230,7 @@ export const TunnelSettings: React.FC = () => {
   if (state === 'checking') {
     return (
       <div className="flex items-center justify-center py-12">
-        <span className="h-1.5 w-1.5 rounded-full bg-current animate-busy-pulse" aria-label={t('settings.openchamber.tunnel.state.loading')} />
+        <span className="h-1.5 w-1.5 rounded-full bg-current animate-busy-pulse" aria-label={t('settings.gridforge.tunnel.state.loading')} />
       </div>
     );
   }
@@ -1238,15 +1238,15 @@ export const TunnelSettings: React.FC = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="typography-ui-header font-semibold text-foreground">{t('settings.openchamber.tunnel.title')}</h3>
+        <h3 className="typography-ui-header font-semibold text-foreground">{t('settings.gridforge.tunnel.title')}</h3>
         <p className="typography-meta mt-0 text-muted-foreground/70">
-          {t('settings.openchamber.tunnel.description')}
+          {t('settings.gridforge.tunnel.description')}
         </p>
         <p className="typography-meta mt-0 text-muted-foreground/60">
-          {t('settings.openchamber.tunnel.note.serverSideEnforced')}
+          {t('settings.gridforge.tunnel.note.serverSideEnforced')}
         </p>
         <p className="typography-meta mt-0 text-muted-foreground/60">
-          {t('settings.openchamber.tunnel.note.connectLinksOneTime')}
+          {t('settings.gridforge.tunnel.note.connectLinksOneTime')}
         </p>
       </div>
 
@@ -1255,7 +1255,7 @@ export const TunnelSettings: React.FC = () => {
           <div className="rounded-lg border border-[var(--status-info-border)] bg-[var(--status-info-background)]/30 p-3">
             <div className="mb-2 flex items-center gap-2">
               <Icon name="information" className="size-4 text-[var(--status-info)]" />
-              <p className="typography-ui-label text-foreground">{t('settings.openchamber.tunnel.section.redeemedAccessLinks')}</p>
+              <p className="typography-ui-label text-foreground">{t('settings.gridforge.tunnel.section.redeemedAccessLinks')}</p>
             </div>
             <div className="space-y-1">
               {renderedSessionRecords.map((record) => {
@@ -1270,10 +1270,10 @@ export const TunnelSettings: React.FC = () => {
                   ? (isQuick ? 'text-[var(--status-warning)]' : isManagedRemote ? 'text-[var(--status-info)]' : 'text-[var(--status-success)]')
                   : 'text-muted-foreground/50';
                 const modeLabel = isQuick
-                  ? t('settings.openchamber.tunnel.badge.quick')
+                  ? t('settings.gridforge.tunnel.badge.quick')
                   : isManagedRemote
-                    ? t('settings.openchamber.tunnel.badge.remote')
-                    : t('settings.openchamber.tunnel.badge.local');
+                    ? t('settings.gridforge.tunnel.badge.remote')
+                    : t('settings.gridforge.tunnel.badge.local');
 
                 return (
                   <div
@@ -1285,14 +1285,14 @@ export const TunnelSettings: React.FC = () => {
                       {modeLabel}
                     </span>
                     <span className="typography-meta text-muted-foreground/80">
-                      {t('settings.openchamber.tunnel.session.redeemedAt', { time: formatAbsoluteTime(record.createdAt, timeFormatPreference) })}
+                      {t('settings.gridforge.tunnel.session.redeemedAt', { time: formatAbsoluteTime(record.createdAt, timeFormatPreference) })}
                     </span>
                     <span className="typography-meta text-foreground">
                       {record.isActive
-                        ? t('settings.openchamber.tunnel.session.expiresIn', { remaining: record.remainingTextForSession })
-                        : (record.inactiveLabel === t('settings.openchamber.tunnel.state.inactive')
-                          ? t('settings.openchamber.tunnel.state.inactive')
-                          : t('settings.openchamber.tunnel.session.inactiveWithReason', { reason: record.inactiveLabel }))}
+                        ? t('settings.gridforge.tunnel.session.expiresIn', { remaining: record.remainingTextForSession })
+                        : (record.inactiveLabel === t('settings.gridforge.tunnel.state.inactive')
+                          ? t('settings.gridforge.tunnel.state.inactive')
+                          : t('settings.gridforge.tunnel.session.inactiveWithReason', { reason: record.inactiveLabel }))}
                     </span>
                   </div>
                 );
@@ -1308,9 +1308,9 @@ export const TunnelSettings: React.FC = () => {
             <Icon name="error-warning" className="mt-0.5 size-4 shrink-0 text-[var(--status-warning)]" />
             <div className="space-y-1">
               <p className="typography-meta font-medium text-foreground">
-                {t('settings.openchamber.tunnel.notAvailable.dependencyNotFound', { dependency: displayedDependencyInstallInfo.dependency })}
+                {t('settings.gridforge.tunnel.notAvailable.dependencyNotFound', { dependency: displayedDependencyInstallInfo.dependency })}
               </p>
-              <p className="typography-meta text-muted-foreground/70">{t('settings.openchamber.tunnel.notAvailable.installHint')}</p>
+              <p className="typography-meta text-muted-foreground/70">{t('settings.gridforge.tunnel.notAvailable.installHint')}</p>
               <code className="typography-code block rounded bg-muted/50 px-2 py-1 text-xs text-foreground">
                 {displayedDependencyInstallInfo.installCommand}
               </code>
@@ -1323,7 +1323,7 @@ export const TunnelSettings: React.FC = () => {
         <section className="space-y-4 px-2 pb-2 pt-0">
           <div className="space-y-3">
             <div data-settings-item="tunnel.provider" className="space-y-1.5">
-              <p className="typography-ui-label text-foreground">{t('settings.openchamber.tunnel.field.provider')}</p>
+              <p className="typography-ui-label text-foreground">{t('settings.gridforge.tunnel.field.provider')}</p>
               <Select
                 value={tunnelProvider}
                 onValueChange={(value) => {
@@ -1332,7 +1332,7 @@ export const TunnelSettings: React.FC = () => {
                 disabled={isSavingMode || state === 'starting' || state === 'stopping'}
               >
                 <SelectTrigger className="max-w-[16rem]">
-                  <SelectValue placeholder={t('settings.openchamber.tunnel.field.providerPlaceholder')}>
+                  <SelectValue placeholder={t('settings.gridforge.tunnel.field.providerPlaceholder')}>
                     {getProviderLabel(tunnelProvider)}
                   </SelectValue>
                 </SelectTrigger>
@@ -1348,13 +1348,13 @@ export const TunnelSettings: React.FC = () => {
                         <ProviderOptionLabel provider="cloudflare" />
                       </SelectItem>
                     )}
-                  <SelectItem value="__more-soon" disabled>{t('settings.openchamber.tunnel.option.moreProvidersSoon')}</SelectItem>
+                  <SelectItem value="__more-soon" disabled>{t('settings.gridforge.tunnel.option.moreProvidersSoon')}</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
             <div data-settings-item="tunnel.type" className="space-y-1.5">
-              <p className="typography-ui-label text-foreground">{t('settings.openchamber.tunnel.field.tunnelType')}</p>
+              <p className="typography-ui-label text-foreground">{t('settings.gridforge.tunnel.field.tunnelType')}</p>
               <div className="flex flex-wrap items-center gap-1">
                 {tunnelModeOptions.map((option) => (
                   <Tooltip key={option.value}>
@@ -1383,7 +1383,7 @@ export const TunnelSettings: React.FC = () => {
 
           <div data-settings-item="tunnel.ttl" className="mt-2 grid grid-cols-1 gap-2 py-1.5 md:grid-cols-[14rem_auto] md:gap-x-8 md:gap-y-2">
             <div className="flex min-w-0 items-center gap-2">
-              <span className="typography-ui-label shrink-0 text-foreground">{t('settings.openchamber.tunnel.field.connectLinkTtl')}</span>
+              <span className="typography-ui-label shrink-0 text-foreground">{t('settings.gridforge.tunnel.field.connectLinkTtl')}</span>
               <Select
                 value={ttlOptionValue(BOOTSTRAP_TTL_OPTIONS, bootstrapTtlMs, '1800000')}
                 onValueChange={(value) => {
@@ -1405,7 +1405,7 @@ export const TunnelSettings: React.FC = () => {
             </div>
 
             <div className="flex min-w-0 items-center gap-2">
-              <span className="typography-ui-label shrink-0 text-foreground">{t('settings.openchamber.tunnel.field.tunnelSessionTtl')}</span>
+              <span className="typography-ui-label shrink-0 text-foreground">{t('settings.gridforge.tunnel.field.tunnelSessionTtl')}</span>
               <Select
                 value={ttlOptionValue(SESSION_TTL_OPTIONS, sessionTtlMs, '28800000')}
                 onValueChange={(value) => {
@@ -1433,11 +1433,11 @@ export const TunnelSettings: React.FC = () => {
                 <Icon name="error-warning" className="mt-0.5 size-4 shrink-0 text-[var(--status-warning)]" />
                 <div>
                   <p className="typography-meta text-[var(--status-warning)]">
-                    {t('settings.openchamber.tunnel.option.mode.quick.tooltip')}
+                    {t('settings.gridforge.tunnel.option.mode.quick.tooltip')}
                   </p>
                   {providerSupportsManagedModes && (
                     <p className="typography-meta mt-1 text-[var(--status-warning)]">
-                      {t('settings.openchamber.tunnel.warning.quickModeReliability')}
+                      {t('settings.gridforge.tunnel.warning.quickModeReliability')}
                     </p>
                   )}
                 </div>
@@ -1450,13 +1450,13 @@ export const TunnelSettings: React.FC = () => {
               {typeof suggestedConnectorPort === 'number' && (
                 <div className="rounded-md border border-[var(--status-info-border)] bg-[var(--status-info-background)]/35 px-2 py-1.5">
                   <p className="typography-meta text-[var(--status-info)]">
-                    {t('settings.openchamber.tunnel.note.cloudflareConnectorTarget')} <code>http://localhost:{suggestedConnectorPort}</code>
+                    {t('settings.gridforge.tunnel.note.cloudflareConnectorTarget')} <code>http://localhost:{suggestedConnectorPort}</code>
                   </p>
                 </div>
               )}
 
               <div className="mb-1 flex items-center justify-between gap-3">
-                <p className="typography-ui-label text-foreground">{t('settings.openchamber.tunnel.section.savedManagedRemoteTunnels')}</p>
+                <p className="typography-ui-label text-foreground">{t('settings.gridforge.tunnel.section.savedManagedRemoteTunnels')}</p>
                 <Button
                   variant="ghost"
                   size="xs"
@@ -1507,7 +1507,7 @@ export const TunnelSettings: React.FC = () => {
                               variant="ghost"
                               size="xs"
                               className="h-7 w-7 p-0 text-muted-foreground hover:text-[var(--status-error)]"
-                              aria-label={t('settings.openchamber.tunnel.actions.removePresetAria', { name: preset.name })}
+                              aria-label={t('settings.gridforge.tunnel.actions.removePresetAria', { name: preset.name })}
                               onClick={() => {
                                 void handleRemovePreset(preset.id);
                               }}
@@ -1519,7 +1519,7 @@ export const TunnelSettings: React.FC = () => {
 
                           <CollapsibleContent className="pt-1.5">
                             <div className="space-y-1 px-3 pb-2">
-                              <p className="typography-meta text-muted-foreground/70">{t('settings.openchamber.tunnel.field.hostnameLabel')} <code>{preset.hostname}</code></p>
+                              <p className="typography-meta text-muted-foreground/70">{t('settings.gridforge.tunnel.field.hostnameLabel')} <code>{preset.hostname}</code></p>
                               <Input
                                 type="password"
                                 value={rowToken}
@@ -1540,7 +1540,7 @@ export const TunnelSettings: React.FC = () => {
                                     token: tokenToSave,
                                   });
                                 }}
-                                placeholder={hasSavedToken ? t('settings.openchamber.tunnel.field.savedTokenAvailablePlaceholder') : t('settings.openchamber.tunnel.field.pasteTokenPlaceholder')}
+                                placeholder={hasSavedToken ? t('settings.gridforge.tunnel.field.savedTokenAvailablePlaceholder') : t('settings.gridforge.tunnel.field.pasteTokenPlaceholder')}
                                 className="h-7"
                                 disabled={state === 'starting' || state === 'stopping'}
                               />
@@ -1559,7 +1559,7 @@ export const TunnelSettings: React.FC = () => {
                                     });
                                   }}
                                 >
-                                  {t('settings.openchamber.tunnel.actions.saveToken')}
+                                  {t('settings.gridforge.tunnel.actions.saveToken')}
                                 </Button>
                               </div>
                             </div>
@@ -1570,7 +1570,7 @@ export const TunnelSettings: React.FC = () => {
                   })}
                 </div>
               ) : (
-                <p className="typography-meta text-muted-foreground/70">{t('settings.openchamber.tunnel.empty.noManagedRemoteTunnels')}</p>
+                <p className="typography-meta text-muted-foreground/70">{t('settings.gridforge.tunnel.empty.noManagedRemoteTunnels')}</p>
               )}
 
               {isAddingPreset && (
@@ -1578,14 +1578,14 @@ export const TunnelSettings: React.FC = () => {
                   <Input
                     value={newPresetName}
                     onChange={(event) => setNewPresetName(event.target.value)}
-                    placeholder={t('settings.openchamber.tunnel.field.newPresetNamePlaceholder')}
+                    placeholder={t('settings.gridforge.tunnel.field.newPresetNamePlaceholder')}
                     className="h-7"
                     disabled={isSavingMode || state === 'starting' || state === 'stopping'}
                   />
                   <Input
                     value={newPresetHostname}
                     onChange={(event) => setNewPresetHostname(event.target.value)}
-                    placeholder={t('settings.openchamber.tunnel.field.newPresetHostnamePlaceholder')}
+                    placeholder={t('settings.gridforge.tunnel.field.newPresetHostnamePlaceholder')}
                     className="h-7"
                     disabled={isSavingMode || state === 'starting' || state === 'stopping'}
                   />
@@ -1593,13 +1593,13 @@ export const TunnelSettings: React.FC = () => {
                     type="password"
                     value={newPresetToken}
                     onChange={(event) => setNewPresetToken(event.target.value)}
-                    placeholder={t('settings.openchamber.tunnel.field.newPresetTokenPlaceholder')}
+                    placeholder={t('settings.gridforge.tunnel.field.newPresetTokenPlaceholder')}
                     className="h-7"
                     disabled={isSavingMode || state === 'starting' || state === 'stopping'}
                   />
                   {typeof suggestedConnectorPort === 'number' && (
                     <p className="typography-meta text-muted-foreground/70">
-                      {t('settings.openchamber.tunnel.note.cloudflareConnectorTargetUse')} <code>http://localhost:{suggestedConnectorPort}</code>.
+                      {t('settings.gridforge.tunnel.note.cloudflareConnectorTargetUse')} <code>http://localhost:{suggestedConnectorPort}</code>.
                     </p>
                   )}
                   <div className="flex items-center gap-2">
@@ -1633,19 +1633,19 @@ export const TunnelSettings: React.FC = () => {
               )}
 
               <div className="flex items-center gap-1.5">
-                <p className="typography-meta text-muted-foreground/80">{t('settings.openchamber.tunnel.note.tokensSavedPerTunnel')}</p>
+                <p className="typography-meta text-muted-foreground/80">{t('settings.gridforge.tunnel.note.tokensSavedPerTunnel')}</p>
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <button
                       type="button"
                       className="rounded p-0.5 text-muted-foreground/70 hover:text-foreground"
-                      aria-label={t('settings.openchamber.tunnel.field.managedRemoteTokenInfoAria')}
+                      aria-label={t('settings.gridforge.tunnel.field.managedRemoteTokenInfoAria')}
                     >
                       <Icon name="information" className="h-3.5 w-3.5" />
                     </button>
                   </TooltipTrigger>
                   <TooltipContent sideOffset={8} className="max-w-xs">
-                    {t('settings.openchamber.tunnel.tooltip.tokensSavedPath')}
+                    {t('settings.gridforge.tunnel.tooltip.tokensSavedPath')}
                   </TooltipContent>
                 </Tooltip>
               </div>
@@ -1659,7 +1659,7 @@ export const TunnelSettings: React.FC = () => {
           {tunnelMode === 'managed-local' && (
             <div data-settings-item="tunnel.managed-local-config" className="space-y-2 rounded-lg border border-[var(--interactive-border)] bg-[var(--surface-elevated)] p-3">
               <div className="space-y-1.5">
-                <p className="typography-ui-label text-foreground">{t('settings.openchamber.tunnel.field.configurationFile')}</p>
+                <p className="typography-ui-label text-foreground">{t('settings.gridforge.tunnel.field.configurationFile')}</p>
                 <input
                   ref={managedLocalConfigFileInputRef}
                   type="file"
@@ -1678,7 +1678,7 @@ export const TunnelSettings: React.FC = () => {
                     onBlur={() => {
                       void handleManagedLocalConfigInputBlur();
                     }}
-                    placeholder={t('settings.openchamber.tunnel.field.configurationFilePlaceholder')}
+                    placeholder={t('settings.gridforge.tunnel.field.configurationFilePlaceholder')}
                     className="h-7"
                     disabled={state === 'starting' || state === 'stopping' || isSavingMode}
                   />
@@ -1686,7 +1686,7 @@ export const TunnelSettings: React.FC = () => {
                     variant="outline"
                     size="xs"
                     className="h-7 w-7 p-0"
-                    aria-label={t('settings.openchamber.tunnel.actions.browseConfigFileAria')}
+                    aria-label={t('settings.gridforge.tunnel.actions.browseConfigFileAria')}
                     onClick={() => {
                       void handleBrowseManagedLocalConfig();
                     }}
@@ -1699,7 +1699,7 @@ export const TunnelSettings: React.FC = () => {
                       variant="ghost"
                       size="xs"
                       className="h-7 w-7 p-0"
-                      aria-label={t('settings.openchamber.tunnel.actions.clearConfigFileAria')}
+                      aria-label={t('settings.gridforge.tunnel.actions.clearConfigFileAria')}
                       onClick={() => {
                         void handleManagedLocalConfigClear();
                       }}
@@ -1711,8 +1711,8 @@ export const TunnelSettings: React.FC = () => {
                 </div>
                 <p className="typography-meta text-muted-foreground/70">
                   {managedLocalConfigPath
-                    ? t('settings.openchamber.tunnel.note.customConfigUsed')
-                    : t('settings.openchamber.tunnel.note.defaultConfigUsed')}
+                    ? t('settings.gridforge.tunnel.note.customConfigUsed')
+                    : t('settings.gridforge.tunnel.note.defaultConfigUsed')}
                 </p>
                 {isManagedLocalConfigPathInvalid && (
                   <p className="typography-meta text-[var(--status-error)]">{managedLocalConfigExtensionError}</p>
@@ -1730,7 +1730,7 @@ export const TunnelSettings: React.FC = () => {
                     {tunnelMode === 'managed-remote' && (
                       <>
                         <p className="typography-meta text-[var(--status-info)]">
-                          {t('settings.openchamber.tunnel.note.managedRemoteRequiresDomain')}
+                          {t('settings.gridforge.tunnel.note.managedRemoteRequiresDomain')}
                         </p>
                         <button
                           type="button"
@@ -1739,7 +1739,7 @@ export const TunnelSettings: React.FC = () => {
                             void openExternal(MANAGED_REMOTE_TUNNEL_DOC_URL);
                           }}
                         >
-                          {t('settings.openchamber.tunnel.actions.openManagedRemoteDocs')}
+                          {t('settings.gridforge.tunnel.actions.openManagedRemoteDocs')}
                           <Icon name="external-link" className="size-3.5" />
                         </button>
                       </>
@@ -1747,7 +1747,7 @@ export const TunnelSettings: React.FC = () => {
                     {tunnelMode === 'managed-local' && (
                       <>
                         <p className="typography-meta text-[var(--status-info)]">
-                          {t('settings.openchamber.tunnel.note.managedLocalUsesConfig')}
+                          {t('settings.gridforge.tunnel.note.managedLocalUsesConfig')}
                         </p>
                         <button
                           type="button"
@@ -1756,14 +1756,14 @@ export const TunnelSettings: React.FC = () => {
                             void openExternal(MANAGED_LOCAL_TUNNEL_DOC_URL);
                           }}
                         >
-                          {t('settings.openchamber.tunnel.actions.openManagedLocalDocs')}
+                          {t('settings.gridforge.tunnel.actions.openManagedLocalDocs')}
                           <Icon name="external-link" className="size-3.5" />
                         </button>
                       </>
                     )}
                     <p className="typography-meta text-[var(--status-info)]">
-                      {t('settings.openchamber.tunnel.note.startModeAndGenerateLink', {
-                        mode: tUnsafe(TUNNEL_MODE_OPTIONS.find((option) => option.value === tunnelMode)?.labelKey ?? 'settings.openchamber.tunnel.option.mode.quick.label'),
+                      {t('settings.gridforge.tunnel.note.startModeAndGenerateLink', {
+                        mode: tUnsafe(TUNNEL_MODE_OPTIONS.find((option) => option.value === tunnelMode)?.labelKey ?? 'settings.gridforge.tunnel.option.mode.quick.label'),
                       })}
                     </p>
                   </div>
@@ -1772,7 +1772,7 @@ export const TunnelSettings: React.FC = () => {
 
               {tunnelMode === 'managed-remote' && (
                 <div className="space-y-1.5">
-                  <p className="typography-ui-label text-foreground">{t('settings.openchamber.tunnel.field.managedRemoteTunnelToConnect')}</p>
+                  <p className="typography-ui-label text-foreground">{t('settings.gridforge.tunnel.field.managedRemoteTunnelToConnect')}</p>
                   <Select
                     value={selectedPresetId || (managedRemoteTunnelPresets[0]?.id ?? '')}
                     onValueChange={(presetId) => {
@@ -1786,7 +1786,7 @@ export const TunnelSettings: React.FC = () => {
                     }
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={t('settings.openchamber.tunnel.field.selectSavedTunnelPlaceholder')}>
+                      <SelectValue placeholder={t('settings.gridforge.tunnel.field.selectSavedTunnelPlaceholder')}>
                         {selectedPreset?.name}
                       </SelectValue>
                     </SelectTrigger>
@@ -1804,7 +1804,7 @@ export const TunnelSettings: React.FC = () => {
                   <div className="flex items-start gap-2">
                     <Icon name="error-warning" className="mt-0.5 size-4 shrink-0 text-[var(--status-warning)]" />
                     <p className="typography-meta text-[var(--status-warning)]">
-                      {t('settings.openchamber.tunnel.warning.replacesActiveTunnel')}
+                      {t('settings.gridforge.tunnel.warning.replacesActiveTunnel')}
                     </p>
                   </div>
                 </div>
@@ -1822,8 +1822,8 @@ export const TunnelSettings: React.FC = () => {
                 className={cn(primaryCtaClass, state === 'starting' && 'opacity-70')}
               >
                 {state === 'starting'
-                  ? <><Icon name="loader-4" className="size-3.5 animate-spin" /> {t('settings.openchamber.tunnel.actions.startingTunnel')}</>
-                  : t('settings.openchamber.tunnel.actions.startTunnel')}
+                  ? <><Icon name="loader-4" className="size-3.5 animate-spin" /> {t('settings.gridforge.tunnel.actions.startingTunnel')}</>
+                  : t('settings.gridforge.tunnel.actions.startTunnel')}
               </Button>
             </div>
           )}
@@ -1836,11 +1836,11 @@ export const TunnelSettings: React.FC = () => {
           <div className="space-y-3">
             <div className="flex items-center gap-2">
               <div className="size-2 shrink-0 rounded-full bg-[var(--status-success)]" />
-              <p className="typography-meta font-medium text-foreground">{t('settings.openchamber.tunnel.state.tunnelReady')}</p>
+              <p className="typography-meta font-medium text-foreground">{t('settings.gridforge.tunnel.state.tunnelReady')}</p>
             </div>
 
             <div>
-              <p className="typography-meta mb-1 text-muted-foreground/70">{t('settings.openchamber.tunnel.field.publicUrlHint')}</p>
+              <p className="typography-meta mb-1 text-muted-foreground/70">{t('settings.gridforge.tunnel.field.publicUrlHint')}</p>
               <code className="typography-code block truncate rounded bg-muted/50 px-2 py-1 text-xs text-foreground">
                 {tunnelInfo.url}
               </code>
@@ -1849,7 +1849,7 @@ export const TunnelSettings: React.FC = () => {
             {isConnectLinkLive && tunnelInfo.connectUrl && (
               <>
                 <div>
-                  <p className="typography-meta mb-1 text-muted-foreground/70">{t('settings.openchamber.tunnel.field.connectLink')}</p>
+                  <p className="typography-meta mb-1 text-muted-foreground/70">{t('settings.gridforge.tunnel.field.connectLink')}</p>
                   <div className="flex items-center gap-2">
                     <code className="typography-code flex-1 truncate rounded bg-muted/50 px-2 py-1 text-xs text-foreground">
                       {tunnelInfo.connectUrl}
@@ -1858,19 +1858,19 @@ export const TunnelSettings: React.FC = () => {
                       {copied
                         ? <Icon name="check" className="size-3.5 text-[var(--status-success)]" />
                         : <Icon name="file-copy" className="size-3.5" />}
-                      {copied ? t('settings.openchamber.tunnel.actions.copied') : t('settings.common.actions.copyAll')}
+                      {copied ? t('settings.gridforge.tunnel.actions.copied') : t('settings.common.actions.copyAll')}
                     </Button>
                   </div>
                   <p className="typography-meta mt-1 text-muted-foreground/70">
-                    {t('settings.openchamber.tunnel.field.expires')}: {tunnelInfo.bootstrapExpiresAt ? remainingText : t('settings.openchamber.tunnel.state.never')}
+                    {t('settings.gridforge.tunnel.field.expires')}: {tunnelInfo.bootstrapExpiresAt ? remainingText : t('settings.gridforge.tunnel.state.never')}
                   </p>
                 </div>
 
                 <div className="flex flex-col items-center gap-2 rounded-lg border border-border/50 bg-[var(--surface-elevated)] p-4">
                   {qrDataUrl
-                    ? <img src={qrDataUrl} alt={t('settings.openchamber.tunnel.field.connectQrAlt')} className="size-48" />
+                    ? <img src={qrDataUrl} alt={t('settings.gridforge.tunnel.field.connectQrAlt')} className="size-48" />
                     : <div className="size-48 rounded bg-muted/30" />}
-                  <p className="typography-meta text-muted-foreground">{t('settings.openchamber.tunnel.note.scanQrToConnect')}</p>
+                  <p className="typography-meta text-muted-foreground">{t('settings.gridforge.tunnel.note.scanQrToConnect')}</p>
                 </div>
               </>
             )}
@@ -1885,7 +1885,7 @@ export const TunnelSettings: React.FC = () => {
                 className={primaryCtaClass}
               >
                 <Icon name="restart" className="size-3.5" />
-                {t('settings.openchamber.tunnel.actions.newConnectLink')}
+                {t('settings.gridforge.tunnel.actions.newConnectLink')}
               </Button>
 
               <Button size="sm"
@@ -1895,8 +1895,8 @@ export const TunnelSettings: React.FC = () => {
                 className="gap-2 text-[var(--status-error)]"
               >
                 {state === 'stopping'
-                  ? <><Icon name="loader-4" className="size-3.5 animate-spin" /> {t('settings.openchamber.tunnel.actions.stopping')}</>
-                  : t('settings.openchamber.tunnel.actions.stopTunnel')}
+                  ? <><Icon name="loader-4" className="size-3.5 animate-spin" /> {t('settings.gridforge.tunnel.actions.stopping')}</>
+                  : t('settings.gridforge.tunnel.actions.stopTunnel')}
               </Button>
             </div>
           </div>
@@ -1906,7 +1906,7 @@ export const TunnelSettings: React.FC = () => {
       {state === 'error' && errorMessage && (
         <section className="space-y-3 px-2 pb-2 pt-0">
           <p className="typography-meta text-[var(--status-error)]">{errorMessage}</p>
-          <Button size="sm" variant="ghost" onClick={handleStart}>{t('settings.openchamber.tunnel.actions.retry')}</Button>
+          <Button size="sm" variant="ghost" onClick={handleStart}>{t('settings.gridforge.tunnel.actions.retry')}</Button>
         </section>
       )}
     </div>

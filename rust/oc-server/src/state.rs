@@ -190,8 +190,8 @@ pub struct AppState {
     pub scheduled_tasks_config: Arc<crate::scheduled_tasks::ProjectConfigRuntime>,
     /// Scheduled-tasks 状态机 (timer 队列 + 并发限制)。
     pub scheduled_tasks_runtime: Arc<crate::scheduled_tasks::ScheduledTasksRuntime>,
-    /// SSE 客户端池 (`/api/openchamber/events` 注册)。
-    pub open_chamber_event_clients: Arc<crate::scheduled_tasks::routes::OpenChamberEventClients>,
+    /// SSE 客户端池 (`/api/gridforge/events` 注册)。
+    pub gridforge_event_clients: Arc<crate::scheduled_tasks::routes::GridForgeEventClients>,
 
     // -----------------------------------------------------------------------
     // TTS 模块 (Text-to-Speech / Speech-to-Text)
@@ -266,12 +266,12 @@ impl AppState {
             crate::fs::EXEC_JOB_TTL_SECS,
         )));
 
-        // settings.json 路径: $OPENCHAMBER_DATA_DIR/settings.json 或 ~/.config/openchamber/settings.json
-        let data_dir = std::env::var("OPENCHAMBER_DATA_DIR")
+        // settings.json 路径: $GRIDFORGE_DATA_DIR/settings.json 或 ~/.config/gridforge/settings.json
+        let data_dir = std::env::var("GRIDFORGE_DATA_DIR")
             .map(PathBuf::from)
             .unwrap_or_else(|_| {
                 let home = std::env::var("HOME").unwrap_or_else(|_| ".".to_string());
-                PathBuf::from(home).join(".config").join("openchamber")
+                PathBuf::from(home).join(".config").join("gridforge")
             });
         let settings_path = data_dir.join("settings.json");
 
@@ -366,13 +366,13 @@ impl AppState {
             session_goal: Arc::new(SessionGoalRuntime::new()),
 
             // Scheduled-tasks 模块 (阶段 3c group 4) — config + runtime.
-            // 用 user_config_root (与 Node OPENCHAMBER_USER_CONFIG_ROOT 对齐, 不读 OPENCHAMBER_DATA_DIR)。
+            // 用 user_config_root (与 Node GRIDFORGE_USER_CONFIG_ROOT 对齐, 不读 GRIDFORGE_DATA_DIR)。
             scheduled_tasks_config: Arc::new(crate::scheduled_tasks::ProjectConfigRuntime::new(
                 crate::github::settings::user_config_root().join("projects"),
             )),
             scheduled_tasks_runtime: crate::scheduled_tasks::build_default_runtime(),
-            open_chamber_event_clients: Arc::new(
-                crate::scheduled_tasks::routes::OpenChamberEventClients::new(),
+            gridforge_event_clients: Arc::new(
+                crate::scheduled_tasks::routes::GridForgeEventClients::new(),
             ),
 
             // TTS 模块 — 初始化为 default; `init_say_tts_capability` 在 startup 后探测真实能力

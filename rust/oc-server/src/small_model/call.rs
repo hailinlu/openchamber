@@ -25,7 +25,7 @@ use crate::small_model::resolve::{ResolvedModel, OPENAI_OAUTH_SMALL_MODEL};
 
 pub const REQUEST_TIMEOUT_MS: u64 = 60_000;
 pub const DEFAULT_MAX_OUTPUT_TOKENS: u32 = 4_000;
-pub const USER_AGENT: &str = "opencode/1.0 openchamber";
+pub const USER_AGENT: &str = "opencode/1.0 gridforge";
 
 pub const CODEX_TOKEN_URL: &str = "https://auth.openai.com/oauth/token";
 pub const CODEX_RESPONSES_URL: &str = "https://chatgpt.com/backend-api/codex/responses";

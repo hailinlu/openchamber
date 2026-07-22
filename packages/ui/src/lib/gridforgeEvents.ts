@@ -10,8 +10,8 @@ type ScheduledTaskRanEvent = {
   sessionId?: string;
 };
 
-type OpenChamberEvent = ScheduledTaskRanEvent;
-type Listener = (event: OpenChamberEvent) => void;
+type GridforgeEvent = ScheduledTaskRanEvent;
+type Listener = (event: GridforgeEvent) => void;
 
 let eventSource: EventSource | null = null;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -81,16 +81,16 @@ const parseEnvelope = (raw: string): { type: string; properties: unknown } | nul
 };
 
 const dispatchFromEnvelope = (envelope: { type: string; properties: unknown }) => {
-  if (envelope.type === 'openchamber:event-stream-ready') {
+  if (envelope.type === 'gridforge:event-stream-ready') {
     reconnectAttempt = 0;
     return;
   }
 
-  if (envelope.type === 'openchamber:heartbeat') {
+  if (envelope.type === 'gridforge:heartbeat') {
     return;
   }
 
-  if (envelope.type !== 'openchamber:scheduled-task-ran') {
+  if (envelope.type !== 'gridforge:scheduled-task-ran') {
     return;
   }
 
@@ -133,7 +133,7 @@ const connect = () => {
 
   cleanupSource();
 
-  const source = new EventSource(getRuntimeUrlResolver().sse('/api/openchamber/events'));
+  const source = new EventSource(getRuntimeUrlResolver().sse('/api/gridforge/events'));
   source.onopen = () => {
     resetHeartbeatTimer();
   };
@@ -168,7 +168,7 @@ const cleanupRuntimeChangeSubscription = () => {
   runtimeChangeUnsubscribe = null;
 };
 
-export const subscribeOpenchamberEvents = (listener: Listener): (() => void) => {
+export const subscribeGridforgeEvents = (listener: Listener): (() => void) => {
   listeners.add(listener);
   ensureRuntimeChangeSubscription();
   connect();

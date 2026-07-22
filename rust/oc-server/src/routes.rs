@@ -3,13 +3,14 @@
 //! 对应现有: `packages/web/server/lib/opencode/core-routes.js` line 235-360。
 //!
 //! JSON 响应形状与 Node 侧逐字段对齐:
-//!   - /health: { status, timestamp, openchamberVersion, runtime, compatibility, ... }
-//!   - /api/version: { status, openchamberVersion, runtime, startedAt, compatibility }
-//!   - /api/system/info: { openchamberVersion, runtime, pid, startedAt }
+//!   - /health: { status, timestamp, gridforgeVersion, runtime, compatibility, ... }
+//!   - /api/version: { status, gridforgeVersion, runtime, startedAt, compatibility }
+//!   - /api/system/info: { gridforgeVersion, runtime, pid, startedAt }
 
 use std::sync::Arc;
 
 use axum::extract::State;
+use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use axum::Json;
 use once_cell::sync::Lazy;
@@ -61,7 +62,7 @@ pub async fn health(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     let mut body = json!({
         "status": "ok",
         "timestamp": chrono::Utc::now().to_rfc3339(),
-        "openchamberVersion": state.version,
+        "gridforgeVersion": state.version,
         "runtime": "rust",
         "compatibility": COMPATIBILITY.clone(),
     });
@@ -88,7 +89,7 @@ pub async fn health(State(state): State<Arc<AppState>>) -> impl IntoResponse {
 pub async fn version(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     Json(json!({
         "status": "ok",
-        "openchamberVersion": state.version,
+        "gridforgeVersion": state.version,
         "runtime": "rust",
         "startedAt": state.started_at,
         "compatibility": COMPATIBILITY.clone(),
@@ -100,11 +101,57 @@ pub async fn version(State(state): State<Arc<AppState>>) -> impl IntoResponse {
 /// 对应 `core-routes.js` line 353。
 pub async fn system_info(State(state): State<Arc<AppState>>) -> impl IntoResponse {
     Json(json!({
-        "openchamberVersion": state.version,
+        "gridforgeVersion": state.version,
         "runtime": "rust",
         "pid": std::process::id(),
         "startedAt": state.started_at,
     }))
+}
+
+/// `GET /api/opencode/health` — OpenCode 健康检查代理。
+///
+/// 对应 `routes.js` line 251。前端 `opencodeClient.checkHealth()` 调用此端点。
+pub async fn opencode_health(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let base_url = state.opencode_base_url.trim_end_matches('/');
+    let health_url = format!("{}/global/health", base_url);
+    let client = reqwest::Client::new();
+
+    match client
+        .get(&health_url)
+        .header("Accept", "application/json")
+        .header(reqwest::header::AUTHORIZATION, &state.opencode_auth_header)
+        .timeout(std::time::Duration::from_secs(5))
+        .send()
+        .await
+    {
+        Ok(resp) => {
+            let status = resp.status();
+            match resp.json::<Value>().await {
+                Ok(health) => {
+                    let healthy = health.get("healthy").and_then(|v| v.as_bool()).unwrap_or(false);
+                    if status.is_success() {
+                        (StatusCode::OK, Json(json!({ "healthy": healthy }))).into_response()
+                    } else {
+                        let error = health
+                            .get("error")
+                            .and_then(|v| v.as_str())
+                            .unwrap_or(status.canonical_reason().unwrap_or("OpenCode health check failed"));
+                        (status, Json(json!({ "healthy": false, "error": error }))).into_response()
+                    }
+                }
+                Err(e) => {
+                    (StatusCode::OK, Json(json!({ "healthy": false, "error": e.status().map_or_else(|| "OpenCode health check failed".to_string(), |s| s.to_string()) }))).into_response()
+                }
+            }
+        }
+        Err(e) => {
+            (StatusCode::SERVICE_UNAVAILABLE, Json(json!({
+                "healthy": false,
+                "error": e.to_string(),
+            })))
+                .into_response()
+        }
+    }
 }
 
 /// `GET /robots.txt` — 禁止爬虫。

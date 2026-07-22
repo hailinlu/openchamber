@@ -1,5 +1,5 @@
 //! Session-goal metadata — GoalMetadata 全套字段 + GOAL_STATUSES 枚举 +
-//! session.metadata.openchamber.goal 的规范化与 merge。
+//! session.metadata.gridforge.goal 的规范化与 merge。
 //!
 //! 对应 Node `session-goal/runtime.js` 的 `parseGoalMetadata` + `GOAL_STATUSES`。
 //!
@@ -46,7 +46,7 @@ impl GoalStatus {
 /// GoalStatus 字符串集合 — 校验来自 wire 的 status 字段。
 pub const GOAL_STATUSES: &[&str] = &["active", "paused", "blocked", "budgetLimited", "complete"];
 
-/// GoalMetadata — 对应 session.metadata.openchamber.goal。
+/// GoalMetadata — 对应 session.metadata.gridforge.goal。
 ///
 /// UI 通过该对象读 goal 状态。注意: 所有数字字段 (tokenBudget 等) 都是 Option<u64> —
 /// `tokenBudget` 缺省为 None; 其他累加字段缺省为 0。
@@ -118,13 +118,13 @@ pub struct GoalMetadata {
     pub updated_at: i64,
 }
 
-/// 从 session 对象中规范化 `metadata.openchamber.goal` 字段。
+/// 从 session 对象中规范化 `metadata.gridforge.goal` 字段。
 ///
 /// 对应 Node `parseGoalMetadata(session)`。
 /// 返回 None 表示 goal 不存在或字段无效。
 pub fn parse_goal_metadata(session: &Value) -> Option<GoalMetadata> {
     let metadata = session.get("metadata")?;
-    let namespace = metadata.get("openchamber")?;
+    let namespace = metadata.get("gridforge")?;
     let goal = namespace.get("goal")?;
     let goal_obj = goal.as_object()?;
 
@@ -252,7 +252,7 @@ pub fn parse_goal_metadata(session: &Value) -> Option<GoalMetadata> {
 /// 从 session metadata 中读取 `openchamber.goal` 字段 (Value 形式, 用于持久化前的 merge)。
 pub fn read_goal_value_from_session(session: &Value) -> Option<Value> {
     let metadata = session.get("metadata")?;
-    let namespace = metadata.get("openchamber")?;
+    let namespace = metadata.get("gridforge")?;
     namespace.get("goal").cloned()
 }
 
@@ -268,14 +268,14 @@ pub fn merge_goal_into_session_metadata(session: &Value, new_goal: &Value) -> Va
     let mut metadata = metadata;
 
     let namespace = metadata
-        .get("openchamber")
+        .get("gridforge")
         .and_then(Value::as_object)
         .cloned()
         .unwrap_or_else(Map::new);
     let mut namespace = namespace;
     namespace.insert("goal".to_string(), new_goal.clone());
 
-    metadata.insert("openchamber".to_string(), Value::Object(namespace));
+    metadata.insert("gridforge".to_string(), Value::Object(namespace));
     let mut session_obj = session
         .as_object()
         .cloned()
@@ -317,7 +317,7 @@ mod tests {
         let session = json!({
             "id": "sess_1",
             "metadata": {
-                "openchamber": {
+                "gridforge": {
                     "goal": {
                         "id": "goal_1",
                         "objective": "build widget",
@@ -338,7 +338,7 @@ mod tests {
     fn parse_goal_metadata_file_mode() {
         let session = json!({
             "metadata": {
-                "openchamber": {
+                "gridforge": {
                     "goal": {
                         "id": "g",
                         "objectiveFile": true,
@@ -356,7 +356,7 @@ mod tests {
     fn parse_goal_metadata_rejects_invalid_status() {
         let session = json!({
             "metadata": {
-                "openchamber": {
+                "gridforge": {
                     "goal": {
                         "id": "g",
                         "objective": "x",
@@ -372,7 +372,7 @@ mod tests {
     fn parse_goal_metadata_rejects_missing_id() {
         let session = json!({
             "metadata": {
-                "openchamber": {
+                "gridforge": {
                     "goal": {
                         "objective": "x",
                         "status": "active"
@@ -387,7 +387,7 @@ mod tests {
     fn parse_goal_metadata_rejects_empty_without_file_flag() {
         let session = json!({
             "metadata": {
-                "openchamber": {
+                "gridforge": {
                     "goal": {
                         "id": "g",
                         "objective": "",
@@ -404,7 +404,7 @@ mod tests {
     fn parse_goal_metadata_normalizes_numbers() {
         let session = json!({
             "metadata": {
-                "openchamber": {
+                "gridforge": {
                     "goal": {
                         "id": "g",
                         "objective": "x",
@@ -428,7 +428,7 @@ mod tests {
     fn parse_goal_metadata_rejects_negative_token_budget() {
         let session = json!({
             "metadata": {
-                "openchamber": {
+                "gridforge": {
                     "goal": {
                         "id": "g",
                         "objective": "x",
@@ -448,7 +448,7 @@ mod tests {
         let long = "x".repeat(GOAL_OBJECTIVE_CHAR_LIMIT + 100);
         let session = json!({
             "metadata": {
-                "openchamber": {
+                "gridforge": {
                     "goal": {
                         "id": "g",
                         "objective": long,
@@ -462,11 +462,11 @@ mod tests {
     }
 
     #[test]
-    fn merge_preserves_other_openchamber_fields() {
+    fn merge_preserves_other_gridforge_fields() {
         let session = json!({
             "id": "sess_1",
             "metadata": {
-                "openchamber": {
+                "gridforge": {
                     "assist": {"recap": "x"},
                     "goal": {"id": "old"}
                 },
@@ -475,8 +475,8 @@ mod tests {
         });
         let new_goal = json!({"id": "new", "objective": "y", "status": "active"});
         let merged = merge_goal_into_session_metadata(&session, &new_goal);
-        assert_eq!(merged["metadata"]["openchamber"]["goal"], new_goal);
-        assert_eq!(merged["metadata"]["openchamber"]["assist"]["recap"], "x");
+        assert_eq!(merged["metadata"]["gridforge"]["goal"], new_goal);
+        assert_eq!(merged["metadata"]["gridforge"]["assist"]["recap"], "x");
         assert_eq!(merged["metadata"]["other_namespace"], "value");
         assert_eq!(merged["id"], "sess_1");
     }
@@ -486,7 +486,7 @@ mod tests {
         let session = json!({"id": "sess_2"});
         let new_goal = json!({"id": "g", "status": "active"});
         let merged = merge_goal_into_session_metadata(&session, &new_goal);
-        assert_eq!(merged["metadata"]["openchamber"]["goal"], new_goal);
+        assert_eq!(merged["metadata"]["gridforge"]["goal"], new_goal);
     }
 
     #[test]

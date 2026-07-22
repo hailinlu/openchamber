@@ -47,7 +47,7 @@ describe('runtime auth headers', () => {
       clearRuntimeAuthCredentialProvider();
       Object.defineProperty(globalThis, 'window', {
         configurable: true,
-        value: { __OPENCHAMBER_CLIENT_TOKEN__: ' injected-token ' },
+        value: { __GRIDFORGE_CLIENT_TOKEN__: ' injected-token ' },
       });
 
       expect(getRuntimeBearerTokenSync()).toBe('injected-token');

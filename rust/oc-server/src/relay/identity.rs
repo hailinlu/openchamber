@@ -31,7 +31,7 @@ use crate::relay::crypto::{export_ecdh_private_jwk, export_public_key_jwk};
 
 /// Default public OpenChamber relay URL. Users with a private deployment
 /// override via settings.privateRelay.relayUrl.
-pub const DEFAULT_RELAY_URL: &str = "wss://relay.openchamber.app/v1";
+pub const DEFAULT_RELAY_URL: &str = "wss://relay.gridforge.app/v1";
 
 /// Snapshot of the host's two keypairs plus a closure for producing relay-auth
 /// signatures for outbound WS connections.

@@ -10,7 +10,7 @@
 //! - `runtime` — `ScheduledTasksRuntime` (state machine + timer arming +
 //!   queue + concurrency limits)
 //! - `routes` — HTTP handlers (`/api/projects/:id/scheduled-tasks/*`,
-//!   `/api/openchamber/scheduled-tasks/status`, `/api/openchamber/events` SSE)
+//!   `/api/gridforge/scheduled-tasks/status`, `/api/gridforge/events` SSE)
 
 #![allow(dead_code)] // 部分 helper 由 runtime 间接使用
 

@@ -43,46 +43,46 @@ interface Option<T extends string> {
 const THEME_MODE_OPTIONS: Array<{ value: ThemeMode; labelKey: string }> = [
     {
         value: 'system',
-        labelKey: 'settings.openchamber.visual.option.themeMode.system',
+        labelKey: 'settings.gridforge.visual.option.themeMode.system',
     },
     {
         value: 'light',
-        labelKey: 'settings.openchamber.visual.option.themeMode.light',
+        labelKey: 'settings.gridforge.visual.option.themeMode.light',
     },
     {
         value: 'dark',
-        labelKey: 'settings.openchamber.visual.option.themeMode.dark',
+        labelKey: 'settings.gridforge.visual.option.themeMode.dark',
     },
 ];
 
 const DIFF_LAYOUT_OPTIONS: Option<'dynamic' | 'inline' | 'side-by-side'>[] = [
     {
         id: 'dynamic',
-        labelKey: 'settings.openchamber.visual.option.diffLayout.dynamic.label',
-        descriptionKey: 'settings.openchamber.visual.option.diffLayout.dynamic.description',
+        labelKey: 'settings.gridforge.visual.option.diffLayout.dynamic.label',
+        descriptionKey: 'settings.gridforge.visual.option.diffLayout.dynamic.description',
     },
     {
         id: 'inline',
-        labelKey: 'settings.openchamber.visual.option.diffLayout.inline.label',
-        descriptionKey: 'settings.openchamber.visual.option.diffLayout.inline.description',
+        labelKey: 'settings.gridforge.visual.option.diffLayout.inline.label',
+        descriptionKey: 'settings.gridforge.visual.option.diffLayout.inline.description',
     },
     {
         id: 'side-by-side',
-        labelKey: 'settings.openchamber.visual.option.diffLayout.sideBySide.label',
-        descriptionKey: 'settings.openchamber.visual.option.diffLayout.sideBySide.description',
+        labelKey: 'settings.gridforge.visual.option.diffLayout.sideBySide.label',
+        descriptionKey: 'settings.gridforge.visual.option.diffLayout.sideBySide.description',
     },
 ];
 
 const MERMAID_RENDERING_OPTIONS: Option<'svg' | 'ascii'>[] = [
     {
         id: 'svg',
-        labelKey: 'settings.openchamber.visual.option.mermaidRendering.svg.label',
-        descriptionKey: 'settings.openchamber.visual.option.mermaidRendering.svg.description',
+        labelKey: 'settings.gridforge.visual.option.mermaidRendering.svg.label',
+        descriptionKey: 'settings.gridforge.visual.option.mermaidRendering.svg.description',
     },
     {
         id: 'ascii',
-        labelKey: 'settings.openchamber.visual.option.mermaidRendering.ascii.label',
-        descriptionKey: 'settings.openchamber.visual.option.mermaidRendering.ascii.description',
+        labelKey: 'settings.gridforge.visual.option.mermaidRendering.ascii.label',
+        descriptionKey: 'settings.gridforge.visual.option.mermaidRendering.ascii.description',
     },
 ];
 
@@ -90,49 +90,49 @@ const DEFAULT_PWA_INSTALL_NAME = 'GridForge';
 const PWA_ORIENTATION_OPTIONS: Option<'system' | 'portrait' | 'landscape'>[] = [
     {
         id: 'system',
-        labelKey: 'settings.openchamber.visual.option.pwaOrientation.system.label',
-        descriptionKey: 'settings.openchamber.visual.option.pwaOrientation.system.description',
+        labelKey: 'settings.gridforge.visual.option.pwaOrientation.system.label',
+        descriptionKey: 'settings.gridforge.visual.option.pwaOrientation.system.description',
     },
     {
         id: 'portrait',
-        labelKey: 'settings.openchamber.visual.option.pwaOrientation.portrait.label',
-        descriptionKey: 'settings.openchamber.visual.option.pwaOrientation.portrait.description',
+        labelKey: 'settings.gridforge.visual.option.pwaOrientation.portrait.label',
+        descriptionKey: 'settings.gridforge.visual.option.pwaOrientation.portrait.description',
     },
     {
         id: 'landscape',
-        labelKey: 'settings.openchamber.visual.option.pwaOrientation.landscape.label',
-        descriptionKey: 'settings.openchamber.visual.option.pwaOrientation.landscape.description',
+        labelKey: 'settings.gridforge.visual.option.pwaOrientation.landscape.label',
+        descriptionKey: 'settings.gridforge.visual.option.pwaOrientation.landscape.description',
     },
 ];
 
 const MOBILE_KEYBOARD_MODE_OPTIONS: Option<MobileKeyboardMode>[] = [
     {
         id: 'native',
-        labelKey: 'settings.openchamber.visual.option.mobileKeyboardMode.native.label',
-        descriptionKey: 'settings.openchamber.visual.option.mobileKeyboardMode.native.description',
+        labelKey: 'settings.gridforge.visual.option.mobileKeyboardMode.native.label',
+        descriptionKey: 'settings.gridforge.visual.option.mobileKeyboardMode.native.description',
     },
     {
         id: 'resize-content',
-        labelKey: 'settings.openchamber.visual.option.mobileKeyboardMode.resizeContent.label',
-        descriptionKey: 'settings.openchamber.visual.option.mobileKeyboardMode.resizeContent.description',
+        labelKey: 'settings.gridforge.visual.option.mobileKeyboardMode.resizeContent.label',
+        descriptionKey: 'settings.gridforge.visual.option.mobileKeyboardMode.resizeContent.description',
     },
 ];
 
 const MOBILE_LAYOUT_OPTIONS: Array<{ value: MobileLayoutPreference; labelKey: string }> = [
     {
         value: 'default',
-        labelKey: 'settings.openchamber.visual.option.mobileLayout.default',
+        labelKey: 'settings.gridforge.visual.option.mobileLayout.default',
     },
     {
         value: 'new',
-        labelKey: 'settings.openchamber.visual.option.mobileLayout.new',
+        labelKey: 'settings.gridforge.visual.option.mobileLayout.new',
     },
 ];
 
 type PwaInstallNameWindow = Window & {
-    __OPENCHAMBER_SET_PWA_INSTALL_NAME__?: (value: string) => string;
-    __OPENCHAMBER_SET_PWA_ORIENTATION__?: (value: 'system' | 'portrait' | 'landscape') => 'system' | 'portrait' | 'landscape';
-    __OPENCHAMBER_UPDATE_PWA_MANIFEST__?: () => void;
+    __GRIDFORGE_SET_PWA_INSTALL_NAME__?: (value: string) => string;
+    __GRIDFORGE_SET_PWA_ORIENTATION__?: (value: 'system' | 'portrait' | 'landscape') => 'system' | 'portrait' | 'landscape';
+    __GRIDFORGE_UPDATE_PWA_MANIFEST__?: () => void;
 };
 
 const normalizePwaOrientation = (value: unknown): 'system' | 'portrait' | 'landscape' => {
@@ -142,102 +142,102 @@ const normalizePwaOrientation = (value: unknown): 'system' | 'portrait' | 'lands
 const USER_MESSAGE_RENDERING_OPTIONS: Option<'markdown' | 'plain'>[] = [
     {
         id: 'markdown',
-        labelKey: 'settings.openchamber.visual.option.userMessageRendering.markdown.label',
-        descriptionKey: 'settings.openchamber.visual.option.userMessageRendering.markdown.description',
+        labelKey: 'settings.gridforge.visual.option.userMessageRendering.markdown.label',
+        descriptionKey: 'settings.gridforge.visual.option.userMessageRendering.markdown.description',
     },
     {
         id: 'plain',
-        labelKey: 'settings.openchamber.visual.option.userMessageRendering.plain.label',
-        descriptionKey: 'settings.openchamber.visual.option.userMessageRendering.plain.description',
+        labelKey: 'settings.gridforge.visual.option.userMessageRendering.plain.label',
+        descriptionKey: 'settings.gridforge.visual.option.userMessageRendering.plain.description',
     },
 ];
 
 const CHAT_RENDER_MODE_OPTIONS: Option<'sorted' | 'live'>[] = [
     {
         id: 'sorted',
-        labelKey: 'settings.openchamber.visual.option.chatRenderMode.sorted.label',
-        descriptionKey: 'settings.openchamber.visual.option.chatRenderMode.sorted.description',
+        labelKey: 'settings.gridforge.visual.option.chatRenderMode.sorted.label',
+        descriptionKey: 'settings.gridforge.visual.option.chatRenderMode.sorted.description',
     },
     {
         id: 'live',
-        labelKey: 'settings.openchamber.visual.option.chatRenderMode.live.label',
-        descriptionKey: 'settings.openchamber.visual.option.chatRenderMode.live.description',
+        labelKey: 'settings.gridforge.visual.option.chatRenderMode.live.label',
+        descriptionKey: 'settings.gridforge.visual.option.chatRenderMode.live.description',
     },
 ];
 
 const MESSAGE_STREAM_TRANSPORT_OPTIONS: Option<'auto' | 'ws' | 'sse'>[] = [
     {
         id: 'auto',
-        labelKey: 'settings.openchamber.visual.option.messageTransport.auto.label',
-        descriptionKey: 'settings.openchamber.visual.option.messageTransport.auto.description',
+        labelKey: 'settings.gridforge.visual.option.messageTransport.auto.label',
+        descriptionKey: 'settings.gridforge.visual.option.messageTransport.auto.description',
     },
     {
         id: 'ws',
-        labelKey: 'settings.openchamber.visual.option.messageTransport.ws.label',
-        descriptionKey: 'settings.openchamber.visual.option.messageTransport.ws.description',
+        labelKey: 'settings.gridforge.visual.option.messageTransport.ws.label',
+        descriptionKey: 'settings.gridforge.visual.option.messageTransport.ws.description',
     },
     {
         id: 'sse',
-        labelKey: 'settings.openchamber.visual.option.messageTransport.sse.label',
-        descriptionKey: 'settings.openchamber.visual.option.messageTransport.sse.description',
+        labelKey: 'settings.gridforge.visual.option.messageTransport.sse.label',
+        descriptionKey: 'settings.gridforge.visual.option.messageTransport.sse.description',
     },
 ];
 
 const ACTIVITY_RENDER_MODE_OPTIONS: Option<'collapsed' | 'summary'>[] = [
     {
         id: 'collapsed',
-        labelKey: 'settings.openchamber.visual.option.activityRenderMode.collapsed.label',
-        descriptionKey: 'settings.openchamber.visual.option.activityRenderMode.collapsed.description',
+        labelKey: 'settings.gridforge.visual.option.activityRenderMode.collapsed.label',
+        descriptionKey: 'settings.gridforge.visual.option.activityRenderMode.collapsed.description',
     },
     {
         id: 'summary',
-        labelKey: 'settings.openchamber.visual.option.activityRenderMode.summary.label',
-        descriptionKey: 'settings.openchamber.visual.option.activityRenderMode.summary.description',
+        labelKey: 'settings.gridforge.visual.option.activityRenderMode.summary.label',
+        descriptionKey: 'settings.gridforge.visual.option.activityRenderMode.summary.description',
     },
 ];
 
 const TIME_FORMAT_OPTIONS: Option<'auto' | '12h' | '24h'>[] = [
     {
         id: 'auto',
-        labelKey: 'settings.openchamber.visual.option.timeFormat.auto.label',
-        descriptionKey: 'settings.openchamber.visual.option.timeFormat.auto.description',
+        labelKey: 'settings.gridforge.visual.option.timeFormat.auto.label',
+        descriptionKey: 'settings.gridforge.visual.option.timeFormat.auto.description',
     },
     {
         id: '24h',
-        labelKey: 'settings.openchamber.visual.option.timeFormat.24h.label',
-        descriptionKey: 'settings.openchamber.visual.option.timeFormat.24h.description',
+        labelKey: 'settings.gridforge.visual.option.timeFormat.24h.label',
+        descriptionKey: 'settings.gridforge.visual.option.timeFormat.24h.description',
     },
     {
         id: '12h',
-        labelKey: 'settings.openchamber.visual.option.timeFormat.12h.label',
-        descriptionKey: 'settings.openchamber.visual.option.timeFormat.12h.description',
+        labelKey: 'settings.gridforge.visual.option.timeFormat.12h.label',
+        descriptionKey: 'settings.gridforge.visual.option.timeFormat.12h.description',
     },
 ];
 
 const WEEK_START_OPTIONS: Option<'auto' | 'monday' | 'sunday'>[] = [
     {
         id: 'auto',
-        labelKey: 'settings.openchamber.visual.option.weekStart.auto.label',
-        descriptionKey: 'settings.openchamber.visual.option.weekStart.auto.description',
+        labelKey: 'settings.gridforge.visual.option.weekStart.auto.label',
+        descriptionKey: 'settings.gridforge.visual.option.weekStart.auto.description',
     },
     {
         id: 'monday',
-        labelKey: 'settings.openchamber.visual.option.weekStart.monday.label',
+        labelKey: 'settings.gridforge.visual.option.weekStart.monday.label',
     },
     {
         id: 'sunday',
-        labelKey: 'settings.openchamber.visual.option.weekStart.sunday.label',
+        labelKey: 'settings.gridforge.visual.option.weekStart.sunday.label',
     },
 ];
 
 const FOLLOW_UP_BEHAVIOR_OPTIONS: Option<FollowUpBehavior>[] = [
     {
         id: 'steer',
-        labelKey: 'settings.openchamber.visual.option.followUpBehavior.steer.label',
+        labelKey: 'settings.gridforge.visual.option.followUpBehavior.steer.label',
     },
     {
         id: 'queue',
-        labelKey: 'settings.openchamber.visual.option.followUpBehavior.queue.label',
+        labelKey: 'settings.gridforge.visual.option.followUpBehavior.queue.label',
     },
 ];
 
@@ -247,12 +247,12 @@ const normalizeUserMessageRenderingMode = (mode: unknown): 'markdown' | 'plain' 
 
 type VisibleSetting = 'sessionAssist' | 'sessionGoal' | 'theme' | 'pwaInstallName' | 'pwaOrientation' | 'mobileKeyboardMode' | 'timeFormat' | 'weekStart' | 'fontSize' | 'terminalFontSize' | 'editorFontSize' | 'spacing' | 'inputBarOffset' | 'mermaidRendering' | 'userMessageRendering' | 'chatRenderMode' | 'messageTransport' | 'activityRenderMode' | 'collapsibleUserMessages' | 'stickyUserHeader' | 'promptNavigatorEnabled' | 'wideChatLayout' | 'codeBlockLineWrap' | 'splitAssistantMessageActions' | 'subagentReadOnlyBanner' | 'diffLayout' | 'mobileStatusBar' | 'dotfiles' | 'fileViewerPreview' | 'reasoning' | 'showToolFileIcons' | 'showTurnChangedFiles' | 'expandedTools' | 'followUpBehavior' | 'terminalQuickKeys' | 'fileEditorKeymap' | 'persistDraft' | 'inputSpellcheck' | 'reportUsage' | 'expandedEditorToolbar';
 
-interface OpenChamberVisualSettingsProps {
+interface GridforgeVisualSettingsProps {
     /** Which settings to show. If undefined, shows all. */
     visibleSettings?: VisibleSetting[];
 }
 
-export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps> = ({ visibleSettings }) => {
+export const GridforgeVisualSettings: React.FC<GridforgeVisualSettingsProps> = ({ visibleSettings }) => {
     const { locale, locales, setLocale, label, t } = useI18n();
     const tUnsafe = React.useCallback((key: string) => t(key as Parameters<typeof t>[0]), [t]);
     const { isMobile } = useDeviceInfo();
@@ -362,10 +362,10 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     // macOS-desktop-only vibrancy toggle. Changing it needs a full relaunch
     // (vibrancy is a window-creation option), so we persist + restart on save.
     const macVibrancySupported = React.useMemo(
-        () => isDesktopShell() && typeof window !== 'undefined' && window.__OPENCHAMBER_ELECTRON__?.macVibrancySupported === true,
+        () => isDesktopShell() && typeof window !== 'undefined' && window.__GRIDFORGE_ELECTRON__?.macVibrancySupported === true,
         [],
     );
-    const macVibrancyEnabled = typeof window !== 'undefined' && window.__OPENCHAMBER_ELECTRON__?.macVibrancy === true;
+    const macVibrancyEnabled = typeof window !== 'undefined' && window.__GRIDFORGE_ELECTRON__?.macVibrancy === true;
     const [vibrancyChecked, setVibrancyChecked] = React.useState(macVibrancyEnabled);
     const [vibrancyRestarting, setVibrancyRestarting] = React.useState(false);
 
@@ -374,7 +374,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     // toggle is offered only where it actually has an effect. No relaunch needed.
     const dockBadgeSupported = React.useMemo(
         () => isDesktopShell() && typeof window !== 'undefined'
-            && (window as unknown as { __OPENCHAMBER_PLATFORM__?: string }).__OPENCHAMBER_PLATFORM__ === 'darwin',
+            && (window as unknown as { __GRIDFORGE_PLATFORM__?: string }).__GRIDFORGE_PLATFORM__ === 'darwin',
         [],
     );
     const dockBadgeEnabled = useUIStore(state => state.dockBadgeEnabled);
@@ -508,7 +508,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     const handleFileViewerPreviewChange = React.useCallback((enabled: boolean) => {
         setSettingsDefaultFileViewerPreview(enabled);
         void updateDesktopSettings({ defaultFileViewerPreview: enabled });
-        window.dispatchEvent(new CustomEvent('openchamber:file-viewer-preview-mode-changed', { detail: { enabled } }));
+        window.dispatchEvent(new CustomEvent('gridforge:file-viewer-preview-mode-changed', { detail: { enabled } }));
     }, [setSettingsDefaultFileViewerPreview]);
 
     const handleShowExpandedBashToolsChange = React.useCallback((enabled: boolean) => {
@@ -604,11 +604,11 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
     const [pwaOrientation, setPwaOrientation] = React.useState<'system' | 'portrait' | 'landscape'>('system');
     const selectedTimeFormatLabel = React.useMemo(() => {
         const option = TIME_FORMAT_OPTIONS.find((item) => item.id === timeFormatPreference);
-        return tUnsafe(option?.labelKey ?? 'settings.openchamber.visual.option.timeFormat.auto.label');
+        return tUnsafe(option?.labelKey ?? 'settings.gridforge.visual.option.timeFormat.auto.label');
     }, [timeFormatPreference, tUnsafe]);
     const selectedWeekStartLabel = React.useMemo(() => {
         const option = WEEK_START_OPTIONS.find((item) => item.id === weekStartPreference);
-        return tUnsafe(option?.labelKey ?? 'settings.openchamber.visual.option.weekStart.auto.label');
+        return tUnsafe(option?.labelKey ?? 'settings.gridforge.visual.option.weekStart.auto.label');
     }, [weekStartPreference, tUnsafe]);
     const selectedPwaOrientationLabel = React.useMemo(() => {
         const option = PWA_ORIENTATION_OPTIONS.find((item) => item.id === pwaOrientation);
@@ -640,14 +640,14 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
         await updateDesktopSettings({ pwaAppName: persistedValue });
 
-        if (typeof win.__OPENCHAMBER_SET_PWA_INSTALL_NAME__ === 'function') {
-            const resolved = win.__OPENCHAMBER_SET_PWA_INSTALL_NAME__(persistedValue);
+        if (typeof win.__GRIDFORGE_SET_PWA_INSTALL_NAME__ === 'function') {
+            const resolved = win.__GRIDFORGE_SET_PWA_INSTALL_NAME__(persistedValue);
             setPwaInstallName(resolved);
             return;
         }
 
         setPwaInstallName(persistedValue || DEFAULT_PWA_INSTALL_NAME);
-        win.__OPENCHAMBER_UPDATE_PWA_MANIFEST__?.();
+        win.__GRIDFORGE_UPDATE_PWA_MANIFEST__?.();
     }, []);
 
     const applyPwaOrientation = React.useCallback(async (value: 'system' | 'portrait' | 'landscape') => {
@@ -660,14 +660,14 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
         await updateDesktopSettings({ pwaOrientation: normalized });
 
-        if (typeof win.__OPENCHAMBER_SET_PWA_ORIENTATION__ === 'function') {
-            const resolved = win.__OPENCHAMBER_SET_PWA_ORIENTATION__(normalized);
+        if (typeof win.__GRIDFORGE_SET_PWA_ORIENTATION__ === 'function') {
+            const resolved = win.__GRIDFORGE_SET_PWA_ORIENTATION__(normalized);
             setPwaOrientation(resolved);
             return;
         }
 
         setPwaOrientation(normalized);
-        win.__OPENCHAMBER_UPDATE_PWA_MANIFEST__?.();
+        win.__GRIDFORGE_UPDATE_PWA_MANIFEST__?.();
     }, []);
 
     React.useEffect(() => {
@@ -740,7 +740,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                         {hasThemeSettings && (
                             <section className="px-2 pb-2 pt-0 space-y-2">
                                 <div className="flex min-w-0 flex-col gap-1.5">
-                                    <span className="typography-ui-header font-medium text-foreground">{t('settings.openchamber.visual.section.colorMode')}</span>
+                                    <span className="typography-ui-header font-medium text-foreground">{t('settings.gridforge.visual.section.colorMode')}</span>
                                     <div className="flex flex-wrap items-center gap-1">
                                         {THEME_MODE_OPTIONS.map((option) => (
                                             <Button
@@ -759,7 +759,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
                                 {showMobileLayoutSetting && (
                                     <div className="flex min-w-0 flex-col gap-1.5 py-1.5">
-                                        <span className="typography-ui-header font-medium text-foreground">{t('settings.openchamber.visual.section.mobileLayout')}</span>
+                                        <span className="typography-ui-header font-medium text-foreground">{t('settings.gridforge.visual.section.mobileLayout')}</span>
                                         <div className="flex flex-wrap items-center gap-1">
                                             {MOBILE_LAYOUT_OPTIONS.map((option) => (
                                                 <Button
@@ -779,10 +779,10 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
                                 <div className="grid grid-cols-1 gap-2 py-1.5 md:grid-cols-[14rem_auto] md:gap-x-8 md:gap-y-2">
                                     <div data-settings-item="appearance.light-theme" className="flex min-w-0 items-center gap-2">
-                                        <span className="typography-ui-label text-foreground shrink-0">{t('settings.openchamber.visual.field.lightTheme')}</span>
+                                        <span className="typography-ui-label text-foreground shrink-0">{t('settings.gridforge.visual.field.lightTheme')}</span>
                                         <Select value={selectedLightTheme?.metadata.id ?? ''} onValueChange={setLightThemePreference}>
-                                            <SelectTrigger aria-label={t('settings.openchamber.visual.field.selectLightThemeAria')} className="w-fit">
-                                                <SelectValue placeholder={t('settings.openchamber.visual.field.selectThemePlaceholder')}>
+                                            <SelectTrigger aria-label={t('settings.gridforge.visual.field.selectLightThemeAria')} className="w-fit">
+                                                <SelectValue placeholder={t('settings.gridforge.visual.field.selectThemePlaceholder')}>
                                                     {selectedLightTheme
                                                         ? formatThemeLabel(selectedLightTheme.metadata.name, 'light')
                                                         : undefined}
@@ -798,10 +798,10 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                         </Select>
                                     </div>
                                     <div data-settings-item="appearance.dark-theme" className="flex min-w-0 items-center gap-2">
-                                        <span className="typography-ui-label text-foreground shrink-0">{t('settings.openchamber.visual.field.darkTheme')}</span>
+                                        <span className="typography-ui-label text-foreground shrink-0">{t('settings.gridforge.visual.field.darkTheme')}</span>
                                         <Select value={selectedDarkTheme?.metadata.id ?? ''} onValueChange={setDarkThemePreference}>
-                                            <SelectTrigger aria-label={t('settings.openchamber.visual.field.selectDarkThemeAria')} className="w-fit">
-                                                <SelectValue placeholder={t('settings.openchamber.visual.field.selectThemePlaceholder')}>
+                                            <SelectTrigger aria-label={t('settings.gridforge.visual.field.selectDarkThemeAria')} className="w-fit">
+                                                <SelectValue placeholder={t('settings.gridforge.visual.field.selectThemePlaceholder')}>
                                                     {selectedDarkTheme
                                                         ? formatThemeLabel(selectedDarkTheme.metadata.name, 'dark')
                                                         : undefined}
@@ -838,20 +838,20 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                         }}
                                         className="inline-flex items-center typography-ui-label font-normal text-foreground underline decoration-[1px] underline-offset-2 hover:text-foreground/80 disabled:cursor-not-allowed disabled:text-muted-foreground/60"
                                     >
-                                        {themesReloading ? t('settings.openchamber.visual.actions.reloadingThemes') : t('settings.openchamber.visual.actions.reloadThemes')}
+                                        {themesReloading ? t('settings.gridforge.visual.actions.reloadingThemes') : t('settings.gridforge.visual.actions.reloadThemes')}
                                     </button>
                                     <Tooltip>
                                         <TooltipTrigger asChild>
                                             <button
                                                 type="button"
                                                 className="flex items-center justify-center rounded-md p-1 text-muted-foreground/70 hover:text-foreground"
-                                                aria-label={t('settings.openchamber.visual.field.themeImportInfoAria')}
+                                                aria-label={t('settings.gridforge.visual.field.themeImportInfoAria')}
                                             >
                                                 <Icon name="information" className="h-3.5 w-3.5" />
                                             </button>
                                         </TooltipTrigger>
                                         <TooltipContent sideOffset={8}>
-                                            {t('settings.openchamber.visual.field.themeImportInfoTooltip')}
+                                            {t('settings.gridforge.visual.field.themeImportInfoTooltip')}
                                         </TooltipContent>
                                     </Tooltip>
                                 </div>
@@ -875,14 +875,14 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 checked={vibrancyChecked}
                                                 onChange={setVibrancyChecked}
                                                 disabled={vibrancyRestarting}
-                                                ariaLabel={t('settings.openchamber.visual.field.macVibrancy')}
+                                                ariaLabel={t('settings.gridforge.visual.field.macVibrancy')}
                                             />
                                             <div className="flex min-w-0 flex-col">
                                                 <span className="typography-ui-label text-foreground">
-                                                    {t('settings.openchamber.visual.field.macVibrancy')}
+                                                    {t('settings.gridforge.visual.field.macVibrancy')}
                                                 </span>
                                                 <span className="typography-meta text-muted-foreground">
-                                                    {t('settings.openchamber.visual.field.macVibrancyHint')}
+                                                    {t('settings.gridforge.visual.field.macVibrancyHint')}
                                                 </span>
                                             </div>
                                         </div>
@@ -898,8 +898,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                     }}
                                                 >
                                                     {vibrancyRestarting
-                                                        ? t('settings.openchamber.visual.actions.restarting')
-                                                        : t('settings.openchamber.visual.actions.saveAndRestart')}
+                                                        ? t('settings.gridforge.visual.actions.restarting')
+                                                        : t('settings.gridforge.visual.actions.saveAndRestart')}
                                                 </Button>
                                             </div>
                                         )}
@@ -924,14 +924,14 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={dockBadgeEnabled}
                                                 onChange={setDockBadgeEnabled}
-                                                ariaLabel={t('settings.openchamber.visual.field.dockBadge')}
+                                                ariaLabel={t('settings.gridforge.visual.field.dockBadge')}
                                             />
                                             <div className="flex min-w-0 flex-col">
                                                 <span className="typography-ui-label text-foreground">
-                                                    {t('settings.openchamber.visual.field.dockBadge')}
+                                                    {t('settings.gridforge.visual.field.dockBadge')}
                                                 </span>
                                                 <span className="typography-meta text-muted-foreground">
-                                                    {t('settings.openchamber.visual.field.dockBadgeHint')}
+                                                    {t('settings.gridforge.visual.field.dockBadgeHint')}
                                                 </span>
                                             </div>
                                         </div>
@@ -942,7 +942,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
                         {hasLocalizationSettings && (
                             <section className="px-2 pb-2 pt-0 space-y-2">
-                                <h4 className="typography-ui-header font-medium text-foreground">{t('settings.openchamber.visual.section.localization')}</h4>
+                                <h4 className="typography-ui-header font-medium text-foreground">{t('settings.gridforge.visual.section.localization')}</h4>
 
                                 <div data-settings-item="appearance.language" className="grid grid-cols-1 gap-2 py-1.5 md:grid-cols-[14rem_auto] md:gap-x-8 md:gap-y-2">
                                     <div className="flex min-w-0 flex-col">
@@ -967,9 +967,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                     <div className="grid grid-cols-1 gap-2 py-1.5 md:grid-cols-[14rem_auto] md:gap-x-8 md:gap-y-2">
                                         {shouldShow('timeFormat') && (
                                             <div data-settings-item="appearance.time-format" className="flex min-w-0 items-center gap-2">
-                                                <span className="typography-ui-label text-foreground shrink-0">{t('settings.openchamber.visual.field.timeFormat')}</span>
+                                                <span className="typography-ui-label text-foreground shrink-0">{t('settings.gridforge.visual.field.timeFormat')}</span>
                                                 <Select value={timeFormatPreference} onValueChange={(value: 'auto' | '12h' | '24h') => handleTimeFormatPreferenceChange(value)}>
-                                                    <SelectTrigger aria-label={t('settings.openchamber.visual.field.selectTimeFormatAria')} className="w-fit">
+                                                    <SelectTrigger aria-label={t('settings.gridforge.visual.field.selectTimeFormatAria')} className="w-fit">
                                                         <SelectValue>{selectedTimeFormatLabel}</SelectValue>
                                                     </SelectTrigger>
                                                     <SelectContent>
@@ -983,9 +983,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
                                         {shouldShow('weekStart') && (
                                             <div data-settings-item="appearance.week-start" className="flex min-w-0 items-center gap-2">
-                                                <span className="typography-ui-label text-foreground shrink-0">{t('settings.openchamber.visual.field.weekStartsOn')}</span>
+                                                <span className="typography-ui-label text-foreground shrink-0">{t('settings.gridforge.visual.field.weekStartsOn')}</span>
                                                 <Select value={weekStartPreference} onValueChange={(value: 'auto' | 'monday' | 'sunday') => handleWeekStartPreferenceChange(value)}>
-                                                    <SelectTrigger aria-label={t('settings.openchamber.visual.field.selectWeekStartAria')} className="w-fit">
+                                                    <SelectTrigger aria-label={t('settings.gridforge.visual.field.selectWeekStartAria')} className="w-fit">
                                                         <SelectValue>{selectedWeekStartLabel}</SelectValue>
                                                     </SelectTrigger>
                                                     <SelectContent>
@@ -1007,8 +1007,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                             {showPwaInstallNameSetting && (
                                 <div data-settings-item="appearance.pwa-install-name" className="py-1.5 space-y-1.5">
                                     <div className="flex min-w-0 flex-col">
-                                        <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.installAppName')}</span>
-                                        <span className="typography-meta text-muted-foreground">{t('settings.openchamber.visual.field.installAppNameHint')}</span>
+                                        <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.installAppName')}</span>
+                                        <span className="typography-meta text-muted-foreground">{t('settings.gridforge.visual.field.installAppNameHint')}</span>
                                     </div>
                                     <div className="flex w-full max-w-[28rem] items-center gap-2">
                                         <Input
@@ -1027,7 +1027,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             }}
                                             className="h-7"
                                             maxLength={64}
-                                            aria-label={t('settings.openchamber.visual.field.pwaInstallAppNameAria')}
+                                            aria-label={t('settings.gridforge.visual.field.pwaInstallAppNameAria')}
                                         />
                                         <Button size="sm"
                                             type="button"
@@ -1037,7 +1037,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 void applyPwaInstallName('');
                                             }}
                                             className="h-7 w-7 px-0 text-muted-foreground hover:text-foreground"
-                                            aria-label={t('settings.openchamber.visual.actions.resetInstallAppNameAria')}
+                                            aria-label={t('settings.gridforge.visual.actions.resetInstallAppNameAria')}
                                             title={t('settings.common.actions.reset')}
                                         >
                                             <Icon name="restart" className="h-3.5 w-3.5" />
@@ -1049,8 +1049,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                             {showPwaOrientationSetting && (
                                 <div data-settings-item="appearance.pwa-orientation" className="py-1.5 space-y-1.5">
                                     <div className="flex min-w-0 flex-col">
-                                        <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.installOrientation')}</span>
-                                        <span className="typography-meta text-muted-foreground">{t('settings.openchamber.visual.field.installOrientationHint')}</span>
+                                        <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.installOrientation')}</span>
+                                        <span className="typography-meta text-muted-foreground">{t('settings.gridforge.visual.field.installOrientationHint')}</span>
                                     </div>
                                     <div className="flex w-full max-w-[18rem] items-center gap-2">
                                         <Select
@@ -1061,8 +1061,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 void applyPwaOrientation(orientation);
                                             }}
                                         >
-                                            <SelectTrigger aria-label={t('settings.openchamber.visual.field.pwaInstallOrientationAria')} className="w-full">
-                                                <SelectValue placeholder={t('settings.openchamber.visual.field.selectOrientationPlaceholder')}>
+                                            <SelectTrigger aria-label={t('settings.gridforge.visual.field.pwaInstallOrientationAria')} className="w-full">
+                                                <SelectValue placeholder={t('settings.gridforge.visual.field.selectOrientationPlaceholder')}>
                                                     {selectedPwaOrientationLabel}
                                                 </SelectValue>
                                             </SelectTrigger>
@@ -1083,7 +1083,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             }}
                                             disabled={pwaOrientation === 'system'}
                                             className="h-7 w-7 px-0 text-muted-foreground hover:text-foreground"
-                                            aria-label={t('settings.openchamber.visual.actions.resetInstallOrientationAria')}
+                                            aria-label={t('settings.gridforge.visual.actions.resetInstallOrientationAria')}
                                             title={t('settings.common.actions.reset')}
                                         >
                                             <Icon name="restart" className="h-3.5 w-3.5" />
@@ -1095,8 +1095,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                             {showMobileKeyboardModeSetting && (
                                 <div data-settings-item="appearance.mobile-keyboard-mode" className="py-1.5 space-y-1.5">
                                     <div className="flex min-w-0 flex-col">
-                                        <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.mobileKeyboardMode')}</span>
-                                        <span className="typography-meta text-muted-foreground">{t('settings.openchamber.visual.field.mobileKeyboardModeHint')}</span>
+                                        <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.mobileKeyboardMode')}</span>
+                                        <span className="typography-meta text-muted-foreground">{t('settings.gridforge.visual.field.mobileKeyboardModeHint')}</span>
                                     </div>
                                     <div className="flex w-full max-w-[18rem] items-center gap-2">
                                         <Select
@@ -1107,8 +1107,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 void updateDesktopSettings({ mobileKeyboardMode: mode });
                                             }}
                                         >
-                                            <SelectTrigger aria-label={t('settings.openchamber.visual.field.mobileKeyboardModeAria')} className="w-full">
-                                                <SelectValue placeholder={t('settings.openchamber.visual.field.selectMobileKeyboardModePlaceholder')}>
+                                            <SelectTrigger aria-label={t('settings.gridforge.visual.field.mobileKeyboardModeAria')} className="w-full">
+                                                <SelectValue placeholder={t('settings.gridforge.visual.field.selectMobileKeyboardModePlaceholder')}>
                                                     {selectedMobileKeyboardModeLabel}
                                                 </SelectValue>
                                             </SelectTrigger>
@@ -1129,7 +1129,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             }}
                                             disabled={mobileKeyboardMode === 'native'}
                                             className="h-7 w-7 px-0 text-muted-foreground hover:text-foreground"
-                                            aria-label={t('settings.openchamber.visual.actions.resetMobileKeyboardModeAria')}
+                                            aria-label={t('settings.gridforge.visual.actions.resetMobileKeyboardModeAria')}
                                             title={t('settings.common.actions.reset')}
                                         >
                                             <Icon name="restart" className="h-3.5 w-3.5" />
@@ -1146,17 +1146,17 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                 {hasLayoutSettings && (
                     <div className="mb-8 space-y-3">
                         <section className="p-2 space-y-0.5">
-                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.openchamber.visual.section.spacingAndLayout')}</h4>
+                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.gridforge.visual.section.spacingAndLayout')}</h4>
                             <div className="pl-2">
 
                             {shouldShow('fontSize') && !isMobile && (
                                 <div data-settings-item="appearance.interface-font-size" className="flex items-center gap-8 py-1">
                                     <div className="flex min-w-0 flex-col w-56 shrink-0">
-                                        <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.interfaceFont')}</span>
+                                        <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.interfaceFont')}</span>
                                     </div>
                                     <div className="flex items-center gap-2 w-fit">
                                         <Select value={uiFont} onValueChange={(value) => setUiFont(value as UiFontOption)}>
-                                            <SelectTrigger aria-label={t('settings.openchamber.visual.field.selectInterfaceFontAria')} className="w-[13rem]">
+                                            <SelectTrigger aria-label={t('settings.gridforge.visual.field.selectInterfaceFontAria')} className="w-[13rem]">
                                                 <SelectValue>{UI_FONT_OPTIONS.find((option) => option.id === uiFont)?.label}</SelectValue>
                                             </SelectTrigger>
                                             <SelectContent>
@@ -1173,7 +1173,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             onClick={() => setUiFont(DEFAULT_UI_FONT)}
                                             disabled={uiFont === DEFAULT_UI_FONT}
                                             className="h-7 w-7 px-0 text-muted-foreground hover:text-foreground"
-                                            aria-label={t('settings.openchamber.visual.actions.resetInterfaceFontAria')}
+                                            aria-label={t('settings.gridforge.visual.actions.resetInterfaceFontAria')}
                                             title={t('settings.common.actions.reset')}
                                         >
                                             <Icon name="restart" className="h-3.5 w-3.5" />
@@ -1185,11 +1185,11 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                             {shouldShow('terminalFontSize') && (
                                 <div className={cn("py-1", isMobile ? "flex flex-col gap-3" : "flex items-center gap-8")}>
                                     <div className={cn("flex min-w-0 flex-col", isMobile ? "w-full" : "w-56 shrink-0")}>
-                                        <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.codeFont')}</span>
+                                        <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.codeFont')}</span>
                                     </div>
                                     <div className={cn("flex items-center gap-2", isMobile ? "w-full" : "w-fit")}>
                                         <Select value={monoFont} onValueChange={(value) => setMonoFont(value as MonoFontOption)}>
-                                            <SelectTrigger aria-label={t('settings.openchamber.visual.field.selectCodeFontAria')} className="w-[13rem]">
+                                            <SelectTrigger aria-label={t('settings.gridforge.visual.field.selectCodeFontAria')} className="w-[13rem]">
                                                 <SelectValue>{CODE_FONT_OPTIONS.find((option) => option.id === monoFont)?.label}</SelectValue>
                                             </SelectTrigger>
                                             <SelectContent>
@@ -1206,7 +1206,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             onClick={() => setMonoFont(DEFAULT_MONO_FONT)}
                                             disabled={monoFont === DEFAULT_MONO_FONT}
                                             className="h-7 w-7 px-0 text-muted-foreground hover:text-foreground"
-                                            aria-label={t('settings.openchamber.visual.actions.resetCodeFontAria')}
+                                            aria-label={t('settings.gridforge.visual.actions.resetCodeFontAria')}
                                             title={t('settings.common.actions.reset')}
                                         >
                                             <Icon name="restart" className="h-3.5 w-3.5" />
@@ -1218,7 +1218,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                             {shouldShow('fontSize') && !isMobile && (
                                 <div className="flex items-center gap-8 py-1">
                                     <div className="flex min-w-0 flex-col w-56 shrink-0">
-                                        <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.interfaceFontSize')}</span>
+                                        <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.interfaceFontSize')}</span>
                                     </div>
                                     <div className="flex items-center gap-2 w-fit">
                                         <NumberInput
@@ -1227,7 +1227,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             min={50}
                                             max={200}
                                             step={5}
-                                            aria-label={t('settings.openchamber.visual.field.fontSizePercentageAria')}
+                                            aria-label={t('settings.gridforge.visual.field.fontSizePercentageAria')}
                                             className="w-16"
                                         />
                                         <Button size="sm"
@@ -1236,7 +1236,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             onClick={() => setFontSize(100)}
                                             disabled={fontSize === 100}
                                             className="h-7 w-7 px-0 text-muted-foreground hover:text-foreground"
-                                            aria-label={t('settings.openchamber.visual.actions.resetFontSizeAria')}
+                                            aria-label={t('settings.gridforge.visual.actions.resetFontSizeAria')}
                                             title={t('settings.common.actions.reset')}
                                         >
                                             <Icon name="restart" className="h-3.5 w-3.5" />
@@ -1248,7 +1248,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                             {shouldShow('terminalFontSize') && (
                                 <div data-settings-item="appearance.terminal-font-size" className={cn("py-1", isMobile ? "flex flex-col gap-3" : "flex items-center gap-8")}>
                                     <div className={cn("flex min-w-0 flex-col", isMobile ? "w-full" : "w-56 shrink-0")}>
-                                        <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.terminalFontSize')}</span>
+                                        <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.terminalFontSize')}</span>
                                     </div>
                                     <div className={cn("flex items-center gap-2", isMobile ? "w-full" : "w-fit")}>
                                         <NumberInput
@@ -1265,7 +1265,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             onClick={() => setTerminalFontSize(13)}
                                             disabled={terminalFontSize === 13}
                                             className="h-7 w-7 px-0 text-muted-foreground hover:text-foreground"
-                                            aria-label={t('settings.openchamber.visual.actions.resetTerminalFontSizeAria')}
+                                            aria-label={t('settings.gridforge.visual.actions.resetTerminalFontSizeAria')}
                                             title={t('settings.common.actions.reset')}
                                         >
                                             <Icon name="restart" className="h-3.5 w-3.5" />
@@ -1277,7 +1277,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                             {shouldShow('editorFontSize') && (
                                 <div data-settings-item="appearance.editor-font-size" className={cn("py-1", isMobile ? "flex flex-col gap-3" : "flex items-center gap-8")}>
                                     <div className={cn("flex min-w-0 flex-col", isMobile ? "w-full" : "w-56 shrink-0")}>
-                                        <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.editorFontSize')}</span>
+                                        <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.editorFontSize')}</span>
                                     </div>
                                     <div className={cn("flex items-center gap-2", isMobile ? "w-full" : "w-fit")}>
                                         <NumberInput
@@ -1294,7 +1294,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             onClick={() => setEditorFontSize(13)}
                                             disabled={editorFontSize === 13}
                                             className="h-7 w-7 px-0 text-muted-foreground hover:text-foreground"
-                                            aria-label={t('settings.openchamber.visual.actions.resetEditorFontSizeAria')}
+                                            aria-label={t('settings.gridforge.visual.actions.resetEditorFontSizeAria')}
                                             title={t('settings.common.actions.reset')}
                                         >
                                             <Icon name="restart" className="h-3.5 w-3.5" />
@@ -1306,7 +1306,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                             {shouldShow('spacing') && (
                                 <div data-settings-item="appearance.spacing-density" className={cn("py-1", isMobile ? "flex flex-col gap-3" : "flex items-center gap-8")}>
                                     <div className={cn("flex min-w-0 flex-col", isMobile ? "w-full" : "w-56 shrink-0")}>
-                                        <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.spacingDensity')}</span>
+                                        <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.spacingDensity')}</span>
                                     </div>
                                     <div className={cn("flex items-center gap-2", isMobile ? "w-full" : "w-fit")}>
                                         <NumberInput
@@ -1323,7 +1323,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             onClick={() => setPadding(100)}
                                             disabled={padding === 100}
                                             className="h-7 w-7 px-0 text-muted-foreground hover:text-foreground"
-                                            aria-label={t('settings.openchamber.visual.actions.resetSpacingAria')}
+                                            aria-label={t('settings.gridforge.visual.actions.resetSpacingAria')}
                                             title={t('settings.common.actions.reset')}
                                         >
                                             <Icon name="restart" className="h-3.5 w-3.5" />
@@ -1336,13 +1336,13 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                 <div data-settings-item="appearance.input-bar-offset" className={cn("py-1", isMobile ? "flex flex-col gap-3" : "flex items-center gap-8")}>
                                     <div className={cn("flex min-w-0 flex-col", isMobile ? "w-full" : "w-56 shrink-0")}>
                                         <div className="flex items-center gap-1.5">
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.inputBarOffset')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.inputBarOffset')}</span>
                                             <Tooltip>
                                                 <TooltipTrigger asChild>
                                                     <Icon name="information" className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
                                                 </TooltipTrigger>
                                                 <TooltipContent sideOffset={8} className="max-w-xs">
-                                                    {t('settings.openchamber.visual.field.inputBarOffsetTooltip')}
+                                                    {t('settings.gridforge.visual.field.inputBarOffsetTooltip')}
                                                 </TooltipContent>
                                             </Tooltip>
                                         </div>
@@ -1362,7 +1362,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             onClick={() => setInputBarOffset(0)}
                                             disabled={inputBarOffset === 0}
                                             className="h-7 w-7 px-0 text-muted-foreground hover:text-foreground"
-                                            aria-label={t('settings.openchamber.visual.actions.resetInputBarOffsetAria')}
+                                            aria-label={t('settings.gridforge.visual.actions.resetInputBarOffsetAria')}
                                             title={t('settings.common.actions.reset')}
                                         >
                                             <Icon name="restart" className="h-3.5 w-3.5" />
@@ -1381,20 +1381,20 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                 {hasNavigationSettings && (
                     <div className="space-y-3">
                         <section className="px-2 pb-2 pt-0">
-                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.openchamber.visual.section.navigation')}</h4>
+                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.gridforge.visual.section.navigation')}</h4>
                             {shouldShow('fileEditorKeymap') && (
                                 <div data-settings-item="appearance.file-editor-keymap" className="flex flex-col gap-2 py-1.5 sm:flex-row sm:items-start sm:gap-8">
                                     <span className="typography-ui-label text-foreground sm:w-56 shrink-0">
-                                        {t('settings.openchamber.visual.field.fileEditorKeymap')}
+                                        {t('settings.gridforge.visual.field.fileEditorKeymap')}
                                     </span>
                                     <div
                                         role="radiogroup"
-                                        aria-label={t('settings.openchamber.visual.field.fileEditorKeymap')}
+                                        aria-label={t('settings.gridforge.visual.field.fileEditorKeymap')}
                                         className="space-y-0"
                                     >
                                         {(['default', 'vim'] as const).map((keymap) => {
                                             const selected = fileEditorKeymap === keymap;
-                                            const labelText = t(`settings.openchamber.visual.option.fileEditorKeymap.${keymap}`);
+                                            const labelText = t(`settings.gridforge.visual.option.fileEditorKeymap.${keymap}`);
                                             return (
                                                 <button
                                                     key={keymap}
@@ -1442,9 +1442,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                     <Checkbox
                                         checked={expandedEditorToolbar}
                                         onChange={handleExpandedEditorToolbarChange}
-                                        ariaLabel={t('settings.openchamber.visual.field.expandedEditorToolbarAria')}
+                                        ariaLabel={t('settings.gridforge.visual.field.expandedEditorToolbarAria')}
                                     />
-                                    <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.expandedEditorToolbar')}</span>
+                                    <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.expandedEditorToolbar')}</span>
                                 </div>
                             )}
                             {shouldShow('terminalQuickKeys') && !isMobile && (
@@ -1465,16 +1465,16 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                     <Checkbox
                                         checked={showTerminalQuickKeysOnDesktop}
                                         onChange={setShowTerminalQuickKeysOnDesktop}
-                                        ariaLabel={t('settings.openchamber.visual.field.terminalQuickKeysAria')}
+                                        ariaLabel={t('settings.gridforge.visual.field.terminalQuickKeysAria')}
                                     />
                                     <div className="flex min-w-0 items-center gap-1.5">
-                                        <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.terminalQuickKeys')}</span>
+                                        <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.terminalQuickKeys')}</span>
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <Icon name="information" className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
                                             </TooltipTrigger>
                                             <TooltipContent sideOffset={8} className="max-w-xs">
-                                                {t('settings.openchamber.visual.field.terminalQuickKeysTooltip')}
+                                                {t('settings.gridforge.visual.field.terminalQuickKeysTooltip')}
                                             </TooltipContent>
                                         </Tooltip>
                                     </div>
@@ -1491,8 +1491,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                 <div className="grid grid-cols-1 gap-y-2 md:grid-cols-[minmax(0,16rem)_minmax(0,16rem)] md:justify-start md:gap-x-2">
                                     {shouldShow('chatRenderMode') && (
                                         <section data-settings-item="chat.render-mode" className="p-2 md:col-span-2">
-                                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.openchamber.visual.section.chatRenderMode')}</h4>
-                                            <div role="radiogroup" aria-label={t('settings.openchamber.visual.section.chatRenderModeAria')} className="mt-1 grid w-full max-w-[26rem] grid-cols-1 gap-3 sm:grid-cols-2">
+                                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.gridforge.visual.section.chatRenderMode')}</h4>
+                                            <div role="radiogroup" aria-label={t('settings.gridforge.visual.section.chatRenderModeAria')} className="mt-1 grid w-full max-w-[26rem] grid-cols-1 gap-3 sm:grid-cols-2">
                                                 {CHAT_RENDER_MODE_OPTIONS.map((option) => {
                                                     const selected = chatRenderMode === option.id;
                                                     const previewPhase = chatRenderPreviewTick % 12;
@@ -1575,7 +1575,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
                                     {shouldShow('messageTransport') && (
                                         <section data-settings-item="chat.message-transport" className="p-2 md:col-span-2">
-                                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.openchamber.visual.section.messageStreamTransport')}</h4>
+                                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.gridforge.visual.section.messageStreamTransport')}</h4>
                                             <div className="mt-1 flex max-w-[24rem] flex-col gap-2">
                                                 <div className="flex flex-wrap items-center gap-1">
                                                     {MESSAGE_STREAM_TRANSPORT_OPTIONS.map((option) => (
@@ -1603,8 +1603,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
                                     {shouldShow('activityRenderMode') && chatRenderMode === 'sorted' && (
                                         <section className="p-2 md:col-span-2">
-                                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.openchamber.visual.section.activityDefault')}</h4>
-                                            <div role="radiogroup" aria-label={t('settings.openchamber.visual.section.activityDefaultAria')} className="mt-0.5 space-y-0">
+                                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.gridforge.visual.section.activityDefault')}</h4>
+                                            <div role="radiogroup" aria-label={t('settings.gridforge.visual.section.activityDefaultAria')} className="mt-0.5 space-y-0">
                                                 {ACTIVITY_RENDER_MODE_OPTIONS.map((option) => {
                                                     const selected = activityRenderMode === option.id;
                                                     return (
@@ -1625,7 +1625,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                             <Radio
                                                                 checked={selected}
                                                                 onChange={() => handleActivityRenderModeChange(option.id)}
-                                                                ariaLabel={t('settings.openchamber.visual.field.activityDefaultModeAria', { option: tUnsafe(option.labelKey) })}
+                                                                ariaLabel={t('settings.gridforge.visual.field.activityDefaultModeAria', { option: tUnsafe(option.labelKey) })}
                                                             />
                                                             <span className={cn('typography-ui-label font-normal', selected ? 'text-foreground' : 'text-foreground/50')}>
                                                                 {tUnsafe(option.labelKey)}
@@ -1639,7 +1639,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
                                     {shouldShow('expandedTools') && (
                                         <section className="p-2 md:col-span-2 space-y-0.5">
-                                            <div className="typography-ui-header font-medium text-foreground py-1.5">{t('settings.openchamber.visual.section.showToolsOpenedByDefault')}</div>
+                                            <div className="typography-ui-header font-medium text-foreground py-1.5">{t('settings.gridforge.visual.section.showToolsOpenedByDefault')}</div>
 
                                             <div
                                                 data-settings-item="chat.showNonEditToolCalls"
@@ -1658,9 +1658,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 <Checkbox
                                                     checked={!hideNonEditToolCalls}
                                                     onChange={(checked) => setHideNonEditToolCalls(!checked)}
-                                                    ariaLabel={t('settings.openchamber.visual.field.showNonEditToolCallsAria')}
+                                                    ariaLabel={t('settings.gridforge.visual.field.showNonEditToolCallsAria')}
                                                 />
-                                                <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.showNonEditToolCalls')}</span>
+                                                <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.showNonEditToolCalls')}</span>
                                             </div>
 
                                             <div
@@ -1679,9 +1679,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 <Checkbox
                                                     checked={showExpandedBashTools}
                                                     onChange={handleShowExpandedBashToolsChange}
-                                                    ariaLabel={t('settings.openchamber.visual.field.showExpandedBashToolsAria')}
+                                                    ariaLabel={t('settings.gridforge.visual.field.showExpandedBashToolsAria')}
                                                 />
-                                                <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.bash')}</span>
+                                                <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.bash')}</span>
                                             </div>
 
                                             <div
@@ -1700,17 +1700,17 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 <Checkbox
                                                     checked={showExpandedEditTools}
                                                     onChange={handleShowExpandedEditToolsChange}
-                                                    ariaLabel={t('settings.openchamber.visual.field.showExpandedEditToolsAria')}
+                                                    ariaLabel={t('settings.gridforge.visual.field.showExpandedEditToolsAria')}
                                                 />
-                                                <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.editTools')}</span>
+                                                <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.editTools')}</span>
                                             </div>
                                         </section>
                                     )}
 
                                     {shouldShow('userMessageRendering') && (
                                         <section className="p-2">
-                                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.openchamber.visual.section.userMessageRendering')}</h4>
-                                            <div role="radiogroup" aria-label={t('settings.openchamber.visual.section.userMessageRenderingAria')} className="mt-0.5 space-y-0">
+                                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.gridforge.visual.section.userMessageRendering')}</h4>
+                                            <div role="radiogroup" aria-label={t('settings.gridforge.visual.section.userMessageRenderingAria')} className="mt-0.5 space-y-0">
                                                 {USER_MESSAGE_RENDERING_OPTIONS.map((option) => {
                                                     const selected = normalizeUserMessageRenderingMode(userMessageRenderingMode) === option.id;
                                                     return (
@@ -1731,7 +1731,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                             <Radio
                                                                 checked={selected}
                                                                 onChange={() => handleUserMessageRenderingModeChange(option.id)}
-                                                                ariaLabel={t('settings.openchamber.visual.field.userMessageRenderingAria', { option: tUnsafe(option.labelKey) })}
+                                                                ariaLabel={t('settings.gridforge.visual.field.userMessageRenderingAria', { option: tUnsafe(option.labelKey) })}
                                                             />
                                                             <span className={cn('typography-ui-label font-normal', selected ? 'text-foreground' : 'text-foreground/50')}>
                                                                 {tUnsafe(option.labelKey)}
@@ -1745,8 +1745,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
                                     {shouldShow('mermaidRendering') && (
                                         <section className="p-2">
-                                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.openchamber.visual.section.mermaidRendering')}</h4>
-                                            <div role="radiogroup" aria-label={t('settings.openchamber.visual.section.mermaidRenderingAria')} className="mt-0.5 space-y-0">
+                                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.gridforge.visual.section.mermaidRendering')}</h4>
+                                            <div role="radiogroup" aria-label={t('settings.gridforge.visual.section.mermaidRenderingAria')} className="mt-0.5 space-y-0">
                                                 {MERMAID_RENDERING_OPTIONS.map((option) => {
                                                     const selected = mermaidRenderingMode === option.id;
                                                     return (
@@ -1767,7 +1767,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                             <Radio
                                                                 checked={selected}
                                                                 onChange={() => handleMermaidRenderingModeChange(option.id)}
-                                                                ariaLabel={t('settings.openchamber.visual.field.mermaidRenderingAria', { option: tUnsafe(option.labelKey) })}
+                                                                ariaLabel={t('settings.gridforge.visual.field.mermaidRenderingAria', { option: tUnsafe(option.labelKey) })}
                                                             />
                                                             <span className={cn('typography-ui-label font-normal', selected ? 'text-foreground' : 'text-foreground/50')}>
                                                                 {tUnsafe(option.labelKey)}
@@ -1781,8 +1781,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
                                     {shouldShow('diffLayout') && !isVSCode && (
                                         <section className="p-2">
-                                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.openchamber.visual.section.diffLayout')}</h4>
-                                            <div role="radiogroup" aria-label={t('settings.openchamber.visual.section.diffLayoutAria')} className="mt-0.5 space-y-0">
+                                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.gridforge.visual.section.diffLayout')}</h4>
+                                            <div role="radiogroup" aria-label={t('settings.gridforge.visual.section.diffLayoutAria')} className="mt-0.5 space-y-0">
                                                 {DIFF_LAYOUT_OPTIONS.map((option) => {
                                                     const selected = diffLayoutPreference === option.id;
                                                     return (
@@ -1803,7 +1803,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                             <Radio
                                                                 checked={selected}
                                                                 onChange={() => setDiffLayoutPreference(option.id)}
-                                                                ariaLabel={t('settings.openchamber.visual.field.diffLayoutAria', { option: tUnsafe(option.labelKey) })}
+                                                                ariaLabel={t('settings.gridforge.visual.field.diffLayoutAria', { option: tUnsafe(option.labelKey) })}
                                                             />
                                                             <span className={cn('typography-ui-label font-normal', selected ? 'text-foreground' : 'text-foreground/50')}>
                                                                 {tUnsafe(option.labelKey)}
@@ -1817,8 +1817,8 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
                                     {shouldShow('followUpBehavior') && (
                                         <section data-settings-item="chat.follow-up-behavior" className="p-2">
-                                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.openchamber.visual.section.followUpBehavior')}</h4>
-                                            <div role="radiogroup" aria-label={t('settings.openchamber.visual.section.followUpBehaviorAria')} className="mt-0.5 space-y-0">
+                                            <h4 className="typography-ui-header font-medium text-foreground">{t('settings.gridforge.visual.section.followUpBehavior')}</h4>
+                                            <div role="radiogroup" aria-label={t('settings.gridforge.visual.section.followUpBehaviorAria')} className="mt-0.5 space-y-0">
                                                 {FOLLOW_UP_BEHAVIOR_OPTIONS.map((option) => {
                                                     const selected = followUpBehavior === option.id;
                                                     return (
@@ -1839,7 +1839,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                             <Radio
                                                                 checked={selected}
                                                                 onChange={() => setFollowUpBehavior(option.id)}
-                                                                ariaLabel={t('settings.openchamber.visual.field.followUpBehaviorAria', { option: tUnsafe(option.labelKey) })}
+                                                                ariaLabel={t('settings.gridforge.visual.field.followUpBehaviorAria', { option: tUnsafe(option.labelKey) })}
                                                             />
                                                             <span className={cn('typography-ui-label font-normal', selected ? 'text-foreground' : 'text-foreground/50')}>
                                                                 {tUnsafe(option.labelKey)}
@@ -1859,13 +1859,13 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                             {shouldShow('sessionGoal') && !isVSCode && (
                                 <section className="p-2 mb-6 space-y-0.5">
                                     <div className="flex items-center gap-1.5 py-1.5">
-                                        <h3 className="typography-ui-header font-medium text-foreground">{t('settings.openchamber.visual.goal.sectionTitle')}</h3>
+                                        <h3 className="typography-ui-header font-medium text-foreground">{t('settings.gridforge.visual.goal.sectionTitle')}</h3>
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <Icon name="information" className="h-3.5 w-3.5 cursor-help text-muted-foreground/60" />
                                             </TooltipTrigger>
                                             <TooltipContent sideOffset={8} className="max-w-sm">
-                                                {t('settings.openchamber.visual.goal.description')}
+                                                {t('settings.gridforge.visual.goal.description')}
                                             </TooltipContent>
                                         </Tooltip>
                                     </div>
@@ -1886,9 +1886,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={sessionGoalEnabled}
                                                 onChange={setSessionGoalEnabled}
-                                                ariaLabel={t('settings.openchamber.visual.field.sessionGoalAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.sessionGoalAria')}
                                             />
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.sessionGoal')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.sessionGoal')}</span>
                                         </div>
                                         <div
                                             data-settings-item="chat.session-goal-budget"
@@ -1913,9 +1913,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                     checked={sessionGoalDefaultBudgetEnabled}
                                                     onChange={setSessionGoalDefaultBudgetEnabled}
                                                     disabled={!sessionGoalEnabled}
-                                                    ariaLabel={t('settings.openchamber.visual.goal.budgetAria')}
+                                                    ariaLabel={t('settings.gridforge.visual.goal.budgetAria')}
                                                 />
-                                                <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.goal.budgetLabel')}</span>
+                                                <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.goal.budgetLabel')}</span>
                                             </div>
                                             {sessionGoalEnabled && sessionGoalDefaultBudgetEnabled ? (
                                                 <NumberInput
@@ -1938,7 +1938,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                 <div className="space-y-6">
                                     {(shouldShow('sessionAssist') || shouldShow('subagentReadOnlyBanner')) && (
                                         <section className="p-2 space-y-0.5">
-                                            <h3 data-settings-item="chat.session-assistance" className="typography-ui-header font-medium text-foreground py-1.5">{t('settings.openchamber.visual.section.sessionAssistance')}</h3>
+                                            <h3 data-settings-item="chat.session-assistance" className="typography-ui-header font-medium text-foreground py-1.5">{t('settings.gridforge.visual.section.sessionAssistance')}</h3>
                                             {shouldShow('sessionAssist') && (
                                         <>
                                         <div
@@ -1958,9 +1958,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={sessionRecapEnabled}
                                                 onChange={setSessionRecapEnabled}
-                                                ariaLabel={t('settings.openchamber.visual.field.sessionRecapAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.sessionRecapAria')}
                                             />
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.sessionRecap')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.sessionRecap')}</span>
                                         </div>
                                         <div
                                             data-settings-item="chat.session-suggestion"
@@ -1979,9 +1979,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={sessionSuggestionEnabled}
                                                 onChange={setSessionSuggestionEnabled}
-                                                ariaLabel={t('settings.openchamber.visual.field.sessionSuggestionAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.sessionSuggestionAria')}
                                             />
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.sessionSuggestion')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.sessionSuggestion')}</span>
                                         </div>
                                         </>
                                             )}
@@ -2003,16 +2003,16 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                     <Checkbox
                                                         checked={allowPromptingSubagentSessions}
                                                         onChange={setAllowPromptingSubagentSessions}
-                                                        ariaLabel={t('settings.openchamber.visual.field.allowPromptingSubagentSessionsAria')}
+                                                        ariaLabel={t('settings.gridforge.visual.field.allowPromptingSubagentSessionsAria')}
                                                     />
-                                                    <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.allowPromptingSubagentSessions')}</span>
+                                                    <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.allowPromptingSubagentSessions')}</span>
                                                 </div>
                                             )}
                                         </section>
                                     )}
                                     {shouldShow('reasoning') && (
                                         <section className="p-2 space-y-0.5">
-                                            <h3 data-settings-item="chat.reasoning" className="typography-ui-header font-medium text-foreground py-1.5">{t('settings.openchamber.visual.section.reasoning')}</h3>
+                                            <h3 data-settings-item="chat.reasoning" className="typography-ui-header font-medium text-foreground py-1.5">{t('settings.gridforge.visual.section.reasoning')}</h3>
                                     {shouldShow('reasoning') && (
                                         <div
                                             data-settings-item="chat.reasoning-traces"
@@ -2031,9 +2031,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={showReasoningTraces}
                                                 onChange={setShowReasoningTraces}
-                                                ariaLabel={t('settings.openchamber.visual.field.showReasoningTracesAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.showReasoningTracesAria')}
                                             />
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.showReasoningTraces')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.showReasoningTraces')}</span>
                                         </div>
                                     )}
 
@@ -2054,9 +2054,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={collapsibleThinkingBlocks}
                                                 onChange={setCollapsibleThinkingBlocks}
-                                                ariaLabel={t('settings.openchamber.visual.field.collapsibleThinkingBlocksAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.collapsibleThinkingBlocksAria')}
                                             />
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.collapsibleThinkingBlocks')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.collapsibleThinkingBlocks')}</span>
                                         </div>
                                     )}
                                         </section>
@@ -2064,7 +2064,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
                                     {(shouldShow('collapsibleUserMessages') || shouldShow('stickyUserHeader') || (shouldShow('promptNavigatorEnabled') && !isVSCode) || shouldShow('wideChatLayout') || shouldShow('splitAssistantMessageActions') || shouldShow('codeBlockLineWrap')) && (
                                         <section className="p-2 space-y-0.5">
-                                            <h3 data-settings-item="chat.message-appearance" className="typography-ui-header font-medium text-foreground py-1.5">{t('settings.openchamber.visual.section.messageAppearance')}</h3>
+                                            <h3 data-settings-item="chat.message-appearance" className="typography-ui-header font-medium text-foreground py-1.5">{t('settings.gridforge.visual.section.messageAppearance')}</h3>
                                     {shouldShow('collapsibleUserMessages') && (
                                         <div
                                             data-settings-item="chat.collapsible-user-messages"
@@ -2083,9 +2083,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={collapsibleUserMessages}
                                                 onChange={handleCollapsibleUserMessagesChange}
-                                                ariaLabel={t('settings.openchamber.visual.field.collapsibleUserMessagesAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.collapsibleUserMessagesAria')}
                                             />
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.collapsibleUserMessages')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.collapsibleUserMessages')}</span>
                                         </div>
                                     )}
 
@@ -2107,9 +2107,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={stickyUserHeader}
                                                 onChange={handleStickyUserHeaderChange}
-                                                ariaLabel={t('settings.openchamber.visual.field.stickyUserHeaderAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.stickyUserHeaderAria')}
                                             />
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.stickyUserHeader')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.stickyUserHeader')}</span>
                                         </div>
                                     )}
 
@@ -2131,9 +2131,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={promptNavigatorEnabled}
                                                 onChange={handlePromptNavigatorEnabledChange}
-                                                ariaLabel={t('settings.openchamber.visual.field.promptNavigatorEnabledAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.promptNavigatorEnabledAria')}
                                             />
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.promptNavigatorEnabled')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.promptNavigatorEnabled')}</span>
                                         </div>
                                     )}
 
@@ -2155,9 +2155,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={wideChatLayoutEnabled}
                                                 onChange={handleWideChatLayoutChange}
-                                                ariaLabel={t('settings.openchamber.visual.field.wideChatLayoutAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.wideChatLayoutAria')}
                                             />
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.wideChatLayout')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.wideChatLayout')}</span>
                                         </div>
                                     )}
 
@@ -2179,16 +2179,16 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={showSplitAssistantMessageActions}
                                                 onChange={handleShowSplitAssistantMessageActionsChange}
-                                                ariaLabel={t('settings.openchamber.visual.field.showSplitAssistantMessageActionsAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.showSplitAssistantMessageActionsAria')}
                                             />
                                             <div className="flex min-w-0 items-center gap-1.5">
-                                                <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.showSplitAssistantMessageActions')}</span>
+                                                <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.showSplitAssistantMessageActions')}</span>
                                                 <Tooltip>
                                                     <TooltipTrigger asChild>
                                                         <Icon name="information" className="h-3.5 w-3.5 cursor-help text-muted-foreground/60" />
                                                     </TooltipTrigger>
                                                     <TooltipContent sideOffset={8} className="max-w-xs">
-                                                        {t('settings.openchamber.visual.field.showSplitAssistantMessageActionsTooltip')}
+                                                        {t('settings.gridforge.visual.field.showSplitAssistantMessageActionsTooltip')}
                                                     </TooltipContent>
                                                 </Tooltip>
                                             </div>
@@ -2213,9 +2213,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={codeBlockLineWrap}
                                                 onChange={setCodeBlockLineWrap}
-                                                ariaLabel={t('settings.openchamber.visual.field.codeBlockLineWrapAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.codeBlockLineWrapAria')}
                                             />
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.codeBlockLineWrap')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.codeBlockLineWrap')}</span>
                                         </div>
                                     )}
                                         </section>
@@ -2223,7 +2223,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
                                     {(shouldShow('showToolFileIcons') || shouldShow('showTurnChangedFiles') || shouldShow('dotfiles') || shouldShow('fileViewerPreview')) && (
                                         <section className="p-2 space-y-0.5">
-                                            <h3 data-settings-item="chat.tools-and-files" className="typography-ui-header font-medium text-foreground py-1.5">{t('settings.openchamber.visual.section.toolsAndFiles')}</h3>
+                                            <h3 data-settings-item="chat.tools-and-files" className="typography-ui-header font-medium text-foreground py-1.5">{t('settings.gridforge.visual.section.toolsAndFiles')}</h3>
                                     {shouldShow('showToolFileIcons') && (
                                         <div
                                             data-settings-item="chat.tool-file-icons"
@@ -2242,9 +2242,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={showToolFileIcons}
                                                 onChange={handleShowToolFileIconsChange}
-                                                ariaLabel={t('settings.openchamber.visual.field.showToolFileIconsAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.showToolFileIconsAria')}
                                             />
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.showToolFileIcons')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.showToolFileIcons')}</span>
                                         </div>
                                     )}
 
@@ -2266,9 +2266,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={showTurnChangedFiles}
                                                 onChange={handleShowTurnChangedFilesChange}
-                                                ariaLabel={t('settings.openchamber.visual.field.showTurnChangedFilesAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.showTurnChangedFilesAria')}
                                             />
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.showTurnChangedFiles')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.showTurnChangedFiles')}</span>
                                         </div>
                                     )}
 
@@ -2290,9 +2290,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={directoryShowHidden}
                                                 onChange={setDirectoryShowHidden}
-                                                ariaLabel={t('settings.openchamber.visual.field.showDotfilesAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.showDotfilesAria')}
                                             />
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.showDotfiles')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.showDotfiles')}</span>
                                         </div>
                                     )}
 
@@ -2314,10 +2314,10 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                                 <Checkbox
                                                     checked={settingsDefaultFileViewerPreview}
                                                     onChange={handleFileViewerPreviewChange}
-                                                    ariaLabel={t('settings.openchamber.defaults.field.openFilesPreviewAria')}
+                                                    ariaLabel={t('settings.gridforge.defaults.field.openFilesPreviewAria')}
                                                 />
                                             </span>
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.defaults.field.openFilesPreview')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.defaults.field.openFilesPreview')}</span>
                                         </div>
                                     )}
                                         </section>
@@ -2325,7 +2325,7 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
 
                                     {(shouldShow('persistDraft') || (!isMobile && shouldShow('inputSpellcheck'))) && (
                                         <section className="p-2 space-y-0.5">
-                                            <h3 data-settings-item="chat.composer" className="typography-ui-header font-medium text-foreground py-1.5">{t('settings.openchamber.visual.section.composer')}</h3>
+                                            <h3 data-settings-item="chat.composer" className="typography-ui-header font-medium text-foreground py-1.5">{t('settings.gridforge.visual.section.composer')}</h3>
                                     {shouldShow('persistDraft') && (
                                         <div
                                             data-settings-item="chat.persist-drafts"
@@ -2344,9 +2344,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={persistChatDraft}
                                                 onChange={setPersistChatDraft}
-                                                ariaLabel={t('settings.openchamber.visual.field.persistDraftMessagesAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.persistDraftMessagesAria')}
                                             />
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.persistDraftMessages')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.persistDraftMessages')}</span>
                                         </div>
                                     )}
 
@@ -2368,9 +2368,9 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             <Checkbox
                                                 checked={inputSpellcheckEnabled}
                                                 onChange={handleInputSpellcheckChange}
-                                                ariaLabel={t('settings.openchamber.visual.field.enableSpellcheckInTextInputsAria')}
+                                                ariaLabel={t('settings.gridforge.visual.field.enableSpellcheckInTextInputsAria')}
                                             />
-                                            <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.enableSpellcheckInTextInputs')}</span>
+                                            <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.enableSpellcheckInTextInputs')}</span>
                                         </div>
                                     )}
                                         </section>
@@ -2386,12 +2386,12 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                 {shouldShow('reportUsage') && (
                     <div className="space-y-3">
                         <section className="px-2 pb-2 pt-0">
-                            <h4 className="typography-ui-header font-medium text-foreground mb-2">{t('settings.openchamber.visual.section.privacy')}</h4>
+                            <h4 className="typography-ui-header font-medium text-foreground mb-2">{t('settings.gridforge.visual.section.privacy')}</h4>
                             <div data-settings-item="appearance.usage-reports" className="flex items-start gap-2 py-1.5">
                                 <Checkbox
                                     checked={reportUsage}
                                     onChange={handleReportUsageChange}
-                                    ariaLabel={t('settings.openchamber.visual.field.sendAnonymousUsageReportsAria')}
+                                    ariaLabel={t('settings.gridforge.visual.field.sendAnonymousUsageReportsAria')}
                                 />
                                 <div className="flex min-w-0 flex-col gap-0.5">
                                     <div
@@ -2407,10 +2407,10 @@ export const OpenChamberVisualSettings: React.FC<OpenChamberVisualSettingsProps>
                                             }
                                         }}
                                     >
-                                        <span className="typography-ui-label text-foreground">{t('settings.openchamber.visual.field.sendAnonymousUsageReports')}</span>
+                                        <span className="typography-ui-label text-foreground">{t('settings.gridforge.visual.field.sendAnonymousUsageReports')}</span>
                                     </div>
                                     <span className="typography-meta text-muted-foreground pointer-events-none">
-                                        {t('settings.openchamber.visual.field.sendAnonymousUsageReportsHint')}
+                                        {t('settings.gridforge.visual.field.sendAnonymousUsageReportsHint')}
                                     </span>
                                 </div>
                             </div>

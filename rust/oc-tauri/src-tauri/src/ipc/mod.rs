@@ -1,6 +1,6 @@
 //! IPC 分发器: 复现 Electron main.mjs 的 `handleInvoke` switch + origin 门。
 //!
-//! 桥入口是 `openchamber_invoke` Tauri command, 接收 `{ cmd, args }` 并 dispatch
+//! 桥入口是 `gridforge_invoke` Tauri command, 接收 `{ cmd, args }` 并 dispatch
 //! 到对应模块。origin 门复现 `COMMANDS_SAFE_FOR_REMOTE` 允许列表。
 
 pub mod dialog_cmd;
@@ -40,12 +40,12 @@ static COMMANDS_SAFE_FOR_REMOTE: LazyLock<HashSet<&str>> = LazyLock::new(|| {
     ])
 });
 
-/// `openchamber_invoke` — 桥的 invoke 方法的 Rust 侧入口。
+/// `gridforge_invoke` — 桥的 invoke 方法的 Rust 侧入口。
 ///
 /// args 结构: `{ cmd: string, args: object }`
 /// 返回: `Result<Value, String>` (error 为字符串, 与 Electron throw Error 一致)。
 #[tauri::command]
-pub async fn openchamber_invoke(
+pub async fn gridforge_invoke(
     cmd: String,
     args: Value,
     window: WebviewWindow,
@@ -167,14 +167,14 @@ async fn dispatch(
 }
 
 /// 判断窗口 origin 是否 local。
-/// local = openchamber-ui:// 协议 (packaged UI) 或 http(s)://127.0.0.1|localhost:* (loopback)。
+/// local = gridforge-ui:// 协议 (packaged UI) 或 http(s)://127.0.0.1|localhost:* (loopback)。
 pub(crate) fn is_local_origin(window: &WebviewWindow) -> bool {
     let url = match window.url() {
         Ok(u) => u,
         Err(_) => return false,
     };
     let scheme = url.scheme();
-    scheme == "openchamber-ui"
+    scheme == "gridforge-ui"
         || (scheme == "http" || scheme == "https")
             && url
                 .host_str()

@@ -134,7 +134,7 @@ impl PermissionAutoAcceptRuntime {
     /// 1. 更新 settings.json (原子写)
     /// 2. 更新内存 policy
     /// 3. 如果 enabled=true, 触发 reconcile (补全已有 pending)
-    /// 4. 广播 `openchamber:permission-auto-accept.updated` SSE 事件
+    /// 4. 广播 `gridforge:permission-auto-accept.updated` SSE 事件
     pub async fn set_session_policy(
         self: Arc<Self>,
         session_id: &str,
@@ -180,7 +180,7 @@ impl PermissionAutoAcceptRuntime {
 
         // 广播 UI 事件
         let snapshot = self.policy.lock().unwrap().snapshot();
-        // 事件类型: openchamber:permission-auto-accept.updated
+        // 事件类型: gridforge:permission-auto-accept.updated
         // (snapshot 直接喂给 broadcast_ui_notification; 标记 desktop=false 避免触发原生通知)
         emitter.broadcast_ui_notification(&snapshot, false);
 

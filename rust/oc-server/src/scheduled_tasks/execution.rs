@@ -138,9 +138,9 @@ pub fn build_goal_intro_text(token_budget: Option<i64>) -> String {
 /// 1. 准备 objectiveText (expand_snippets)
 /// 2. > 5000 chars → try `generate_small_model_text` for distillation
 /// 3. 失败 → head+tail excerpt with marker
-/// 4. 写 `$OPENCHAMBER_DATA_DIR/goals/{session_id}.md` (objective_file = true)
+/// 4. 写 `$GRIDFORGE_DATA_DIR/goals/{session_id}.md` (objective_file = true)
 /// 5. 失败 → inline clamp
-/// 6. PATCH `metadata.openchamber.goal = {...}`
+/// 6. PATCH `metadata.gridforge.goal = {...}`
 pub async fn create_task_goal(
     state: &AppState,
     session_id: &str,
@@ -218,9 +218,9 @@ pub async fn create_task_goal(
         "updatedAt": now_ms,
     });
 
-    let openchamber_namespace = json!({ "goal": goal_value });
+    let gridforge_namespace = json!({ "goal": goal_value });
     let payload = json!({
-        "metadata": { "openchamber": openchamber_namespace }
+        "metadata": { "gridforge": gridforge_namespace }
     });
 
     let client = build(state);

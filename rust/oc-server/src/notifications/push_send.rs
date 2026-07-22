@@ -53,18 +53,18 @@ mod inner {
 
         /// 解析 VAPID subject (mailto: 或 https:// origin)。
         fn resolve_vapid_subject(&self) -> String {
-            if let Ok(subj) = std::env::var("OPENCHAMBER_VAPID_SUBJECT") {
+            if let Ok(subj) = std::env::var("GRIDFORGE_VAPID_SUBJECT") {
                 let trimmed = subj.trim();
                 if !trimmed.is_empty() {
                     return trimmed.to_string();
                 }
             }
 
-            if let Ok(origin) = std::env::var("OPENCHAMBER_PUBLIC_ORIGIN") {
+            if let Ok(origin) = std::env::var("GRIDFORGE_PUBLIC_ORIGIN") {
                 let trimmed = origin.trim();
                 if !trimmed.is_empty() {
                     if is_loopback_http_origin(trimmed) {
-                        return "mailto:openchamber@localhost".to_string();
+                        return "mailto:gridforge@localhost".to_string();
                     }
                     return trimmed.to_string();
                 }
@@ -75,13 +75,13 @@ mod inner {
                 let trimmed = stored.trim();
                 if !trimmed.is_empty() {
                     if is_loopback_http_origin(trimmed) {
-                        return "mailto:openchamber@localhost".to_string();
+                        return "mailto:gridforge@localhost".to_string();
                     }
                     return trimmed.to_string();
                 }
             }
 
-            "mailto:openchamber@localhost".to_string()
+            "mailto:gridforge@localhost".to_string()
         }
 
         /// 发送 push 到单个订阅。

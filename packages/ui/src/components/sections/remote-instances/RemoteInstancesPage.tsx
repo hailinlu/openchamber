@@ -106,9 +106,9 @@ const phaseLabelKey = (phase?: string): I18nKey => {
     case 'remote_probe':
       return 'settings.remoteInstances.page.phase.probingRemote';
     case 'installing':
-      return 'settings.remoteInstances.page.phase.installingOpenChamber';
+      return 'settings.remoteInstances.page.phase.installingGridforge';
     case 'updating':
-      return 'settings.remoteInstances.page.phase.updatingOpenChamber';
+      return 'settings.remoteInstances.page.phase.updatingGridforge';
     case 'server_detecting':
       return 'settings.remoteInstances.page.phase.detectingServer';
     case 'server_starting':
@@ -1103,14 +1103,14 @@ export const RemoteInstancesPage: React.FC = () => {
     }
 
     if (
-      normalized.auth.openchamberPassword?.enabled &&
-      normalized.auth.openchamberPassword.value?.trim() &&
-      normalized.auth.openchamberPassword.store !== 'settings'
+      normalized.auth.gridforgePassword?.enabled &&
+      normalized.auth.gridforgePassword.value?.trim() &&
+      normalized.auth.gridforgePassword.store !== 'settings'
     ) {
       const store = window.confirm(t('settings.remoteInstances.page.confirm.storeUiPasswordPlaintext'));
-      normalized.auth.openchamberPassword.store = store ? 'settings' : 'never';
+      normalized.auth.gridforgePassword.store = store ? 'settings' : 'never';
       if (!store) {
-        normalized.auth.openchamberPassword.value = undefined;
+        normalized.auth.gridforgePassword.value = undefined;
       }
     }
 
@@ -2335,16 +2335,16 @@ export const RemoteInstancesPage: React.FC = () => {
             <Input
               className="h-7 md:max-w-sm"
               type="password"
-              value={draft.auth.openchamberPassword?.value || ''}
+              value={draft.auth.gridforgePassword?.value || ''}
               onChange={(event) =>
                 updateDraft((current) => ({
                   ...current,
                   auth: {
                     ...current.auth,
-                    openchamberPassword: {
+                    gridforgePassword: {
                       enabled: event.target.value.trim().length > 0,
                       value: event.target.value,
-                      store: current.auth.openchamberPassword?.store || 'never',
+                      store: current.auth.gridforgePassword?.store || 'never',
                     },
                   },
                 }))

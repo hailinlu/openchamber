@@ -62,7 +62,7 @@ type SyncSystem = {
   directory: string
 }
 
-const SYNC_CONTEXT_GLOBAL_KEY = "__openchamber_sync_context__"
+const SYNC_CONTEXT_GLOBAL_KEY = "__gridforge_sync_context__"
 type SyncGlobal = typeof globalThis & {
   [SYNC_CONTEXT_GLOBAL_KEY]?: React.Context<SyncSystem | null>
 }
@@ -340,7 +340,7 @@ const asOptionalString = (value: unknown): string | undefined => {
 }
 
 const handleUiNotificationEvent = (payload: Event, fallbackDirectory: string): boolean => {
-  if ((payload as { type?: unknown }).type !== "openchamber:notification") {
+  if ((payload as { type?: unknown }).type !== "gridforge:notification") {
     return false
   }
 
@@ -572,7 +572,7 @@ const SHOULD_DISPATCH_VSCODE_NOTIFICATIONS = isVSCodeRuntime()
 
 const dispatchVSCodeRuntimeNotificationEvent = (directory: string, payload: Event) => {
   if (!SHOULD_DISPATCH_VSCODE_NOTIFICATIONS || typeof window === "undefined") return
-  window.dispatchEvent(new CustomEvent("openchamber:vscode-notification-event", {
+  window.dispatchEvent(new CustomEvent("gridforge:vscode-notification-event", {
     detail: { directory, payload },
   }))
 }
@@ -1328,7 +1328,7 @@ function handleEvent(
   childStores: ChildStoreManager,
   routingIndex: EventRoutingIndex,
 ) {
-  if ((payload as { type?: unknown }).type === "openchamber:permission-auto-accept.updated") {
+  if ((payload as { type?: unknown }).type === "gridforge:permission-auto-accept.updated") {
     const properties = (payload as unknown as { properties?: unknown }).properties
     if (properties && typeof properties === "object") {
       const snapshot = properties as { sessions?: unknown }
@@ -1640,7 +1640,7 @@ function handleEvent(
 
 const dispatchOpenCodeUpdateAvailable = (payload: { version: string }) => {
   if (typeof window === "undefined") return
-  window.dispatchEvent(new CustomEvent("openchamber:opencode-update-available", { detail: payload }))
+  window.dispatchEvent(new CustomEvent("gridforge:opencode-update-available", { detail: payload }))
 }
 
 let bundledOpenCodeRuntimeCache: { runtimeKey: string; promise: Promise<boolean> } | null = null

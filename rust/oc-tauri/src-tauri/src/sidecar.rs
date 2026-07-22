@@ -154,10 +154,10 @@ pub struct SidecarBuilder {
 
 #[allow(dead_code)]
 impl SidecarBuilder {
-    /// 用默认值构造: bin = "openchamber", host = "127.0.0.1"。
+    /// 用默认值构造: bin = "gridforge", host = "127.0.0.1"。
     pub fn new() -> Self {
         Self {
-            bin: "openchamber".to_string(),
+            bin: "gridforge".to_string(),
             host: "127.0.0.1".to_string(),
             ready_timeout: DEFAULT_READY_TIMEOUT,
             extra_env: Vec::new(),
@@ -191,7 +191,7 @@ impl SidecarBuilder {
     }
 
     /// 设置固定端口。不调用此方法时，sidecar 将使用 OS 分配的随机端口。
-    /// 生产环境不设置此值；dev 模式可通过 `OPENCHAMBER_PORT` 环境变量设置固定端口，
+    /// 生产环境不设置此值；dev 模式可通过 `GRIDFORGE_PORT` 环境变量设置固定端口，
     /// 使 Vite early injection、proxy 和 sidecar 使用同一个端口。
     pub fn port(mut self, port: u16) -> Self {
         self.port = Some(port);
@@ -209,7 +209,7 @@ impl SidecarBuilder {
                 .with_context(|| format!("failed to allocate port on {}", self.host))?
         };
 
-        // 2. 构造命令: openchamber serve --foreground --port <p> [--host h] [extra...]
+        // 2. 构造命令: gridforge serve --foreground --port <p> [--host h] [extra...]
         //    --foreground 让 CLI 进程本身成为 web server (in-process), 不 detach,
         //    这样 sidecar 进程 == server 进程, kill sidecar 即停服务。
         let mut cmd = Command::new(&self.bin);
@@ -522,7 +522,7 @@ mod tests {
     #[test]
     fn builder_defaults() {
         let b = SidecarBuilder::new();
-        assert_eq!(b.bin, "openchamber");
+        assert_eq!(b.bin, "gridforge");
         assert_eq!(b.host, "127.0.0.1");
         assert_eq!(b.ready_timeout, DEFAULT_READY_TIMEOUT);
         assert!(b.extra_env.is_empty());

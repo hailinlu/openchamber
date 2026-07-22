@@ -797,7 +797,7 @@ export const Header: React.FC<HeaderProps> = ({
       return null;
     }
 
-    const injected = (window as unknown as { __OPENCHAMBER_MACOS_MAJOR__?: unknown }).__OPENCHAMBER_MACOS_MAJOR__;
+    const injected = (window as unknown as { __GRIDFORGE_MACOS_MAJOR__?: unknown }).__GRIDFORGE_MACOS_MAJOR__;
     if (typeof injected === 'number' && Number.isFinite(injected) && injected > 0) {
       return injected;
     }
@@ -896,7 +896,7 @@ export const Header: React.FC<HeaderProps> = ({
       setCurrentInstanceIsLocal(false);
 
       const cfg = await desktopHostsGet();
-      const localOrigin = window.__OPENCHAMBER_LOCAL_ORIGIN__ || window.location.origin;
+      const localOrigin = window.__GRIDFORGE_LOCAL_ORIGIN__ || window.location.origin;
       const runtimeApiBaseUrl = getRuntimeApiBaseUrl();
 
       if (runtimeApiBaseUrl && locationMatchesHost(runtimeApiBaseUrl, localOrigin)) {
@@ -936,7 +936,7 @@ export const Header: React.FC<HeaderProps> = ({
     setRemoteUpdateError(null);
     try {
       const params = new URLSearchParams({ appType: 'web', instanceMode: 'remote' });
-      const response = await runtimeFetch(`/api/openchamber/update-check?${params.toString()}`, {
+      const response = await runtimeFetch(`/api/gridforge/update-check?${params.toString()}`, {
         method: 'GET',
         headers: { Accept: 'application/json' },
       });
@@ -1645,11 +1645,11 @@ export const Header: React.FC<HeaderProps> = ({
     };
 
     void syncFullscreenState();
-    window.addEventListener('openchamber:window-resized', onResize);
+    window.addEventListener('gridforge:window-resized', onResize);
 
     return () => {
       disposed = true;
-      window.removeEventListener('openchamber:window-resized', onResize);
+      window.removeEventListener('gridforge:window-resized', onResize);
     };
   }, [isDesktopApp, isMacPlatform]);
 

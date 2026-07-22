@@ -38,6 +38,7 @@ pub mod tts;
 pub mod tunnels;
 pub mod behavior;
 pub mod mcp_auth;
+pub mod config_mcp;
 pub mod provider_routes;
 pub mod resolution_routes;
 pub mod ui_auth;
@@ -228,6 +229,7 @@ fn build_router(state: Arc<state::AppState>, config: &Config) -> Router {
         .route("/api/version", get(routes::version))
         .route("/api/system/info", get(routes::system_info))
         .route("/robots.txt", get(routes::robots_txt))
+        .route("/api/opencode/health", get(routes::opencode_health))
         // 文本摘要 (阶段 3a)
         .route("/api/text/summarize", post(text::routes::summarize))
         // 文件系统路由 (阶段 3a, 15 个端点)
@@ -329,29 +331,29 @@ fn build_router(state: Arc<state::AppState>, config: &Config) -> Router {
         .route("/api/github/pulls/list", get(github::routes::pulls_list))
         .route("/api/github/pulls/context", get(github::routes::pulls_context))
         // Tunnels 路由 (阶段 3b group 2, 8 个端点)
-        .route("/api/openchamber/tunnel/check", get(tunnels::routes::tunnel_check))
+        .route("/api/gridforge/tunnel/check", get(tunnels::routes::tunnel_check))
         .route(
-            "/api/openchamber/tunnel/doctor",
+            "/api/gridforge/tunnel/doctor",
             post(tunnels::routes::tunnel_doctor).get(tunnels::routes::tunnel_doctor),
         )
         .route(
-            "/api/openchamber/tunnel/providers",
+            "/api/gridforge/tunnel/providers",
             get(tunnels::routes::tunnel_providers),
         )
         .route(
-            "/api/openchamber/tunnel/status",
+            "/api/gridforge/tunnel/status",
             get(tunnels::routes::tunnel_status),
         )
         .route(
-            "/api/openchamber/tunnel/managed-remote-token",
+            "/api/gridforge/tunnel/managed-remote-token",
             put(tunnels::routes::tunnel_managed_remote_token),
         )
         .route(
-            "/api/openchamber/tunnel/start",
+            "/api/gridforge/tunnel/start",
             post(tunnels::routes::tunnel_start),
         )
         .route(
-            "/api/openchamber/tunnel/stop",
+            "/api/gridforge/tunnel/stop",
             post(tunnels::routes::tunnel_stop),
         )
         .route("/connect", get(tunnels::routes::connect))
@@ -414,6 +416,9 @@ fn build_router(state: Arc<state::AppState>, config: &Config) -> Router {
             get(client_auth::routes::connection_candidates),
         )
         // Notifications 路由 (阶段 3b group 4, 18 个端点)
+        // TODO(fork-route-gate): wrap these 18 .route() lines in `#[cfg(feature = "notifications")]`
+        // to disable OpenChamber-hosted push relay. Currently routes are registered unconditionally;
+        // handlers return 404/disabled since GridForge fork 不挂 APNs/VAPID 凭证.
         .route("/api/push/vapid-public-key", get(notifications::routes::vapid_public_key))
         .route("/api/push/subscribe", post(notifications::routes::push_subscribe).delete(notifications::routes::push_unsubscribe))
         .route("/api/push/apns-token", post(notifications::routes::apns_token_subscribe).delete(notifications::routes::apns_token_unsubscribe))
@@ -476,6 +481,7 @@ fn build_router(state: Arc<state::AppState>, config: &Config) -> Router {
         .route("/api/tts/say/speak", post(tts::routes::post_tts_say_speak))
         .route("/api/stt/transcribe", post(tts::routes::post_stt_transcribe))
         // Quota 路由 (阶段 3c group 4 — 7 个端点)
+        // TODO(fork-route-gate): wrap these 7 .route() lines in `#[cfg(feature = "quota")]`.
         .route("/api/quota/providers", get(quota::routes::list_providers))
         .route("/api/quota/credentials/{provider_id}", get(quota::routes::get_credential_status).put(quota::routes::put_credential))
         .route("/api/quota/credentials/{provider_id}/validate", post(quota::routes::validate_credential))
@@ -486,8 +492,8 @@ fn build_router(state: Arc<state::AppState>, config: &Config) -> Router {
         .route("/api/projects/{project_id}/scheduled-tasks", get(scheduled_tasks::routes::list_scheduled_tasks).put(scheduled_tasks::routes::upsert_scheduled_task))
         .route("/api/projects/{project_id}/scheduled-tasks/{task_id}", delete(scheduled_tasks::routes::delete_scheduled_task))
         .route("/api/projects/{project_id}/scheduled-tasks/{task_id}/run", post(scheduled_tasks::routes::run_scheduled_task))
-        .route("/api/openchamber/scheduled-tasks/status", get(scheduled_tasks::routes::scheduled_tasks_status))
-        .route("/api/openchamber/events", get(scheduled_tasks::routes::openchamber_events))
+        .route("/api/gridforge/scheduled-tasks/status", get(scheduled_tasks::routes::scheduled_tasks_status))
+        .route("/api/gridforge/events", get(scheduled_tasks::routes::gridforge_events))
         // Skills-catalog 路由 (阶段 3c group 4 — 12 个端点)
         .route("/api/config/skills", get(skills_catalog::routes::list_skills))
         .route("/api/config/skills/catalog", get(skills_catalog::routes::list_catalog_sources))
@@ -501,6 +507,15 @@ fn build_router(state: Arc<state::AppState>, config: &Config) -> Router {
         .route("/api/behavior/agents-md", get(behavior::get_agents_md).put(behavior::put_agents_md))
         // MCP OAuth pending auth (Tauri 模式下 Node 后端不可达, 复现 Node routes.js 的 Map 内存状态)
         .route("/api/mcp/auth/pending", get(mcp_auth::get_mcp_auth_pending).post(mcp_auth::post_mcp_auth_pending).delete(mcp_auth::delete_mcp_auth_pending))
+        // MCP 服务器配置 CRUD (对应 Node config-entity-routes.js MCP 部分)
+        .route("/api/config/mcp", get(config_mcp::list_mcp))
+        .route(
+            "/api/config/mcp/{name}",
+            get(config_mcp::get_mcp)
+                .post(config_mcp::create_mcp)
+                .patch(config_mcp::update_mcp)
+                .delete(config_mcp::delete_mcp),
+        )
         // OpenCode resolution (Tauri 模式下 Node 后端不可达, 复现 Node routes.js:145)
         .route("/api/config/opencode-resolution", get(resolution_routes::get_opencode_resolution))
         // Provider source + auth (Tauri 模式下 Node 后端不可达, 复现 Node routes.js:377-473)
@@ -542,16 +557,17 @@ fn build_router(state: Arc<state::AppState>, config: &Config) -> Router {
         )
         .route("/api/dictation/ws", any(dictation::routes::dictation_ws_handler))
         // 私有中继 (Phase 3f Group 4) — 管理路由
+        // TODO(fork-route-gate): wrap these 3 .route() lines in `#[cfg(feature = "relay")]`.
         .route(
-            "/api/openchamber/relay/status",
+            "/api/gridforge/relay/status",
             get(relay::routes::get_status_handler),
         )
         .route(
-            "/api/openchamber/relay/enable",
+            "/api/gridforge/relay/enable",
             post(relay::routes::post_enable_handler),
         )
         .route(
-            "/api/openchamber/relay/disable",
+            "/api/gridforge/relay/disable",
             post(relay::routes::post_disable_handler),
         )
         // OpenCode 反向代理 (/api/* catch-all)

@@ -3,8 +3,8 @@
 //! 对应 Node `quota/credentials/store.js`。
 //!
 //! 文件位置:
-//!   - `OPENCHAMBER_DATA_DIR` → `<dir>/quota/<provider>.json`
-//!   - 默认 `~/.config/openchamber/quota/<provider>.json`
+//!   - `GRIDFORGE_DATA_DIR` → `<dir>/quota/<provider>.json`
+//!   - 默认 `~/.config/gridforge/quota/<provider>.json`
 //!
 //! 只有 `opencode-go / ollama-cloud / cursor` 三类 managed provider。
 
@@ -49,15 +49,15 @@ impl From<serde_json::Error> for CredentialError {
     }
 }
 
-/// `~/.config/openchamber/quota` 目录(或 `$OPENCHAMBER_DATA_DIR/quota`)。
+/// `~/.config/gridforge/quota` 目录(或 `$GRIDFORGE_DATA_DIR/quota`)。
 pub fn credentials_directory() -> PathBuf {
-    let base = if let Ok(dir) = std::env::var("OPENCHAMBER_DATA_DIR") {
+    let base = if let Ok(dir) = std::env::var("GRIDFORGE_DATA_DIR") {
         if !dir.is_empty() {
             return PathBuf::from(dir).join("quota");
         }
-        crate::git::paths::home_dir().join(".config").join("openchamber")
+        crate::git::paths::home_dir().join(".config").join("gridforge")
     } else {
-        crate::git::paths::home_dir().join(".config").join("openchamber")
+        crate::git::paths::home_dir().join(".config").join("gridforge")
     };
     base.join("quota")
 }
@@ -174,21 +174,21 @@ pub(crate) mod tests {
     /// 强制目录用临时位置 (绕开 HOME env,直接覆盖内部变量)。
     ///
     /// 测试隔离: 持有共享 `auth::tests::TEST_LOCK` 串行化所有修改
-    /// `OPENCHAMBER_DATA_DIR` 的测试, 防止与 scheduled_tasks/routes、
+    /// `GRIDFORGE_DATA_DIR` 的测试, 防止与 scheduled_tasks/routes、
     /// session_goal/objectives 等并行竞争。
     fn with_temp_data_dir<F: FnOnce()>(f: F) {
         // 串行化: 持有跨模块共享锁直到函数返回。
         let _lock = auth_tests::TEST_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        let prev = std::env::var("OPENCHAMBER_DATA_DIR").ok();
+        let prev = std::env::var("GRIDFORGE_DATA_DIR").ok();
         let dir = unique_dir();
         std::fs::create_dir_all(&dir).unwrap();
-        std::env::set_var("OPENCHAMBER_DATA_DIR", &dir);
+        std::env::set_var("GRIDFORGE_DATA_DIR", &dir);
         f();
         match prev {
-            Some(v) => std::env::set_var("OPENCHAMBER_DATA_DIR", v),
-            None => std::env::remove_var("OPENCHAMBER_DATA_DIR"),
+            Some(v) => std::env::set_var("GRIDFORGE_DATA_DIR", v),
+            None => std::env::remove_var("GRIDFORGE_DATA_DIR"),
         }
         let _ = std::fs::remove_dir_all(&dir);
     }

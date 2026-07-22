@@ -38,10 +38,11 @@ import { createConnectUrlCommand } from './lib/commands-connect-url.js';
 import { createLifecycleCommands } from './lib/commands-lifecycle.js';
 import { createServeCommand } from './lib/commands-serve.js';
 import { createTunnelCommand, isValidTunnelDoctorResponse, shouldDisplayTunnelQr } from './lib/commands-tunnel.js';
+import { migrateCommand } from './lib/commands-migrate.js';
 import {
   resolveDoctorPortStatuses,
   discoverRunningInstances,
-  discoverOpenChamberInstanceOnPort,
+  discoverGridforgeInstanceOnPort,
   discoverLifecycleInstances,
   discoverUnconfirmedRegistryInstanceOnPort,
   resolveTunnelProviders,
@@ -54,7 +55,7 @@ import {
   getPidFilePath,
   getInstanceFilePath,
   isProcessRunning,
-  isOpenchamberCmdline,
+  isGridforgeCmdline,
   isOpenchamberProcessRunning,
   getOpenchamberProcessState,
 } from './lib/cli-process.js';
@@ -181,6 +182,8 @@ const commands = {
 
   startup: startupCommand,
 
+  migrate: migrateCommand,
+
   update: null,
 };
 
@@ -293,7 +296,7 @@ async function main() {
   await commands[command](options);
 }
 
-const isCliExecution = isModuleCliExecution(process.argv[1], import.meta.url, fs.realpathSync, 'openchamber');
+const isCliExecution = isModuleCliExecution(process.argv[1], import.meta.url, fs.realpathSync, 'gridforge');
 
 if (isCliExecution) {
   let isHandlingSigint = false;
@@ -384,13 +387,13 @@ export {
   getInstanceFilePath,
   isProcessRunning,
   isOpenchamberProcessRunning,
-  isOpenchamberCmdline,
+  isGridforgeCmdline,
   getOpenchamberProcessState,
   resolveTunnelProviders,
   fetchTunnelProvidersFromPort,
   fetchSystemInfoFromPort,
   discoverRunningInstances,
-  discoverOpenChamberInstanceOnPort,
+  discoverGridforgeInstanceOnPort,
   discoverLifecycleInstances,
   discoverUnconfirmedRegistryInstanceOnPort,
   ensureTunnelProfilesMigrated,

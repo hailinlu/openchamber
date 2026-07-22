@@ -79,9 +79,9 @@ import {
 } from '@/stores/useGlobalSessionsStore';
 import { useRuntimeAPIs } from '@/hooks/useRuntimeAPIs';
 import { useGitHubAuthStore } from '@/stores/useGitHubAuthStore';
-import { subscribeOpenchamberEvents } from '@/lib/openchamberEvents';
+import { subscribeGridforgeEvents } from '@/lib/gridforgeEvents';
 
-const SHARE_OPINION_TOAST_STORAGE_KEY = 'openchamber.shareOpinionToast.dismissed.v2';
+const SHARE_OPINION_TOAST_STORAGE_KEY = 'gridforge.shareOpinionToast.dismissed.v2';
 const PROJECT_COLLAPSE_STORAGE_KEY = 'oc.sessions.projectCollapse';
 const GROUP_ORDER_STORAGE_KEY = 'oc.sessions.groupOrder';
 const GROUP_COLLAPSE_STORAGE_KEY = 'oc.sessions.groupCollapse';
@@ -335,12 +335,12 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
   const openNewSessionDraft = useSessionUIStore((state) => state.openNewSessionDraft);
   // The sidebar tree's +-buttons (project / group / folder) open a draft but,
   // unlike selecting an existing session, don't navigate. VS Code's compact view
-  // is driven by the openchamber:navigate event, so switch to chat explicitly
+  // is driven by the gridforge:navigate event, so switch to chat explicitly
   // (a no-op in the expanded side-by-side layout, which is always showing chat).
   const openNewSessionDraftFromTree = React.useCallback<typeof openNewSessionDraft>((options) => {
     openNewSessionDraft(options);
     if (isVSCode) {
-      window.dispatchEvent(new CustomEvent('openchamber:navigate', { detail: { view: 'chat' } }));
+      window.dispatchEvent(new CustomEvent('gridforge:navigate', { detail: { view: 'chat' } }));
     }
   }, [isVSCode, openNewSessionDraft]);
   const updateStore = useUpdateStore(useShallow((s) => ({
@@ -502,7 +502,7 @@ export const SessionSidebar: React.FC<SessionSidebarProps> = ({
 
   React.useEffect(() => {
     let refreshTimeout: ReturnType<typeof setTimeout> | null = null;
-    const unsubscribe = subscribeOpenchamberEvents((event) => {
+    const unsubscribe = subscribeGridforgeEvents((event) => {
       if (event.type !== 'scheduled-task-ran') {
         return;
       }

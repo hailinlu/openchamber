@@ -972,7 +972,7 @@ pub async fn list_worktrees(
     let mut response = Json(json!(worktrees)).into_response();
     if worktrees.is_empty() {
         response.headers_mut().insert(
-            HeaderName::from_static("x-openchamber-warning"),
+            HeaderName::from_static("x-gridforge-warning"),
             HeaderValue::from_static("git worktrees unavailable"),
         );
     }

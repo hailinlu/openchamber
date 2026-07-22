@@ -84,3 +84,16 @@ windows-sys = { version = "0.59", features = [
     "Win32_System_JobObjects",
     "Win32_System_Threading",
 ] }
+
+# -----------------------------------------------------------------------
+# Feature flags — 隔离 OpenChamber 托管服务 (源码层)
+# -----------------------------------------------------------------------
+# 默认全部关闭 (GridForge fork 不依赖 OpenChamber relay / 推送中继 / quota)。
+# 调用方可通过 oc-server = { workspace = true, features = ["relay", ...] } 显式启用。
+# 注意: feature flag 仅控制源模块 (pub mod / 路由 / state 字段) 是否参与编译,
+# 不影响依赖项本身 — 否则 webauthn-rs 等公共 deps 也会被错关。
+[features]
+default = []
+relay = []
+notifications = []
+quota = []

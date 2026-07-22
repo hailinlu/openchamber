@@ -1,7 +1,7 @@
 import React from 'react';
 import { useI18n } from '@/lib/i18n';
 
-interface OpenChamberLogoProps {
+interface GridforgeLogoProps {
   className?: string;
   width?: number;
   height?: number;
@@ -9,10 +9,10 @@ interface OpenChamberLogoProps {
 }
 
 /**
- * OpenChamber logo — dark-tech isometric 3D core with orbital rings and lightning bolt.
+ * GridForge logo — dark-tech isometric 3D core with orbital rings and lightning bolt.
  * Design originally provided at 600×600, scaled down to 100×100 viewBox.
  */
-export const OpenChamberLogo: React.FC<OpenChamberLogoProps> = ({
+export const GridforgeLogo: React.FC<GridforgeLogoProps> = ({
   className = '',
   width = 70,
   height = 70,
@@ -30,7 +30,7 @@ export const OpenChamberLogo: React.FC<OpenChamberLogoProps> = ({
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       role="img"
-      aria-label={t('openChamberLogo.aria.logo')}
+      aria-label={t('gridforgeLogo.aria.logo')}
     >
       {isAnimated ? (
         <style>{`@keyframes oc-glow-${uid}{0%,100%{opacity:1}50%{opacity:0.6}}.oc-glow{animation:oc-glow-${uid} 1.8s ease-in-out infinite}@media (prefers-reduced-motion:reduce){.oc-glow{animation:none}}`}</style>

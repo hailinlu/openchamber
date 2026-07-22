@@ -1,12 +1,12 @@
 //! Relay service: settings persistence, lifecycle of the relay host client,
-//! and the `/api/openchamber/relay/*` management routes facade.
+//! and the `/api/gridforge/relay/*` management routes facade.
 //!
 //! Direct port of `packages/web/server/lib/relay/service.js` (~335 lines). The
 //! Node module is the authoritative reference — semantics are intentionally
 //! preserved, including:
 //!
 //!   - The `privateRelay` settings shape `{ enabled, relayUrl }`.
-//!   - The OPENCHAMBER_RELAY_URL env override pinning the relay endpoint.
+//!   - The GRIDFORGE_RELAY_URL env override pinning the relay endpoint.
 //!   - The forced-claim semantic for explicit user actions (enable / pairing).
 //!   - The standby state when another live process holds the host claim.
 //!   - The claim watcher that takes over when the holder dies / stands down
@@ -53,8 +53,8 @@ use crate::relay::identity::{RelayIdentity, RelayIdentityRuntime, DEFAULT_RELAY_
 // Public constants & types
 // =============================================================================
 
-/// Env override name. Mirrors `OPENCHAMBER_RELAY_URL` from `service.js`.
-pub const ENV_RELAY_URL_OVERRIDE: &str = "OPENCHAMBER_RELAY_URL";
+/// Env override name. Mirrors `GRIDFORGE_RELAY_URL` from `service.js`.
+pub const ENV_RELAY_URL_OVERRIDE: &str = "GRIDFORGE_RELAY_URL";
 
 /// Claim watch tick — every 30 s the running service re-checks the host
 /// claim and either takes over (slot became free) or stands down
@@ -281,7 +281,7 @@ impl HostHandle for NullHostHandle {
 pub struct PrivateRelayConfig {
     pub enabled: bool,
     pub relay_url: String,
-    /// `true` when `OPENCHAMBER_RELAY_URL` is set and valid — the stored
+    /// `true` when `GRIDFORGE_RELAY_URL` is set and valid — the stored
     /// `relayUrl` is then ignored.
     pub relay_url_locked: bool,
 }
@@ -467,7 +467,7 @@ impl RelayStatus {
 // Pairing candidate
 // =============================================================================
 
-/// Pairing v2 candidate payload exposed to the unified `/api/openchamber/connection/candidates`
+/// Pairing v2 candidate payload exposed to the unified `/api/gridforge/connection/candidates`
 /// response. `None` when the host relay is off. Mirrors
 /// `getPairingCandidate()` from `service.js`.
 #[derive(Debug, Clone)]
@@ -802,7 +802,7 @@ impl RelayService {
     }
 
     /// Public enable handler. Persists `enabled = true`, force-claims the
-    /// slot, and starts the host. Mirrors `POST /api/openchamber/relay/enable`
+    /// slot, and starts the host. Mirrors `POST /api/gridforge/relay/enable`
     /// from `service.js`.
     pub async fn enable(&self, relay_url: Option<String>) -> Result<RelayStatus, String> {
         let current = read_config();
@@ -824,7 +824,7 @@ impl RelayService {
     }
 
     /// Public disable handler. Persists `enabled = false`, stops the host,
-    /// releases the host claim. Mirrors `POST /api/openchamber/relay/disable`.
+    /// releases the host claim. Mirrors `POST /api/gridforge/relay/disable`.
     pub fn disable(&self) -> Result<RelayStatus, String> {
         let current = read_config();
         let new_cfg = PrivateRelayConfig {

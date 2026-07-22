@@ -1,5 +1,5 @@
 //! Session-assist — busy→idle 后等待 60s 静默期, 调用 small model 生成
-//! recap + suggestion, 写入 `metadata.openchamber.assist`。
+//! recap + suggestion, 写入 `metadata.gridforge.assist`。
 //!
 //! 对应 Node `session-assist/runtime.js` (394 行) + DOCUMENTATION.md。
 //!
@@ -15,7 +15,7 @@
 //! - 生成后 tail-moved-on 检查 (re-fetch + 比 lastAssistantInfo.id)
 //! - 生成 strict-JSON system prompt, 字段长度 clamp, Cyrillic/CJK sanitize
 //! - 语言由 conversation sample 决定 (账户侧个性化会泄露, 用示例控制)
-//! - merge-write metadata.openchamber (保留 dismissals/goal/review 等)
+//! - merge-write metadata.gridforge (保留 dismissals/goal/review 等)
 
 #![allow(dead_code)] // 部分 helper 暂未直接调用
 
@@ -33,7 +33,7 @@ use crate::opencode::session_client::build;
 use crate::small_model::index::{generate_small_model_text, GenerateArgs};
 use crate::state::AppState;
 
-pub use metadata::{clamp_recap, clamp_suggestion, merge_assist_into_openchamber, AssistMetadata};
+pub use metadata::{clamp_recap, clamp_suggestion, merge_assist_into_gridforge, AssistMetadata};
 
 // =========================================================================
 // 常量 — 与 Node `session-assist/runtime.js` 严格对齐
@@ -400,7 +400,7 @@ impl SessionAssistRuntime {
             for_message_id: last_assistant_id.clone(),
             generated_at: crate::session_goal::now_millis(),
         };
-        let merged = merge_assist_into_openchamber(&fresh_session, &assist);
+        let merged = merge_assist_into_gridforge(&fresh_session, &assist);
         let _ = client.patch_session_metadata(session_id, Some(directory), &merged).await;
 
         tracing::info!(session_id, provider = %generated.provider_id, model = %generated.model_id, "[session-assist] generated");

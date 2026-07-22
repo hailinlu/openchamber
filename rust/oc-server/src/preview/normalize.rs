@@ -173,8 +173,8 @@ mod tests {
 
     #[test]
     fn allows_ordinary_external_host() {
-        let result = normalize_proxy_target_url("https://docs.openchamber.dev/security/", true).unwrap();
-        assert_eq!(result.origin, "https://docs.openchamber.dev");
+        let result = normalize_proxy_target_url("https://docs.gridforge.dev/security/", true).unwrap();
+        assert_eq!(result.origin, "https://docs.gridforge.dev");
     }
 
     #[test]
@@ -253,7 +253,7 @@ mod tests {
 
     #[test]
     fn preserves_explicit_port_on_external_host() {
-        let result = normalize_proxy_target_url("https://docs.openchamber.dev:8443/path", true).unwrap();
-        assert_eq!(result.origin, "https://docs.openchamber.dev:8443");
+        let result = normalize_proxy_target_url("https://docs.gridforge.dev:8443/path", true).unwrap();
+        assert_eq!(result.origin, "https://docs.gridforge.dev:8443");
     }
 }

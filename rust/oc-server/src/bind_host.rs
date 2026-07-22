@@ -47,8 +47,8 @@ pub fn enforce(config: &Config) -> anyhow::Result<()> {
     {
         anyhow::bail!(
             "GridForge refuses to bind to {} without UI authentication. \
-             Set --ui-password or OPENCHAMBER_UI_PASSWORD before exposing it over LAN, \
-             or set OPENCHAMBER_ALLOW_UNAUTHENTICATED_LAN=true to accept the risk.",
+             Set --ui-password or GRIDFORGE_UI_PASSWORD before exposing it over LAN, \
+             or set GRIDFORGE_ALLOW_UNAUTHENTICATED_LAN=true to accept the risk.",
             config.host
         );
     }

@@ -9,7 +9,7 @@ import { cn } from '@/lib/utils';
 import { copyTextToClipboard } from '@/lib/clipboard';
 import { toast } from '@/components/ui';
 import { Icon } from "@/components/icon/Icon";
-import { OPENCHAMBER_PROJECT_NOTES_MAX_LENGTH, getProjectNotesAndTodos, saveProjectNotesAndTodos } from '@/lib/openchamberConfig';
+import { GRIDFORGE_PROJECT_NOTES_MAX_LENGTH, getProjectNotesAndTodos, saveProjectNotesAndTodos } from '@/lib/gridforgeConfig';
 import { summarizeSelectionForNotes } from '@/lib/smallModel';
 import { resolveProjectForSessionDirectory } from '@/lib/projectResolution';
 import { useEffectiveDirectory } from '@/hooks/useEffectiveDirectory';
@@ -33,7 +33,7 @@ interface SelectionPayload {
 }
 
 const appendDistilledInsightToNotes = (existingNotes: string, insight: string): string => {
-  const trimmedInsight = insight.trim().replace(/^[-*+]\s+/, '').slice(0, OPENCHAMBER_PROJECT_NOTES_MAX_LENGTH);
+  const trimmedInsight = insight.trim().replace(/^[-*+]\s+/, '').slice(0, GRIDFORGE_PROJECT_NOTES_MAX_LENGTH);
   if (!trimmedInsight) {
     return existingNotes;
   }
@@ -532,7 +532,7 @@ export const TextSelectionMenu: React.FC<TextSelectionMenuProps> = ({ containerR
         toast.error(t('chat.textSelection.toast.addToNotesFailed'));
         return;
       }
-      window.dispatchEvent(new CustomEvent('openchamber:project-notes-updated', {
+      window.dispatchEvent(new CustomEvent('gridforge:project-notes-updated', {
         detail: { projectId: currentProjectRef.id },
       }));
       toast.success(t('chat.textSelection.toast.addToNotesSuccess'));

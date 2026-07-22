@@ -26,10 +26,10 @@
       const baseUrl = location.origin;
       const defaultAppName = 'GridForge';
       const defaultShortName = 'GridForge';
-      const pwaNameStorageKey = 'openchamber.pwaName';
-      const pwaOrientationStorageKey = 'openchamber.pwaOrientation';
-      const mobileKeyboardModeStorageKey = 'openchamber.mobileKeyboardMode';
-      const pwaRecentSessionsStorageKey = 'openchamber.pwaRecentSessions';
+      const pwaNameStorageKey = 'gridforge.pwaName';
+      const pwaOrientationStorageKey = 'gridforge.pwaOrientation';
+      const mobileKeyboardModeStorageKey = 'gridforge.mobileKeyboardMode';
+      const pwaRecentSessionsStorageKey = 'gridforge.pwaRecentSessions';
       const viewportBaseContent = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
 
       const normalizePwaName = (value, fallback) => {
@@ -359,18 +359,18 @@
       const initialInstallNameOverride = getQueryInstallNameOverride();
       void updateManifest(initialInstallNameOverride);
 
-      window.__OPENCHAMBER_GET_PWA_INSTALL_NAME__ = () => getStoredInstallName();
-      window.__OPENCHAMBER_SET_PWA_INSTALL_NAME__ = (value) => {
+      window.__GRIDFORGE_GET_PWA_INSTALL_NAME__ = () => getStoredInstallName();
+      window.__GRIDFORGE_SET_PWA_INSTALL_NAME__ = (value) => {
         const resolvedName = setStoredInstallName(value);
         void updateManifest(resolvedName);
         return resolvedName;
       };
-      window.__OPENCHAMBER_SET_PWA_ORIENTATION__ = (value) => {
+      window.__GRIDFORGE_SET_PWA_ORIENTATION__ = (value) => {
         const resolvedOrientation = setStoredOrientation(value);
         void updateManifest(null, resolvedOrientation);
         return resolvedOrientation;
       };
-      window.__OPENCHAMBER_UPDATE_PWA_MANIFEST__ = () => {
+      window.__GRIDFORGE_UPDATE_PWA_MANIFEST__ = () => {
         refreshManifestFromStorage();
       };
     </script>
@@ -610,7 +610,7 @@
       // Desktop shells manage their own splash via the injected boot outcome;
       // do not force-remove for desktop windows.
       setTimeout(function() {
-        if (typeof window.__OPENCHAMBER_LOCAL_ORIGIN__ === 'string' && window.__OPENCHAMBER_LOCAL_ORIGIN__.length > 0) {
+        if (typeof window.__GRIDFORGE_LOCAL_ORIGIN__ === 'string' && window.__GRIDFORGE_LOCAL_ORIGIN__.length > 0) {
           return;
         }
         var loading = document.getElementById('initial-loading');

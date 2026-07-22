@@ -584,7 +584,7 @@ async fn start_quick(origin_url: &str) -> Result<TunnelController, TunnelService
 
     // 创建临时 HOME 目录
     let temp_dir = std::env::temp_dir().join(format!(
-        "openchamber-cf-{}",
+        "gridforge-cf-{}",
         chrono::Utc::now().timestamp_millis()
     ));
     std::fs::create_dir_all(&temp_dir).map_err(|e| {
@@ -703,7 +703,7 @@ async fn start_managed_remote(
 
     // 写 token 到临时文件
     let temp_dir = std::env::temp_dir().join(format!(
-        "openchamber-cf-token-{}",
+        "gridforge-cf-token-{}",
         chrono::Utc::now().timestamp_millis()
     ));
     std::fs::create_dir_all(&temp_dir).map_err(|e| {

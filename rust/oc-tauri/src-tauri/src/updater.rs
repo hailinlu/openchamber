@@ -4,7 +4,7 @@
 //! - 仅打包后运行 (dev 直接返回 no-update)
 //! - 手动下载 (不自动下载)
 //! - 404/ENOTFOUND → 视为 "无更新" 而非错误 (复现 Electron MISSING_UPDATE_FEED_RE)
-//! - 下载进度 → emit `openchamber:update-progress` + Windows taskbar progress
+//! - 下载进度 → emit `gridforge:update-progress` + Windows taskbar progress
 //! - restart: pending update → app.restart()；否则 app.relaunch() + exit(0)
 //! - on_before_exit: kill sidecar
 //!
@@ -111,8 +111,8 @@ pub async fn download_and_install(_args: &Value, app: &AppHandle) -> Result<Valu
 
     // emit Started
     let _ = app.emit(
-        "openchamber:emit",
-        json!({ "event": "openchamber:update-progress", "detail": { "event": "Started", "data": {} } }),
+        "gridforge:emit",
+        json!({ "event": "gridforge:update-progress", "detail": { "event": "Started", "data": {} } }),
     );
 
     // Windows: 设置 taskbar progress
@@ -135,9 +135,9 @@ pub async fn download_and_install(_args: &Value, app: &AppHandle) -> Result<Valu
                 let downloaded = chunk_length;
                 let total = total_length.unwrap_or(0);
                 let _ = app_handle.emit(
-                    "openchamber:emit",
+                    "gridforge:emit",
                     json!({
-                        "event": "openchamber:update-progress",
+                        "event": "gridforge:update-progress",
                         "detail": {
                             "event": "Progress",
                             "data": { "downloaded": downloaded, "total": total }
@@ -187,8 +187,8 @@ pub async fn download_and_install(_args: &Value, app: &AppHandle) -> Result<Valu
             }
 
             let _ = app.emit(
-                "openchamber:emit",
-                json!({ "event": "openchamber:update-progress", "detail": { "event": "Finished", "data": {} } }),
+                "gridforge:emit",
+                json!({ "event": "gridforge:update-progress", "detail": { "event": "Finished", "data": {} } }),
             );
 
             Ok(json!({ "ok": true }))
@@ -205,8 +205,8 @@ pub async fn download_and_install(_args: &Value, app: &AppHandle) -> Result<Valu
                 }
             }
             let _ = app.emit(
-                "openchamber:emit",
-                json!({ "event": "openchamber:update-progress", "detail": { "event": "Error", "data": { "error": err_str } } }),
+                "gridforge:emit",
+                json!({ "event": "gridforge:update-progress", "detail": { "event": "Error", "data": { "error": err_str } } }),
             );
             Err(err_str)
         }

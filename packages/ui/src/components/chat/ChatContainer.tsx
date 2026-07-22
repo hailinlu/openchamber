@@ -54,8 +54,8 @@ import { getEmbeddedSessionChatOriginSessionId } from '@/components/layout/conte
 
 const EMPTY_MESSAGES: Array<{ info: Message; parts: Part[] }> = [];
 const IDLE_SESSION_STATUS = { type: 'idle' as const };
-const CHAT_FORCE_SCROLL_BOTTOM_EVENT = 'openchamber:chat-force-scroll-bottom';
-const CHAT_SCROLL_TO_MESSAGE_EVENT = 'openchamber:chat-scroll-to-message';
+const CHAT_FORCE_SCROLL_BOTTOM_EVENT = 'gridforge:chat-force-scroll-bottom';
+const CHAT_SCROLL_TO_MESSAGE_EVENT = 'gridforge:chat-scroll-to-message';
 const DEFAULT_RETRY_MESSAGE = 'Quota limit reached. Retrying automatically.';
 const CHAT_SCROLL_STYLE = {
     overflowAnchor: 'none',
@@ -667,7 +667,7 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ autoOpenDraft = tr
             useUIStore.getState().setAllowPromptingSubagentSessions(value);
         };
         const scopedWindow = window as typeof window & {
-            __openchamberApplyChatSettingsSync?: (payload: { allowPromptingSubagentSessions: boolean }) => void;
+            __gridforgeApplyChatSettingsSync?: (payload: { allowPromptingSubagentSessions: boolean }) => void;
         };
         const applySync = (payload: { allowPromptingSubagentSessions: boolean }) => {
             applySetting(payload.allowPromptingSubagentSessions);
@@ -675,18 +675,18 @@ export const ChatContainer: React.FC<ChatContainerProps> = ({ autoOpenDraft = tr
         const handleMessage = (event: MessageEvent) => {
             if (event.source !== window.parent || event.origin !== window.location.origin) return;
             const data = event.data as { type?: unknown; payload?: { allowPromptingSubagentSessions?: unknown } };
-            if (data?.type !== 'openchamber:chat-settings-sync'
+            if (data?.type !== 'gridforge:chat-settings-sync'
                 || typeof data.payload?.allowPromptingSubagentSessions !== 'boolean') return;
             applySetting(data.payload.allowPromptingSubagentSessions);
         };
 
-        scopedWindow.__openchamberApplyChatSettingsSync = applySync;
+        scopedWindow.__gridforgeApplyChatSettingsSync = applySync;
         window.addEventListener('message', handleMessage);
-        window.parent.postMessage({ type: 'openchamber:chat-settings-request' }, window.location.origin);
+        window.parent.postMessage({ type: 'gridforge:chat-settings-request' }, window.location.origin);
         return () => {
             window.removeEventListener('message', handleMessage);
-            if (scopedWindow.__openchamberApplyChatSettingsSync === applySync) {
-                delete scopedWindow.__openchamberApplyChatSettingsSync;
+            if (scopedWindow.__gridforgeApplyChatSettingsSync === applySync) {
+                delete scopedWindow.__gridforgeApplyChatSettingsSync;
             }
         };
     }, []);

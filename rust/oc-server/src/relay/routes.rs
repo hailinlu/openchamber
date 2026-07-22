@@ -3,10 +3,10 @@
 //! Direct port of `packages/web/server/lib/relay/service.js#registerRoutes`.
 //! Three handlers backed by [`RelayService`]:
 //!
-//!   - `GET  /api/openchamber/relay/status`   — current state + settings.
-//!   - `POST /api/openchamber/relay/enable`   — persist `enabled = true` and
+//!   - `GET  /api/gridforge/relay/status`   — current state + settings.
+//!   - `POST /api/gridforge/relay/enable`   — persist `enabled = true` and
 //!                                                force-claim the host slot.
-//!   - `POST /api/openchamber/relay/disable`  — persist `enabled = false` and
+//!   - `POST /api/gridforge/relay/disable`  — persist `enabled = false` and
 //!                                                release the host slot.
 //!
 //! Errors follow the JS reference contract: a JSON body
@@ -51,7 +51,7 @@ fn resolve_relay_service(state: &Arc<AppState>) -> Option<Arc<RelayService>> {
         .clone()
 }
 
-/// `GET /api/openchamber/relay/status`.
+/// `GET /api/gridforge/relay/status`.
 pub async fn get_status_handler(
     State(state): State<Arc<AppState>>,
 ) -> Response {
@@ -64,7 +64,7 @@ pub async fn get_status_handler(
     }
 }
 
-/// `POST /api/openchamber/relay/enable`.
+/// `POST /api/gridforge/relay/enable`.
 ///
 /// Optional body: `{ "relayUrl": "wss://..." }`. When omitted, the current
 /// stored URL is reused. The relay host is force-started and force-claims
@@ -89,7 +89,7 @@ pub async fn post_enable_handler(
     }
 }
 
-/// `POST /api/openchamber/relay/disable`.
+/// `POST /api/gridforge/relay/disable`.
 pub async fn post_disable_handler(
     State(state): State<Arc<AppState>>,
 ) -> Response {
@@ -206,15 +206,15 @@ mod tests {
     fn build_app(state: Arc<AppState>) -> axum::Router {
         axum::Router::new()
             .route(
-                "/api/openchamber/relay/status",
+                "/api/gridforge/relay/status",
                 axum::routing::get(get_status_handler),
             )
             .route(
-                "/api/openchamber/relay/enable",
+                "/api/gridforge/relay/enable",
                 axum::routing::post(post_enable_handler),
             )
             .route(
-                "/api/openchamber/relay/disable",
+                "/api/gridforge/relay/disable",
                 axum::routing::post(post_disable_handler),
             )
             .with_state(state)
@@ -238,7 +238,7 @@ mod tests {
         let resp = app
             .oneshot(
                 Request::builder()
-                    .uri("/api/openchamber/relay/status")
+                    .uri("/api/gridforge/relay/status")
                     .body(axum::body::Body::empty())
                     .unwrap(),
             )
@@ -259,7 +259,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method("POST")
-                    .uri("/api/openchamber/relay/enable")
+                    .uri("/api/gridforge/relay/enable")
                     .header("content-type", "application/json")
                     .body(axum::body::Body::from("{}"))
                     .unwrap(),
@@ -278,7 +278,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method("POST")
-                    .uri("/api/openchamber/relay/disable")
+                    .uri("/api/gridforge/relay/disable")
                     .body(axum::body::Body::empty())
                     .unwrap(),
             )
@@ -296,7 +296,7 @@ mod tests {
         let resp = app
             .oneshot(
                 Request::builder()
-                    .uri("/api/openchamber/relay/status")
+                    .uri("/api/gridforge/relay/status")
                     .body(axum::body::Body::empty())
                     .unwrap(),
             )
@@ -318,7 +318,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method("POST")
-                    .uri("/api/openchamber/relay/enable")
+                    .uri("/api/gridforge/relay/enable")
                     .header("content-type", "application/json")
                     .body(axum::body::Body::from(
                         r#"{"relayUrl":"wss://example.test/v1"}"#,
@@ -349,7 +349,7 @@ mod tests {
             .oneshot(
                 Request::builder()
                     .method("POST")
-                    .uri("/api/openchamber/relay/disable")
+                    .uri("/api/gridforge/relay/disable")
                     .body(axum::body::Body::empty())
                     .unwrap(),
             )

@@ -334,7 +334,7 @@ fn shell_candidates() -> Vec<PathBuf> {
             }
         };
 
-        if let Ok(s) = std::env::var("OPENCHAMBER_TERMINAL_SHELL") {
+        if let Ok(s) = std::env::var("GRIDFORGE_TERMINAL_SHELL") {
             let s = s.trim();
             if !s.is_empty() {
                 push(PathBuf::from(s));
@@ -365,7 +365,7 @@ fn shell_candidates() -> Vec<PathBuf> {
                 candidates.push(c);
             }
         };
-        if let Ok(s) = std::env::var("OPENCHAMBER_TERMINAL_SHELL") {
+        if let Ok(s) = std::env::var("GRIDFORGE_TERMINAL_SHELL") {
             let s = s.trim();
             if !s.is_empty() {
                 push(PathBuf::from(s));

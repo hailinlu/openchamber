@@ -1,11 +1,11 @@
-  if (window.__openchamberPreviewBridgeInstalled) return;
-  window.__openchamberPreviewBridgeInstalled = true;
+  if (window.__gridforgePreviewBridgeInstalled) return;
+  window.__gridforgePreviewBridgeInstalled = true;
 
   const SOURCE = 'openchamber-preview-bridge';
   const VERSION = 1;
   const MAX_TEXT = 500;
   const MAX_ARG = 1000;
-  const TARGET_ORIGIN = typeof window.__openchamberPreviewTargetOrigin === 'string' ? window.__openchamberPreviewTargetOrigin : '';
+  const TARGET_ORIGIN = typeof window.__gridforgePreviewTargetOrigin === 'string' ? window.__gridforgePreviewTargetOrigin : '';
   let inspectMode = false;
   let lastHoverKey = '';
   let pendingHover = null;
@@ -76,8 +76,8 @@
   };
 
   const installColorSchemeMatchMediaPatch = () => {
-    if (window.__openchamberPreviewColorSchemePatched || typeof window.matchMedia !== 'function') return;
-    window.__openchamberPreviewColorSchemePatched = true;
+    if (window.__gridforgePreviewColorSchemePatched || typeof window.matchMedia !== 'function') return;
+    window.__gridforgePreviewColorSchemePatched = true;
     nativeMatchMedia = window.matchMedia.bind(window);
     window.matchMedia = function(query) {
       const nativeMql = nativeMatchMedia(query);
@@ -129,7 +129,7 @@
     try {
       const root = document.documentElement;
       root.style.colorScheme = next;
-      root.dataset.openchamberPreviewColorScheme = next;
+      root.dataset.gridforgePreviewColorScheme = next;
       if (shouldSyncDataTheme()) {
         root.dataset.theme = next;
       }
@@ -277,8 +277,8 @@
   };
 
   const installViteHmrProxyPatch = () => {
-    if (window.__openchamberViteHmrProxyPatched || typeof window.WebSocket !== 'function') return;
-    window.__openchamberViteHmrProxyPatched = true;
+    if (window.__gridforgeViteHmrProxyPatched || typeof window.WebSocket !== 'function') return;
+    window.__gridforgeViteHmrProxyPatched = true;
     const NativeWebSocket = window.WebSocket;
     const proxyMatch = window.location.pathname.match(/^(\/api\/preview\/proxy\/[a-f0-9]{16,64})(?:\/|$)/i);
     if (!proxyMatch) return;
@@ -345,8 +345,8 @@
   };
 
   const installAppRequestProxyPatch = () => {
-    if (window.__openchamberAppRequestProxyPatched) return;
-    window.__openchamberAppRequestProxyPatched = true;
+    if (window.__gridforgeAppRequestProxyPatched) return;
+    window.__gridforgeAppRequestProxyPatched = true;
     const proxyMatch = window.location.pathname.match(/^(\/api\/preview\/proxy\/[a-f0-9]{16,64})(?:\/|$)/i);
     if (!proxyMatch) return;
     const proxyBase = proxyMatch[1];
@@ -579,9 +579,9 @@
   const sendHover = (event) => {
     if (!inspectMode) return;
     pendingHover = event;
-    if (window.__openchamberPreviewHoverFrame) return;
-    window.__openchamberPreviewHoverFrame = window.requestAnimationFrame(() => {
-      window.__openchamberPreviewHoverFrame = 0;
+    if (window.__gridforgePreviewHoverFrame) return;
+    window.__gridforgePreviewHoverFrame = window.requestAnimationFrame(() => {
+      window.__gridforgePreviewHoverFrame = 0;
       const currentEvent = pendingHover;
       pendingHover = null;
       if (!currentEvent || !inspectMode) return;

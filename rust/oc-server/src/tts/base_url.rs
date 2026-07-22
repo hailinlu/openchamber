@@ -44,7 +44,7 @@ pub fn normalize_custom_openai_base_url(value: &str) -> Result<Option<String>, S
     let allow_remote = is_remote_allowed();
     if !allow_remote && !is_allowed_local_host(host) {
         return Err(
-            "Remote custom server URLs are disabled. Set OPENCHAMBER_ALLOW_REMOTE_OPENAI_COMPAT_URLS=true to allow this host."
+            "Remote custom server URLs are disabled. Set GRIDFORGE_ALLOW_REMOTE_OPENAI_COMPAT_URLS=true to allow this host."
                 .to_string(),
         );
     }
@@ -82,9 +82,9 @@ fn normalize_hostname(hostname: &str) -> String {
     }
 }
 
-/// `OPENCHAMBER_RUNTIME=desktop` 或 `OPENCHAMBER_ALLOW_REMOTE_OPENAI_COMPAT_URLS=1|true` 时允许远程 URL。
+/// `GRIDFORGE_RUNTIME=desktop` 或 `GRIDFORGE_ALLOW_REMOTE_OPENAI_COMPAT_URLS=1|true` 时允许远程 URL。
 fn is_remote_allowed() -> bool {
-    let runtime = std::env::var("OPENCHAMBER_RUNTIME")
+    let runtime = std::env::var("GRIDFORGE_RUNTIME")
         .ok()
         .map(|v| v.trim().to_lowercase())
         .unwrap_or_default();
@@ -92,7 +92,7 @@ fn is_remote_allowed() -> bool {
         return true;
     }
     is_env_flag_enabled(
-        &std::env::var("OPENCHAMBER_ALLOW_REMOTE_OPENAI_COMPAT_URLS").unwrap_or_default(),
+        &std::env::var("GRIDFORGE_ALLOW_REMOTE_OPENAI_COMPAT_URLS").unwrap_or_default(),
     )
 }
 
@@ -122,12 +122,12 @@ pub(crate) mod tests {
     impl Drop for EnvGuard {
         fn drop(&mut self) {
             match &self.prev_runtime {
-                Some(v) => std::env::set_var("OPENCHAMBER_RUNTIME", v),
-                None => std::env::remove_var("OPENCHAMBER_RUNTIME"),
+                Some(v) => std::env::set_var("GRIDFORGE_RUNTIME", v),
+                None => std::env::remove_var("GRIDFORGE_RUNTIME"),
             }
             match &self.prev_allow_remote {
-                Some(v) => std::env::set_var("OPENCHAMBER_ALLOW_REMOTE_OPENAI_COMPAT_URLS", v),
-                None => std::env::remove_var("OPENCHAMBER_ALLOW_REMOTE_OPENAI_COMPAT_URLS"),
+                Some(v) => std::env::set_var("GRIDFORGE_ALLOW_REMOTE_OPENAI_COMPAT_URLS", v),
+                None => std::env::remove_var("GRIDFORGE_ALLOW_REMOTE_OPENAI_COMPAT_URLS"),
             }
         }
     }
@@ -138,10 +138,10 @@ pub(crate) mod tests {
     /// (含 set_var + 断言) 在锁内执行, 避免并行竞争。
     fn lock_env_block_remote() -> EnvGuard {
         let lock = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        let prev_runtime = std::env::var("OPENCHAMBER_RUNTIME").ok();
-        let prev_allow_remote = std::env::var("OPENCHAMBER_ALLOW_REMOTE_OPENAI_COMPAT_URLS").ok();
-        std::env::remove_var("OPENCHAMBER_RUNTIME");
-        std::env::remove_var("OPENCHAMBER_ALLOW_REMOTE_OPENAI_COMPAT_URLS");
+        let prev_runtime = std::env::var("GRIDFORGE_RUNTIME").ok();
+        let prev_allow_remote = std::env::var("GRIDFORGE_ALLOW_REMOTE_OPENAI_COMPAT_URLS").ok();
+        std::env::remove_var("GRIDFORGE_RUNTIME");
+        std::env::remove_var("GRIDFORGE_ALLOW_REMOTE_OPENAI_COMPAT_URLS");
         EnvGuard {
             prev_runtime,
             prev_allow_remote,
@@ -213,7 +213,7 @@ pub(crate) mod tests {
     #[test]
     fn remote_host_allowed_when_env_flag_set() {
         let _g = lock_env_block_remote();
-        std::env::set_var("OPENCHAMBER_ALLOW_REMOTE_OPENAI_COMPAT_URLS", "true");
+        std::env::set_var("GRIDFORGE_ALLOW_REMOTE_OPENAI_COMPAT_URLS", "true");
         let result = normalize_custom_openai_base_url("https://api.example.com/v1").unwrap();
         assert_eq!(result, Some("https://api.example.com/v1".to_string()));
     }
@@ -221,7 +221,7 @@ pub(crate) mod tests {
     #[test]
     fn remote_host_allowed_when_runtime_desktop() {
         let _g = lock_env_block_remote();
-        std::env::set_var("OPENCHAMBER_RUNTIME", "desktop");
+        std::env::set_var("GRIDFORGE_RUNTIME", "desktop");
         let result = normalize_custom_openai_base_url("https://api.example.com/v1").unwrap();
         assert_eq!(result, Some("https://api.example.com/v1".to_string()));
     }

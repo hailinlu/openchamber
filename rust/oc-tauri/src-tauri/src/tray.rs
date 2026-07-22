@@ -982,7 +982,7 @@ const TRAY_ID: &str = "main_tray";
 /// 托盘动作 → menu-action channel payload 决策 (pure helper)。
 ///
 /// 与 `menu.rs::handle_menu_event` 中自定义项的 fallthrough 保持一致:
-/// emit `openchamber:menu-action`, detail = 去掉 `tray_` 前缀后的 action 名。
+/// emit `gridforge:menu-action`, detail = 去掉 `tray_` 前缀后的 action 名。
 /// UI 侧 `useMenuActions.handleAction` 收到 `"new_mini_chat"` / `"new_session"`
 /// 等 detail 后走与文件菜单相同的分发路径, 避免引入新事件名。
 ///
@@ -996,7 +996,7 @@ fn tray_menu_action_payload(action_id: &str) -> Option<Value> {
         return None;
     }
     Some(json!({
-        "event": "openchamber:menu-action",
+        "event": "gridforge:menu-action",
         "detail": action,
     }))
 }
@@ -1322,12 +1322,12 @@ fn handle_tray_menu_click(app: &AppHandle, id: &str) {
     match action {
         TrayAction::NewSession => {
             if let Some(payload) = tray_menu_action_payload("tray_new_session") {
-                let _ = app.emit("openchamber:emit", payload);
+                let _ = app.emit("gridforge:emit", payload);
             }
         }
         TrayAction::NewMiniChat => {
             if let Some(payload) = tray_menu_action_payload("tray_new_mini_chat") {
-                let _ = app.emit("openchamber:emit", payload);
+                let _ = app.emit("gridforge:emit", payload);
             }
         }
         TrayAction::ShowMain => {
@@ -1343,9 +1343,9 @@ fn handle_tray_menu_click(app: &AppHandle, id: &str) {
                 "directory": directory,
             });
             let _ = app.emit(
-                "openchamber:emit",
+                "gridforge:emit",
                 json!({
-                    "event": "openchamber:open-session",
+                    "event": "gridforge:open-session",
                     "detail": detail,
                 }),
             );
@@ -1357,9 +1357,9 @@ fn handle_tray_menu_click(app: &AppHandle, id: &str) {
                 "directory": directory,
             });
             let _ = app.emit(
-                "openchamber:emit",
+                "gridforge:emit",
                 json!({
-                    "event": "openchamber:open-session",
+                    "event": "gridforge:open-session",
                     "detail": detail,
                 }),
             );
@@ -1378,9 +1378,9 @@ fn handle_tray_menu_click(app: &AppHandle, id: &str) {
                 "response": response.as_str(),
             });
             let _ = app.emit(
-                "openchamber:emit",
+                "gridforge:emit",
                 json!({
-                    "event": "openchamber:tray-action",
+                    "event": "gridforge:tray-action",
                     "detail": detail,
                 }),
             );
@@ -1398,7 +1398,7 @@ mod tests {
     #[test]
     fn parse_snapshot_with_camel_case_fields() {
         let value = json!({
-            "instanceName": "Local OpenChamber",
+            "instanceName": "Local GridForge",
             "dockBadgeCount": 2,
             "sessions": [{
                 "id": "sess-1",
@@ -1425,7 +1425,7 @@ mod tests {
         });
 
         let snap = parse_snapshot(&value);
-        assert_eq!(snap.instance_name, "Local OpenChamber");
+        assert_eq!(snap.instance_name, "Local GridForge");
         assert_eq!(snap.dock_badge_count, 2);
         assert_eq!(snap.sessions.len(), 1);
         assert_eq!(snap.sessions[0].id, "sess-1");
@@ -1486,9 +1486,9 @@ mod tests {
     // ---- pure model helpers ----
 
     fn build_basic_model() -> TrayMenuModel {
-        let mut model = TrayMenuModel::new("Local OpenChamber");
+        let mut model = TrayMenuModel::new("Local GridForge");
         model.push(TrayMenuEntry::Header {
-            label: "Local OpenChamber".to_string(),
+            label: "Local GridForge".to_string(),
         });
         model.push(TrayMenuEntry::Separator);
         model.push(TrayMenuEntry::Subheader {
@@ -1520,7 +1520,7 @@ mod tests {
     fn contains_label_finds_top_level_entries() {
         let model = build_basic_model();
         assert!(model.contains_label("1. Build parity"));
-        assert!(model.contains_label("Local OpenChamber"));
+        assert!(model.contains_label("Local GridForge"));
         assert!(!model.contains_label("Bogus Item"));
     }
 
@@ -1938,7 +1938,7 @@ mod tests {
         assert_eq!(
             payload,
             json!({
-                "event": "openchamber:menu-action",
+                "event": "gridforge:menu-action",
                 "detail": "new_session",
             })
         );
@@ -1946,20 +1946,20 @@ mod tests {
 
     #[test]
     fn tray_menu_action_payload_new_mini_chat_uses_menu_action_channel() {
-        // 关键 review 修复: 不再 emit `openchamber:open-mini-chat` 这一新事件,
-        // 改为 emit `openchamber:menu-action` + detail "new_mini_chat",
+        // 关键 review 修复: 不再 emit `gridforge:open-mini-chat` 这一新事件,
+        // 改为 emit `gridforge:menu-action` + detail "new_mini_chat",
         // 与 menu.rs:71 (menu_new_mini_chat) + menu.rs:201-208 fallthrough
         // 行为完全一致。
         let payload = tray_menu_action_payload("tray_new_mini_chat").expect("payload");
         assert_eq!(
             payload,
             json!({
-                "event": "openchamber:menu-action",
+                "event": "gridforge:menu-action",
                 "detail": "new_mini_chat",
             })
         );
-        // 防回归: 不再使用旧的 `openchamber:open-mini-chat` 事件名。
-        assert_ne!(payload["event"], "openchamber:open-mini-chat");
+        // 防回归: 不再使用旧的 `gridforge:open-mini-chat` 事件名。
+        assert_ne!(payload["event"], "gridforge:open-mini-chat");
     }
 
     #[test]

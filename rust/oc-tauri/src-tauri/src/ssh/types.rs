@@ -16,7 +16,7 @@ pub struct Instance {
     #[serde(default = "default_connection_timeout")]
     pub connection_timeout_sec: u32,
     #[serde(default)]
-    pub remote_openchamber: RemoteOpenchamber,
+    pub remote_gridforge: RemoteGridForge,
     #[serde(default)]
     pub local_forward: LocalForward,
     #[serde(default)]
@@ -38,7 +38,7 @@ pub struct ParsedSsh {
 
 /// 远程 OpenChamber 配置。
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct RemoteOpenchamber {
+pub struct RemoteGridForge {
     #[serde(default = "default_mode")]
     pub mode: String,
     #[serde(default = "default_true_fn")]
@@ -61,7 +61,7 @@ fn default_install_method() -> String {
     "bun".to_string()
 }
 
-impl Default for RemoteOpenchamber {
+impl Default for RemoteGridForge {
     fn default() -> Self {
         Self {
             mode: default_mode(),
@@ -102,7 +102,7 @@ pub struct Auth {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub ssh_password: Option<StoredSecret>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub openchamber_password: Option<StoredSecret>,
+    pub gridforge_password: Option<StoredSecret>,
 }
 
 

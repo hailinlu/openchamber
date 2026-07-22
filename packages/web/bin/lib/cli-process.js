@@ -123,7 +123,7 @@ function readProcessCmdline(pid) {
   return null;
 }
 
-function isOpenchamberCmdline(cmdline) {
+function isGridforgeCmdline(cmdline) {
   if (typeof cmdline !== 'string' || cmdline.length === 0) {
     return false;
   }
@@ -135,7 +135,7 @@ function isOpenchamberCmdline(cmdline) {
   return cmdline.toLowerCase().includes('openchamber');
 }
 
-// Liveness + identity — "is the OpenChamber instance recorded in a pid file
+// Liveness + identity — "is the GridForge instance recorded in a pid file
 // still the process running under this PID". Use this (not isProcessRunning)
 // when validating a PID read from a pid file. After an ungraceful shutdown
 // removePidFile never runs, so the stale PID can be recycled to an unrelated
@@ -163,7 +163,7 @@ function getOpenchamberProcessState(pid, options = {}) {
   if (cmdline === null) {
     return 'unknown';
   }
-  return isOpenchamberCmdline(cmdline) ? 'matched' : 'mismatched';
+  return isGridforgeCmdline(cmdline) ? 'matched' : 'mismatched';
 }
 
 function hasOpenchamberRuntimeInfo(info) {
@@ -283,7 +283,7 @@ export {
   writeInstanceOptions,
   removeInstanceFile,
   isProcessRunning,
-  isOpenchamberCmdline,
+  isGridforgeCmdline,
   isOpenchamberProcessRunning,
   getOpenchamberProcessState,
   hasOpenchamberRuntimeInfo,

@@ -311,7 +311,7 @@ pub async fn notification_stream(
     tokio::spawn(async move {
         // 发送 stream-ready 事件
         let ready = json!({
-            "type": "openchamber:notification-stream-ready",
+            "type": "gridforge:notification-stream-ready",
             "properties": { "uiToken": ui_token }
         });
         let ready_bytes = Bytes::from(format!("data: {}\n\n", ready));

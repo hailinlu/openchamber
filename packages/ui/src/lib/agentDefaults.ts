@@ -1,4 +1,4 @@
-// Default prompt fragments shipped with OpenChamber. They appear as
+// Default prompt fragments shipped with GridForge. They appear as
 // placeholder text in the Settings → Agents → System Prompt textarea and
 // as initial seed text in Settings → Behavior → Global AGENTS.md.
 // Users can overwrite them — these are hints, not hard rules.

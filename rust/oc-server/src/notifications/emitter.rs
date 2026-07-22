@@ -76,7 +76,7 @@ impl NotificationEmitter {
 
     /// 广播 UI 通知。
     ///
-    /// 对应 Node `broadcastUiNotification`。包装为 `{type:'openchamber:notification', properties:{...}}`
+    /// 对应 Node `broadcastUiNotification`。包装为 `{type:'gridforge:notification', properties:{...}}`
     /// + `desktopNotificationDelivered` + `desktopStdoutActive` 标记, 然后 SSE 广播。
     pub fn broadcast_ui_notification(&self, payload: &Value, desktop_delivered: bool) {
         let mut properties = match payload.as_object() {
@@ -90,7 +90,7 @@ impl NotificationEmitter {
         properties.insert("desktopStdoutActive".to_string(), Value::Bool(false));
 
         let synthetic = json!({
-            "type": "openchamber:notification",
+            "type": "gridforge:notification",
             "properties": properties,
         });
 
@@ -137,7 +137,7 @@ mod tests {
 
         let received = rx.try_recv().unwrap();
         let text = String::from_utf8(received.to_vec()).unwrap();
-        assert!(text.contains("openchamber:notification"));
+        assert!(text.contains("gridforge:notification"));
         assert!(text.contains("desktopNotificationDelivered"));
         assert!(text.contains("Test"));
     }

@@ -18,7 +18,7 @@ import {
   getWorktreeSetupWaitEnabled,
   saveWorktreeSetupCommands,
   saveWorktreeSetupWaitEnabled,
-} from '@/lib/openchamberConfig';
+} from '@/lib/gridforgeConfig';
 import { listProjectWorktrees } from '@/lib/worktrees/worktreeManager';
 import { sessionEvents } from '@/lib/sessionEvents';
 import type { WorktreeMetadata } from '@/types/worktree';
@@ -178,13 +178,13 @@ export const WorktreeSectionContent: React.FC<WorktreeSectionContentProps> = ({ 
     try {
       const ok = await saveWorktreeSetupCommands(projectRef, filtered);
       if (!ok) {
-        toast.error(t('settings.openchamber.worktrees.setup.toast.saveFailed'));
+        toast.error(t('settings.gridforge.worktrees.setup.toast.saveFailed'));
         return false;
       }
       setCommandsSnapshot(JSON.stringify(commands));
       return true;
     } catch {
-      toast.error(t('settings.openchamber.worktrees.setup.toast.saveFailed'));
+      toast.error(t('settings.gridforge.worktrees.setup.toast.saveFailed'));
       return false;
     }
   }, [projectRef, t]);
@@ -331,11 +331,11 @@ export const WorktreeSectionContent: React.FC<WorktreeSectionContentProps> = ({ 
         <Icon name="information" className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
       </TooltipTrigger>
       <TooltipContent sideOffset={8} className="max-w-xs">
-        {t('settings.openchamber.worktrees.setup.tooltipPrefix')}
+        {t('settings.gridforge.worktrees.setup.tooltipPrefix')}
         {' '}
         <code className="font-mono text-xs bg-sidebar-accent/50 px-1 rounded">$ROOT_PROJECT_PATH</code>
         {' '}
-        {t('settings.openchamber.worktrees.setup.tooltipSuffix')}
+        {t('settings.gridforge.worktrees.setup.tooltipSuffix')}
       </TooltipContent>
     </Tooltip>
   );
@@ -346,7 +346,7 @@ export const WorktreeSectionContent: React.FC<WorktreeSectionContentProps> = ({ 
         <Icon name="information" className="h-3.5 w-3.5 text-muted-foreground/60 cursor-help" />
       </TooltipTrigger>
       <TooltipContent sideOffset={8} className="max-w-xs">
-        {t('settings.openchamber.worktrees.list.tooltip')}
+        {t('settings.gridforge.worktrees.list.tooltip')}
       </TooltipContent>
     </Tooltip>
   );
@@ -358,7 +358,7 @@ export const WorktreeSectionContent: React.FC<WorktreeSectionContentProps> = ({ 
         settingsItem="projects.worktree"
       >
         <p className="typography-meta text-muted-foreground">
-          {t('settings.openchamber.worktrees.state.selectProject')}
+          {t('settings.gridforge.worktrees.state.selectProject')}
         </p>
       </ProjectSettingsSubsection>
     );
@@ -371,7 +371,7 @@ export const WorktreeSectionContent: React.FC<WorktreeSectionContentProps> = ({ 
         settingsItem="projects.worktree"
       >
         <p className="typography-meta text-muted-foreground">
-          {t('settings.openchamber.worktrees.state.gitOnly')}
+          {t('settings.gridforge.worktrees.state.gitOnly')}
         </p>
       </ProjectSettingsSubsection>
     );
@@ -385,7 +385,7 @@ export const WorktreeSectionContent: React.FC<WorktreeSectionContentProps> = ({ 
         titleAccessory={setupTooltip}
       >
         {isLoadingCommands ? (
-          <p className="typography-meta text-muted-foreground">{t('settings.openchamber.worktrees.setup.loading')}</p>
+          <p className="typography-meta text-muted-foreground">{t('settings.gridforge.worktrees.setup.loading')}</p>
         ) : (
           <div className={cn('space-y-2', PROJECT_SETTINGS_CONTROL_WIDTH)}>
             {setupCommands.map((command, index) => (
@@ -394,14 +394,14 @@ export const WorktreeSectionContent: React.FC<WorktreeSectionContentProps> = ({ 
                   value={command}
                   onChange={(e) => handleSetupCommandChange(index, e.target.value)}
                   onBlur={handleCommandBlur}
-                  placeholder={t('settings.openchamber.worktrees.setup.commandPlaceholder')}
+                  placeholder={t('settings.gridforge.worktrees.setup.commandPlaceholder')}
                   className="h-7 min-w-0 flex-1 font-mono text-xs"
                 />
                 <button
                   type="button"
                   onClick={() => handleRemoveCommand(index)}
                   className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
-                  aria-label={t('settings.openchamber.worktrees.setup.removeCommandAria')}
+                  aria-label={t('settings.gridforge.worktrees.setup.removeCommandAria')}
                 >
                   <Icon name="close" className="h-4 w-4" />
                 </button>
@@ -415,7 +415,7 @@ export const WorktreeSectionContent: React.FC<WorktreeSectionContentProps> = ({ 
               onClick={handleAddCommand}
             >
               <Icon name="add" className="h-3.5 w-3.5" />
-              {t('settings.openchamber.worktrees.setup.addCommand')}
+              {t('settings.gridforge.worktrees.setup.addCommand')}
             </Button>
             <label
               data-settings-item="projects.worktree.setup.wait"
@@ -424,13 +424,13 @@ export const WorktreeSectionContent: React.FC<WorktreeSectionContentProps> = ({ 
               <Checkbox
                 checked={waitForSetupCommands}
                 onChange={handleWaitForSetupCommandsChange}
-                ariaLabel={t('settings.openchamber.worktrees.setup.waitForCommandsAria')}
+                ariaLabel={t('settings.gridforge.worktrees.setup.waitForCommandsAria')}
               />
               <span className={cn(
                 'typography-ui-label font-normal',
                 waitForSetupCommands ? 'text-foreground' : 'text-foreground/60'
               )}>
-                {t('settings.openchamber.worktrees.setup.waitForCommands')}
+                {t('settings.gridforge.worktrees.setup.waitForCommands')}
               </span>
             </label>
           </div>
@@ -438,14 +438,14 @@ export const WorktreeSectionContent: React.FC<WorktreeSectionContentProps> = ({ 
       </ProjectSettingsSubsection>
 
       <ProjectSettingsSubsection
-        title={t('settings.openchamber.worktrees.list.title')}
+        title={t('settings.gridforge.worktrees.list.title')}
         titleAccessory={listTooltip}
       >
         {isLoadingWorktrees ? (
-          <p className="typography-meta text-muted-foreground">{t('settings.openchamber.worktrees.list.loading')}</p>
+          <p className="typography-meta text-muted-foreground">{t('settings.gridforge.worktrees.list.loading')}</p>
         ) : availableWorktrees.length === 0 ? (
           <p className="typography-meta text-muted-foreground/70">
-            {t('settings.openchamber.worktrees.list.empty')}
+            {t('settings.gridforge.worktrees.list.empty')}
           </p>
         ) : (
           <div className={cn('space-y-1', PROJECT_SETTINGS_CONTROL_WIDTH)}>
@@ -457,7 +457,7 @@ export const WorktreeSectionContent: React.FC<WorktreeSectionContentProps> = ({ 
                 <div className="min-w-0 flex-1">
                   <div className="flex min-w-0 items-center gap-2">
                     <p className="typography-meta min-w-0 truncate text-foreground">
-                      {worktree.label || worktree.branch || t('settings.openchamber.worktrees.list.detachedHead')}
+                      {worktree.label || worktree.branch || t('settings.gridforge.worktrees.list.detachedHead')}
                     </p>
                     <span className="typography-micro flex-shrink-0 self-center rounded bg-sidebar-accent/40 px-1.5 py-[1px] leading-none text-muted-foreground/60">
                       OpenCode
@@ -474,7 +474,7 @@ export const WorktreeSectionContent: React.FC<WorktreeSectionContentProps> = ({ 
                     'flex h-7 w-7 shrink-0 items-center justify-center rounded text-muted-foreground/50 transition-opacity hover:bg-destructive/10 hover:text-destructive focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                     alwaysShowActions ? 'opacity-100' : 'opacity-0 group-hover:opacity-100'
                   )}
-                  aria-label={t('settings.openchamber.worktrees.list.deleteWorktreeAria', { name: worktree.branch || worktree.label || worktree.path })}
+                  aria-label={t('settings.gridforge.worktrees.list.deleteWorktreeAria', { name: worktree.branch || worktree.label || worktree.path })}
                 >
                   <Icon name="delete-bin" className="h-4 w-4" />
                 </button>

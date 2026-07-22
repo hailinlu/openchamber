@@ -185,7 +185,7 @@ export type DesktopSettings = {
   // Message limit — controls fetch, trim, and Load More chunk size (default: 200)
   messageLimit?: number;
 
-  // User-added skills catalogs (persisted to ~/.config/openchamber/settings.json)
+  // User-added skills catalogs (persisted to ~/.config/gridforge/settings.json)
   skillCatalogs?: SkillCatalogConfig[];
   // Opt-in to send anonymous usage reports for update checks (default: true)
   reportUsage?: boolean;
@@ -226,19 +226,19 @@ type ElectronRuntimeGlobal = {
 
 const getElectronRuntime = (): ElectronRuntimeGlobal | null => {
   if (typeof window === 'undefined') return null;
-  return (window as unknown as { __OPENCHAMBER_ELECTRON__?: ElectronRuntimeGlobal }).__OPENCHAMBER_ELECTRON__ ?? null;
+  return (window as unknown as { __GRIDFORGE_ELECTRON__?: ElectronRuntimeGlobal }).__GRIDFORGE_ELECTRON__ ?? null;
 };
 
 const getDesktopBridge = (): DesktopBridgeGlobal | null => {
   if (typeof window === 'undefined') return null;
-  return (window as unknown as { __OPENCHAMBER_DESKTOP__?: DesktopBridgeGlobal }).__OPENCHAMBER_DESKTOP__ ?? null;
+  return (window as unknown as { __GRIDFORGE_DESKTOP__?: DesktopBridgeGlobal }).__GRIDFORGE_DESKTOP__ ?? null;
 };
 
 export const isElectronShell = (): boolean => getElectronRuntime()?.runtime === 'electron';
 
 /** Tauri 壳检测 — 基于 `withGlobalTauri: true` 注入的 `window.__TAURI__`。
  *  此全局变量通过 `AddScriptToExecuteOnDocumentCreated` 设置,
- *  在页面脚本运行前即存在, 因此比 `window.__OPENCHAMBER_ELECTRON__` 更早可用。 */
+ *  在页面脚本运行前即存在, 因此比 `window.__GRIDFORGE_ELECTRON__` 更早可用。 */
 export const isTauriShell = (): boolean => {
   if (typeof window === 'undefined') return false;
   return typeof (window as unknown as Record<string, unknown>).__TAURI__ !== 'undefined';
@@ -246,7 +246,7 @@ export const isTauriShell = (): boolean => {
 
 export const getElectronPlatform = (): string | null => {
   if (typeof window === 'undefined') return null;
-  const platform = (window as unknown as { __OPENCHAMBER_PLATFORM__?: string }).__OPENCHAMBER_PLATFORM__;
+  const platform = (window as unknown as { __GRIDFORGE_PLATFORM__?: string }).__GRIDFORGE_PLATFORM__;
   return typeof platform === 'string' ? platform : null;
 };
 
@@ -256,9 +256,9 @@ export const DESKTOP_WINDOW_CONTROLS_WIDTH_PX = 132;
 /** Windows and Linux use frameless windows with in-app minimize/maximize/close controls. */
 /** Windows 和 Linux 使用无边框窗口，需在 UI 中内嵌最小化/最大化/关闭按钮。
  *
- *  Electron: 检测 `__OPENCHAMBER_ELECTRON__` + `__OPENCHAMBER_PLATFORM__`。
+ *  Electron: 检测 `__GRIDFORGE_ELECTRON__` + `__GRIDFORGE_PLATFORM__`。
  *  Tauri: 检测 `__TAURI__` 全局变量 (由 `withGlobalTauri` 在页面脚本前注入)，
- *  平台信息从 `__OPENCHAMBER_PLATFORM__` (桥注入后) 或 `navigator.userAgent` (桥注入前) 获取。 */
+ *  平台信息从 `__GRIDFORGE_PLATFORM__` (桥注入后) 或 `navigator.userAgent` (桥注入前) 获取。 */
 export const usesFramelessElectronChrome = (): boolean => {
   if (!isDesktopShell()) return false;
 
@@ -326,7 +326,7 @@ export const invokeDesktop = async <T = unknown>(command: string, args?: Record<
         | { core?: { invoke?: (cmd: string, args?: Record<string, unknown>) => Promise<unknown> } }
         | undefined;
       if (typeof tauri?.core?.invoke === 'function') {
-        return (await tauri.core.invoke('openchamber_invoke', {
+        return (await tauri.core.invoke('gridforge_invoke', {
           cmd: command,
           args: args ?? {},
         })) as T;
@@ -501,7 +501,7 @@ export const isDesktopLocalOriginActive = (): boolean => {
     return true;
   }
 
-  const local = typeof window.__OPENCHAMBER_LOCAL_ORIGIN__ === 'string' ? window.__OPENCHAMBER_LOCAL_ORIGIN__ : '';
+  const local = typeof window.__GRIDFORGE_LOCAL_ORIGIN__ === 'string' ? window.__GRIDFORGE_LOCAL_ORIGIN__ : '';
   const localUrl = parseUrl(local);
   const runtimeApiUrl = parseUrl(getRuntimeApiBaseUrl());
 
@@ -590,7 +590,7 @@ export const isWebRuntime = (): boolean => {
 
 export const getDesktopHomeDirectory = async (): Promise<string | null> => {
   if (typeof window !== 'undefined') {
-    const embedded = window.__OPENCHAMBER_HOME__;
+    const embedded = window.__GRIDFORGE_HOME__;
     if (embedded && embedded.length > 0) {
       return embedded;
     }
@@ -734,7 +734,7 @@ export const downloadDesktopUpdate = async (
 
   try {
     if (typeof onProgress === 'function' && bridge?.listen) {
-      unlisten = await bridge.listen('openchamber:update-progress', (evt) => {
+      unlisten = await bridge.listen('gridforge:update-progress', (evt) => {
         const payload = evt?.payload;
         if (!payload || typeof payload !== 'object') return;
         const data = payload as { event?: unknown; data?: unknown };

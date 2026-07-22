@@ -116,7 +116,7 @@ pub async fn transcribe_audio(opts: TranscribeOptions) -> Result<String, String>
 }
 
 /// Multipart 边界 — 必须全局稳定以保证 body 与 Content-Type 一致。
-pub(crate) const MULTIPART_BOUNDARY: &str = "----OpenChamberSTTBoundary7MA4YWxkTrZu0gW";
+pub(crate) const MULTIPART_BOUNDARY: &str = "----GridForgeSTTBoundary7MA4YWxkTrZu0gW";
 
 /// 构造 multipart/form-data body。
 ///

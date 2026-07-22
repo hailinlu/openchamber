@@ -5,8 +5,8 @@
 //! - `PUT    /api/projects/:projectId/scheduled-tasks`              → upsert
 //! - `DELETE /api/projects/:projectId/scheduled-tasks/:taskId`      → delete
 //! - `POST   /api/projects/:projectId/scheduled-tasks/:taskId/run`  → manual run
-//! - `GET    /api/openchamber/scheduled-tasks/status`               → global status
-//! - `GET    /api/openchamber/events`                               → SSE (event stream)
+//! - `GET    /api/gridforge/scheduled-tasks/status`               → global status
+//! - `GET    /api/gridforge/events`                               → SSE (event stream)
 //!
 //! 错误处理: 路径参数校验失败 → 400; project 不存在 → 404; task already
 //! running/queued → 409; task not found/disabled → 404。
@@ -33,11 +33,11 @@ use crate::state::AppState;
 /// `tokio::sync::broadcast` 而不是 `HashSet<Sse>` 是因为后者不容易在 axum
 /// response 上 Clone)。
 #[derive(Default)]
-pub struct OpenChamberEventClients {
+pub struct GridForgeEventClients {
     clients: Mutex<Vec<tokio::sync::broadcast::Sender<Value>>>,
 }
 
-impl OpenChamberEventClients {
+impl GridForgeEventClients {
     pub fn new() -> Self {
         Self {
             clients: Mutex::new(Vec::new()),
@@ -268,7 +268,7 @@ pub async fn run_scheduled_task(
     })))
 }
 
-/// `GET /api/openchamber/scheduled-tasks/status`
+/// `GET /api/gridforge/scheduled-tasks/status`
 pub async fn scheduled_tasks_status(
     State(state): State<Arc<AppState>>,
 ) -> ApiResult<Json<Value>> {
@@ -281,17 +281,17 @@ pub async fn scheduled_tasks_status(
     })))
 }
 
-/// `GET /api/openchamber/events` — long-lived SSE.
+/// `GET /api/gridforge/events` — long-lived SSE.
 //
 // Register a new broadcast::Sender, return Sse stream that:
-//   - immediately sends `openchamber:event-stream-ready`
-//   - sends `openchamber:heartbeat` every 25s
+//   - immediately sends `gridforge:event-stream-ready`
+//   - sends `gridforge:heartbeat` every 25s
 //   - forwards broadcast messages from runtime (if any)
 //   - removes the sender on drop (cleanup)
-pub async fn openchamber_events(
+pub async fn gridforge_events(
     State(state): State<Arc<AppState>>,
 ) -> Sse<impl Stream<Item = Result<sse::Event, Infallible>>> {
-    let tx = state.open_chamber_event_clients.register().await;
+    let tx = state.gridforge_event_clients.register().await;
     let mut rx = tx.subscribe();
 
     let mut heartbeat = interval(Duration::from_secs(25));
@@ -299,7 +299,7 @@ pub async fn openchamber_events(
 
     // initial ready event (synchronously emitted)
     let ready_payload = json!({
-        "type": "openchamber:event-stream-ready",
+        "type": "gridforge:event-stream-ready",
         "properties": { "connectedAt": chrono::Utc::now().timestamp_millis() }
     });
 
@@ -312,7 +312,7 @@ pub async fn openchamber_events(
                 // 心跳 — 25s
                 _ = heartbeat.tick() => {
                     let payload = json!({
-                        "type": "openchamber:heartbeat",
+                        "type": "gridforge:heartbeat",
                         "properties": { "timestamp": chrono::Utc::now().timestamp_millis() }
                     });
                     yield Ok(sse::Event::default().data(payload.to_string()));
@@ -348,7 +348,7 @@ pub async fn openchamber_events(
 /// Health helper for tests — confirms an emitter was wired.
 #[allow(dead_code)]
 pub async fn probe_event_clients(state: &AppState) -> usize {
-    state.open_chamber_event_clients.clients.lock().await.len()
+    state.gridforge_event_clients.clients.lock().await.len()
 }
 
 // =========================================================================
@@ -377,10 +377,10 @@ mod tests {
     use crate::state::AppState;
     use clap::Parser;
 
-    /// Build an AppState with `OPENCHAMBER_DATA_DIR` pointing at a temp dir,
+    /// Build an AppState with `GRIDFORGE_DATA_DIR` pointing at a temp dir,
     /// write a project entry into `settings.json`, return the state.
     ///
-    /// 注意: `OPENCHAMBER_DATA_DIR` env var 在测试期间**保持设置** (不立即 restore),
+    /// 注意: `GRIDFORGE_DATA_DIR` env var 在测试期间**保持设置** (不立即 restore),
     /// 因为 `find_project_by_id` 在 handler 调用时才读 settings.json — 如果 env 已
     /// restore, read_settings 会去读真实 home 的 settings.json 而非 tmp 的。
     /// 测试间串行执行 (`--test-threads=1`) 避免并发 env 污染。
@@ -414,14 +414,14 @@ mod tests {
         (new_state, tmp)
     }
 
-    /// TempDir wrapper that sets `OPENCHAMBER_DATA_DIR` (and `HOME`) on creation
+    /// TempDir wrapper that sets `GRIDFORGE_DATA_DIR` (and `HOME`) on creation
     /// and restores them on Drop.
     ///
     /// 测试隔离: 通过共享 `auth::tests::TEST_LOCK` 串行化所有修改
-    /// `OPENCHAMBER_DATA_DIR` / `HOME` 的测试 (quota/credentials/store、
+    /// `GRIDFORGE_DATA_DIR` / `HOME` 的测试 (quota/credentials/store、
     /// session_goal/objectives、scheduled_tasks/routes), 防止并行竞争。
     /// `HOME` 一并指向临时目录, 使 `data_dir()` 的 fallback
-    /// (`~/.config/openchamber`) 也落在临时目录内。
+    /// (`~/.config/gridforge`) 也落在临时目录内。
     struct TempDirWithEnv {
         path: std::path::PathBuf,
         prev_data_dir: Option<String>,
@@ -432,7 +432,7 @@ mod tests {
     impl TempDirWithEnv {
         fn new() -> Self {
             // 串行化: 持有跨模块共享锁直到 Drop, 避免与同样改
-            // OPENCHAMBER_DATA_DIR/HOME 的测试并行竞争。
+            // GRIDFORGE_DATA_DIR/HOME 的测试并行竞争。
             let lock = crate::opencode::auth::tests::TEST_LOCK
                 .lock()
                 .unwrap_or_else(|e| e.into_inner());
@@ -442,9 +442,9 @@ mod tests {
                 chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
             ));
             let _ = std::fs::create_dir_all(&path);
-            let prev_data_dir = std::env::var("OPENCHAMBER_DATA_DIR").ok();
+            let prev_data_dir = std::env::var("GRIDFORGE_DATA_DIR").ok();
             let prev_home = std::env::var("HOME").ok();
-            std::env::set_var("OPENCHAMBER_DATA_DIR", &path);
+            std::env::set_var("GRIDFORGE_DATA_DIR", &path);
             std::env::set_var("HOME", &path);
             Self {
                 path,
@@ -459,8 +459,8 @@ mod tests {
         fn drop(&mut self) {
             // restore env BEFORE removing dir (read_settings may run during handler)
             match &self.prev_data_dir {
-                Some(p) => std::env::set_var("OPENCHAMBER_DATA_DIR", p),
-                None => std::env::remove_var("OPENCHAMBER_DATA_DIR"),
+                Some(p) => std::env::set_var("GRIDFORGE_DATA_DIR", p),
+                None => std::env::remove_var("GRIDFORGE_DATA_DIR"),
             }
             match &self.prev_home {
                 Some(p) => std::env::set_var("HOME", p),

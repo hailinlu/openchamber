@@ -6,8 +6,8 @@
 //! metadata 只携带 `objectiveFile: true` 标记, 从不携带路径 — 用户可写的
 //! metadata 不可能成为文件读向量。
 //!
-//! 文件路径: `$OPENCHAMBER_DATA_DIR/goals/<session_id>.md` 或
-//! `~/.config/openchamber/goals/<session_id>.md`。
+//! 文件路径: `$GRIDFORGE_DATA_DIR/goals/<session_id>.md` 或
+//! `~/.config/gridforge/goals/<session_id>.md`。
 //!
 //! 对应 Node `session-goal/objectives.js` (61 行)。
 
@@ -33,7 +33,7 @@ fn is_valid_objective_key(session_id: &str) -> bool {
         .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
 }
 
-/// `OPENCHAMBER_DATA_DIR` 或 `~/.config/openchamber` 下的 `goals` 目录。
+/// `GRIDFORGE_DATA_DIR` 或 `~/.config/gridforge` 下的 `goals` 目录。
 pub fn goals_dir() -> PathBuf {
     crate::github::settings::data_dir().join("goals")
 }
@@ -107,28 +107,28 @@ pub fn is_session_goal_enabled() -> bool {
 mod tests {
     use super::*;
 
-    /// 设置临时 OPENCHAMBER_DATA_DIR 并运行 async 测试体。
+    /// 设置临时 GRIDFORGE_DATA_DIR 并运行 async 测试体。
     /// 注意: env 是进程级, 测试需串行化。
     /// 使用 `auth::TEST_LOCK` 与 `config::with_temp_home` 共享锁, 跨模块防止 HOME/
-    /// OPENCHAMBER_DATA_DIR 互相污染。
+    /// GRIDFORGE_DATA_DIR 互相污染。
     #[allow(clippy::await_holding_lock)]
     async fn with_temp_data_dir<F: FnOnce(&PathBuf) -> std::pin::Pin<Box<dyn std::future::Future<Output = ()> + Send>>>(f: F) {
         use crate::opencode::auth::tests as auth_tests;
         let _guard = auth_tests::TEST_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
-        let prev = std::env::var("OPENCHAMBER_DATA_DIR").ok();
+        let prev = std::env::var("GRIDFORGE_DATA_DIR").ok();
         let tmp = std::env::temp_dir().join(format!(
             "oc-server-objectives-test-{}-{}",
             std::process::id(),
             chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
         ));
-        std::env::set_var("OPENCHAMBER_DATA_DIR", &tmp);
+        std::env::set_var("GRIDFORGE_DATA_DIR", &tmp);
         f(&tmp).await;
         if let Some(p) = prev {
-            std::env::set_var("OPENCHAMBER_DATA_DIR", p);
+            std::env::set_var("GRIDFORGE_DATA_DIR", p);
         } else {
-            std::env::remove_var("OPENCHAMBER_DATA_DIR");
+            std::env::remove_var("GRIDFORGE_DATA_DIR");
         }
         let _ = std::fs::remove_dir_all(&tmp);
     }

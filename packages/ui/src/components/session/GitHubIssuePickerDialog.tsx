@@ -421,7 +421,7 @@ export function GitHubIssuePickerDialog({
       void sessionActions.updateSessionTitle(sessionId, sessionTitle).catch(() => undefined);
 
       try {
-        useSessionUIStore.getState().initializeNewOpenChamberSession(sessionId, useConfigStore.getState().agents);
+        useSessionUIStore.getState().initializeNewGridforgeSession(sessionId, useConfigStore.getState().agents);
       } catch {
         // ignore
       }

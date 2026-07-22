@@ -245,7 +245,7 @@ impl GlobalHub {
         self.status_tx.subscribe()
     }
 
-    /// 广播合成事件 (openchamber:session-status / openchamber:session-activity) 到所有
+    /// 广播合成事件 (gridforge:session-status / gridforge:session-activity) 到所有
     /// WS 桥订阅者。
     ///
     /// 合成事件由 `SessionStateRuntime` 从上游 `session.status` 派生, 无 event_id,
@@ -409,7 +409,7 @@ mod tests {
         );
         let mut rx = hub.subscribe_event();
 
-        let payload = json!({"type": "openchamber:session-activity"});
+        let payload = json!({"type": "gridforge:session-activity"});
         hub.broadcast_synthetic(payload.clone());
 
         let event = rx.recv().await.unwrap();

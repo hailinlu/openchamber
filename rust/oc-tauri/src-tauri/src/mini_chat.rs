@@ -206,7 +206,7 @@ pub async fn get_window_pinned(_args: &Value, window: &WebviewWindow) -> Result<
 
 /// 创建 mini-chat 窗口并注入 init_script。
 ///
-/// init_script 会注入 `__OPENCHAMBER_CLIENT_TOKEN__` (从 SettingsStore 读取的
+/// init_script 会注入 `__GRIDFORGE_CLIENT_TOKEN__` (从 SettingsStore 读取的
 /// `desktopLocalClientToken`), 使窗口内的 JS 能认证 HTTP API 请求。
 fn create_mini_chat_window(app: &AppHandle, label: &str, url: &str) -> Result<(), String> {
     let parsed_url = url::Url::parse(url).map_err(|e| format!("invalid URL: {}", e))?;
@@ -220,7 +220,7 @@ fn create_mini_chat_window(app: &AppHandle, label: &str, url: &str) -> Result<()
     // 构建 init_script (与主窗口一致的桥 + client token + runtime headers)
     //
     // 当 BackendPort 不可用时 (managed OpenCode 启动失败等场景), 不设
-    // __OPENCHAMBER_API_BASE_URL__, UI 会自动退到同源 API 请求 (页面 origin
+    // __GRIDFORGE_API_BASE_URL__, UI 会自动退到同源 API 请求 (页面 origin
     // 即 Vite dev server / Node 后端)。这比硬编码 port 0 更健壮 —— port 0
     // 会导致所有 API 请求走到 `http://127.0.0.1:0` 而失败 ("无法连接服务器")。
     let (port, api_base_url) = match get_backend_port(app) {
@@ -236,7 +236,7 @@ fn create_mini_chat_window(app: &AppHandle, label: &str, url: &str) -> Result<()
     // 用 initialization_script 注入 init script, 在页面 JS 执行前运行。
     // 这比 `window.eval()` (窗口创建后再注入) 更可靠:
     // eval 可能因页面未加载而失败, 或页面模块脚本跑在注入之前导致
-    // `__OPENCHAMBER_CLIENT_TOKEN__` 等全局变量未被 `createConfiguredWebAPIs` 读到。
+    // `__GRIDFORGE_CLIENT_TOKEN__` 等全局变量未被 `createConfiguredWebAPIs` 读到。
     let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::External(parsed_url))
         .title("GridForge Mini Chat")
         .inner_size(MINI_CHAT_WIDTH, MINI_CHAT_HEIGHT)
@@ -281,11 +281,11 @@ fn create_mini_chat_window(app: &AppHandle, label: &str, url: &str) -> Result<()
 /// 从全局 backend port 或 HMR UI URL 获取 → 构造 origin。
 ///
 /// 优先级:
-///   1. `OPENCHAMBER_HMR_UI_URL` 环境变量 (Tauri dev 模式, Vite HMR 地址)
+///   1. `GRIDFORGE_HMR_UI_URL` 环境变量 (Tauri dev 模式, Vite HMR 地址)
 ///   2. BackendPort managed state (生产模式, oc-server 嵌入地址)
 fn resolve_origin(app: &AppHandle) -> Result<String, String> {
     // Dev 模式: 从环境变量读取 Vite 地址 (tauri-dev.mjs 注入)
-    if let Ok(hmr_url) = std::env::var("OPENCHAMBER_HMR_UI_URL") {
+    if let Ok(hmr_url) = std::env::var("GRIDFORGE_HMR_UI_URL") {
         let trimmed = hmr_url.trim().trim_end_matches('/');
         if !trimmed.is_empty() {
             return Ok(trimmed.to_string());

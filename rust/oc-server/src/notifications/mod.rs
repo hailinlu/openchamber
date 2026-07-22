@@ -68,7 +68,7 @@ pub const PUSH_QUESTION_DEBOUNCE_MS: u64 = 500;
 pub const PUSH_PERMISSION_DEBOUNCE_MS: u64 = 500;
 
 /// 默认 relay URL。
-pub const DEFAULT_RELAY_URL: &str = "https://api.openchamber.dev/v1/push/send";
+pub const DEFAULT_RELAY_URL: &str = "https://api.gridforge.dev/v1/push/send";
 
 /// APNs 生产环境 host。
 pub const APNS_HOST_PRODUCTION: &str = "https://api.push.apple.com";
@@ -77,7 +77,7 @@ pub const APNS_HOST_PRODUCTION: &str = "https://api.push.apple.com";
 pub const APNS_HOST_SANDBOX: &str = "https://api.sandbox.push.apple.com";
 
 /// 默认 bundle ID。
-pub const DEFAULT_BUNDLE_ID: &str = "com.openchamber.app";
+pub const DEFAULT_BUNDLE_ID: &str = "com.gridforge.app";
 
 /// session activity cooldown 持续时间 (2s)。
 pub const SESSION_COOLDOWN_DURATION_MS: u64 = 2000;

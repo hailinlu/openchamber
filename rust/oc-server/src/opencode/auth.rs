@@ -8,7 +8,7 @@
 #![allow(unused_imports)]
 
 //! Rust 强化: write 走 `.tmp → rename` 原子写(Node 用 `fs.writeFileSync` 直接写)。
-//! 保留 Node 行为: 写前 `copyFileSync(target, target + ".openchamber.backup")` 创建备份。
+//! 保留 Node 行为: 写前 `copyFileSync(target, target + ".gridforge.backup")` 创建备份。
 //! 权限: Unix `0o600`(同 github::settings::write_settings)。
 
 use std::path::{Path, PathBuf};
@@ -41,7 +41,7 @@ impl std::fmt::Display for AuthError {
 impl std::error::Error for AuthError {}
 
 /// auth.json 备份后缀(对齐 Node `auth.js` line 32)。
-const BACKUP_SUFFIX: &str = ".openchamber.backup";
+const BACKUP_SUFFIX: &str = ".gridforge.backup";
 
 /// 读取 auth.json。文件不存在返回空对象;解析失败返回 `AuthError::Parse`。
 ///
@@ -79,7 +79,7 @@ fn write_auth_file_at(auth: &Value, path: &Path) -> Result<(), AuthError> {
             .map_err(|e| AuthError::Write(format!("create_dir_all({}): {}", parent.display(), e)))?;
     }
 
-    // 备份(对齐 Node 行为): 文件存在时复制为 <path>.openchamber.backup
+    // 备份(对齐 Node 行为): 文件存在时复制为 <path>.gridforge.backup
     if path.exists() {
         let backup = format!("{}{}", path.display(), BACKUP_SUFFIX);
         std::fs::copy(path, &backup)
@@ -256,7 +256,7 @@ pub(crate) mod tests {
         let (_home, _lock) = set_temp_home();
         write_auth_file(&json!({"v": 1})).unwrap();
         write_auth_file(&json!({"v": 2})).unwrap();
-        let backup = format!("{}.openchamber.backup", auth_file().display());
+        let backup = format!("{}.gridforge.backup", auth_file().display());
         assert!(PathBuf::from(&backup).exists());
         // 备份内容是旧值
         let backup_content = std::fs::read_to_string(&backup).unwrap();

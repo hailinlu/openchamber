@@ -203,7 +203,7 @@ async fn run_global_bridge_inner(
                     continue;
                 }
                 let heartbeat_payload = json!({
-                    "type": "openchamber:heartbeat",
+                    "type": "gridforge:heartbeat",
                     "timestamp": chrono::Utc::now().timestamp_millis(),
                 });
                 if !send_event_frame(
@@ -396,8 +396,8 @@ fn extract_session_status_for_synthesis(payload: &Value) -> Option<(String, Stri
     Some((session_id.to_string(), status_type))
 }
 
-/// 对 `session.status` 上游事件, 合成 `openchamber:session-status` 和
-/// `openchamber:session-activity` 帧发给当前目录 WS 客户端。
+/// 对 `session.status` 上游事件, 合成 `gridforge:session-status` 和
+/// `gridforge:session-activity` 帧发给当前目录 WS 客户端。
 ///
 /// 对应 Node `directory-ws-bridge.js:82` 的 `processForwardedEventPayload(payload, emitSyntheticEvent)`。
 /// 非 session.status 事件直接返回 true (无操作)。
@@ -415,7 +415,7 @@ async fn emit_synthetic_session_events(
 
     // 合成 session-status (对应 Node index.js:841-860)
     let session_status_payload = json!({
-        "type": "openchamber:session-status",
+        "type": "gridforge:session-status",
         "properties": {
             "sessionID": session_id,
             "status": status,
@@ -444,7 +444,7 @@ async fn emit_synthetic_session_events(
         "idle"
     };
     let session_activity_payload = json!({
-        "type": "openchamber:session-activity",
+        "type": "gridforge:session-activity",
         "properties": {
             "sessionId": session_id,
             "phase": phase,
@@ -604,7 +604,7 @@ async fn run_directory_bridge(socket: WebSocket, state: Arc<AppState>, params: W
                     continue;
                 }
                 let heartbeat_payload = json!({
-                    "type": "openchamber:heartbeat",
+                    "type": "gridforge:heartbeat",
                     "timestamp": chrono::Utc::now().timestamp_millis(),
                 });
                 if !send_event_frame(

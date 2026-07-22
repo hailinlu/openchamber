@@ -1,4 +1,4 @@
-//! init_script 生成器: 注入标量全局变量 + `window.__OPENCHAMBER_DESKTOP__` 桥。
+//! init_script 生成器: 注入标量全局变量 + `window.__GRIDFORGE_DESKTOP__` 桥。
 //!
 //! Tauri 没有 Electron 的 contextBridge 预加载机制。我们用 `withGlobalTauri: true`
 //! 注入 `window.__TAURI__` 全局, 然后在此脚本里构建与 Electron preload.mjs
@@ -78,8 +78,8 @@ pub fn platform_string() -> &'static str {
 /// 生成完整的 init_script 字符串。
 ///
 /// 脚本做了两件事:
-/// 1. 设置所有标量全局变量 (`__OPENCHAMBER_*`)
-/// 2. 构建 `window.__OPENCHAMBER_DESKTOP__` 对象 (5 方法)
+/// 1. 设置所有标量全局变量 (`__GRIDFORGE_*`)
+/// 2. 构建 `window.__GRIDFORGE_DESKTOP__` 对象 (5 方法)
 ///
 /// 桥的 invoke 走 `window.__TAURI__.core.invoke` (withGlobalTauri 注入),
 /// 事件走 Tauri 的 `event.listen`, 复现 Electron 的 listen 双路径
@@ -89,54 +89,54 @@ pub fn build_init_script(ctx: &RuntimeContext) -> String {
 
     // --- 标量全局变量 (条件注入, 与 preload.mjs 一致) ---
 
-    // __OPENCHAMBER_LOCAL_ORIGIN__ — Remote 页面也需要 (HostSwitcher 判断 Local 入口)
+    // __GRIDFORGE_LOCAL_ORIGIN__ — Remote 页面也需要 (HostSwitcher 判断 Local 入口)
     globals.push(format_js_global(
-        "__OPENCHAMBER_LOCAL_ORIGIN__",
+        "__GRIDFORGE_LOCAL_ORIGIN__",
         &json!(ctx.local_origin),
     ));
 
     if let Some(ref url) = ctx.api_base_url {
-        globals.push(format_js_global("__OPENCHAMBER_API_BASE_URL__", &json!(url)));
+        globals.push(format_js_global("__GRIDFORGE_API_BASE_URL__", &json!(url)));
     }
 
     // local-only 全局变量 (UI 会从 location.origin 判断是否 local page)
     // 在 Tauri loopback 模式下, 页面 origin == local_origin, 所以这些始终注入。
     if let Some(ref token) = ctx.client_token {
         globals.push(format_js_global(
-            "__OPENCHAMBER_CLIENT_TOKEN__",
+            "__GRIDFORGE_CLIENT_TOKEN__",
             &json!(token),
         ));
     }
     if let Some(ref home) = ctx.home_directory {
-        globals.push(format_js_global("__OPENCHAMBER_HOME__", &json!(home)));
+        globals.push(format_js_global("__GRIDFORGE_HOME__", &json!(home)));
     }
     if let Some(ref id) = ctx.relay_host_id {
         globals.push(format_js_global(
-            "__OPENCHAMBER_RELAY_HOST_ID__",
+            "__GRIDFORGE_RELAY_HOST_ID__",
             &json!(id),
         ));
     }
     if let Some(ref headers) = ctx.runtime_headers {
         globals.push(format_js_global(
-            "__OPENCHAMBER_RUNTIME_HEADERS__",
+            "__GRIDFORGE_RUNTIME_HEADERS__",
             headers,
         ));
     }
     if let Some(major) = ctx.macos_major {
         globals.push(format_js_global(
-            "__OPENCHAMBER_MACOS_MAJOR__",
+            "__GRIDFORGE_MACOS_MAJOR__",
             &json!(major),
         ));
     }
 
-    // __OPENCHAMBER_PLATFORM__ — UI 用来判断 frameless chrome / control 侧
+    // __GRIDFORGE_PLATFORM__ — UI 用来判断 frameless chrome / control 侧
     let platform = platform_string();
     globals.push(format_js_global(
-        "__OPENCHAMBER_PLATFORM__",
+        "__GRIDFORGE_PLATFORM__",
         &json!(platform),
     ));
 
-    // __OPENCHAMBER_ELECTRON__ — 壳身份标识。UI 的 isElectronShell() 检查它。
+    // __GRIDFORGE_ELECTRON__ — 壳身份标识。UI 的 isElectronShell() 检查它。
     // 注意: UI 的 isElectronShell() 检查的是 runtime === 'electron'。
     // 为了让 UI 在 Tauri 下也走桌面壳分支, 我们仍标 runtime: 'electron'
     // (桥接口完全等价, UI 不需要区分)。
@@ -149,27 +149,27 @@ pub fn build_init_script(ctx: &RuntimeContext) -> String {
         false
     };
     globals.push(format!(
-        "(function(){{window.__OPENCHAMBER_ELECTRON__={{runtime:'electron',macVibrancy:{},macVibrancySupported:{}}};}})();",
+        "(function(){{window.__GRIDFORGE_ELECTRON__={{runtime:'electron',macVibrancy:{},macVibrancySupported:{}}};}})();",
         mac_vibrancy, mac_vibrancy_supported
     ));
 
-    // __OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ — 前端的桌面启动状态机依赖此值。
+    // __GRIDFORGE_DESKTOP_BOOT_OUTCOME__ — 前端的桌面启动状态机依赖此值。
     // 复现 Electron main.mjs buildInitScript。
     // sidecar 已就绪(健康检查通过)后才设置, 此时 local 后端一定可达。
     globals.push(format_js_global(
-        "__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__",
+        "__GRIDFORGE_DESKTOP_BOOT_OUTCOME__",
         &serde_json::json!({"target": "local", "status": "ok"}),
     ));
 
     let globals_js = globals.join("\n");
 
-    // --- __OPENCHAMBER_DESKTOP__ 桥对象 ---
+    // --- __GRIDFORGE_DESKTOP__ 桥对象 ---
     // 复现 preload.mjs:184-190 的 5 个方法。
-    // invoke → __TAURI__.core.invoke('openchamber_invoke', {cmd, args})
-    // openDialog → invoke('openchamber_dialog_open', {options})
-    // grantFileAccess → invoke('openchamber_file_grant', {filePath})
-    // openExternal → invoke('openchamber_invoke', {cmd:'desktop_open_external_url', args:{url}})
-    // listen → 订阅 'openchamber:emit', 双路径分发 (handler + DOM CustomEvent)
+    // invoke → __TAURI__.core.invoke('gridforge_invoke', {cmd, args})
+    // openDialog → invoke('gridforge_dialog_open', {options})
+    // grantFileAccess → invoke('gridforge_file_grant', {filePath})
+    // openExternal → invoke('gridforge_invoke', {cmd:'desktop_open_external_url', args:{url}})
+    // listen → 订阅 'gridforge:emit', 双路径分发 (handler + DOM CustomEvent)
     let bridge_js = r#"
 (function() {
   // event listener 注册表 (复现 preload.mjs eventListeners Map)
@@ -194,7 +194,7 @@ pub fn build_init_script(ctx: &RuntimeContext) -> String {
     }
   }
 
-  // 订阅 Tauri 事件 'openchamber:emit', 分发 {event, detail}
+  // 订阅 Tauri 事件 'gridforge:emit', 分发 {event, detail}
   // withGlobalTauri 注入 __TAURI__.event.listen
   var __ocEmitUnlisten = null;
   function __ocEnsureEmitListener() {
@@ -204,7 +204,7 @@ pub fn build_init_script(ctx: &RuntimeContext) -> String {
       setTimeout(__ocEnsureEmitListener, 50);
       return;
     }
-    window.__TAURI__.event.listen('openchamber:emit', function(evt) {
+    window.__TAURI__.event.listen('gridforge:emit', function(evt) {
       var payload = evt && evt.payload;
       if (!payload || typeof payload !== 'object') return;
       var event = typeof payload.event === 'string' ? payload.event : '';
@@ -215,7 +215,7 @@ pub fn build_init_script(ctx: &RuntimeContext) -> String {
     }).then(function(unlisten) {
       __ocEmitUnlisten = unlisten;
     }).catch(function(e) {
-      console.error('[tauri:bridge] failed to subscribe openchamber:emit:', e);
+      console.error('[tauri:bridge] failed to subscribe gridforge:emit:', e);
     });
   }
 
@@ -236,24 +236,24 @@ pub fn build_init_script(ctx: &RuntimeContext) -> String {
     if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
       return Promise.reject(new Error('Tauri core API not available'));
     }
-    return window.__TAURI__.core.invoke('openchamber_invoke', { cmd: cmd, args: args || {} });
+    return window.__TAURI__.core.invoke('gridforge_invoke', { cmd: cmd, args: args || {} });
   }
 
   __ocEnsureEmitListener();
 
-  window.__OPENCHAMBER_DESKTOP__ = {
+  window.__GRIDFORGE_DESKTOP__ = {
     invoke: function(cmd, args) { return __ocInvoke(cmd, args); },
     openDialog: function(options) {
       if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
         return Promise.reject(new Error('Tauri core API not available'));
       }
-      return window.__TAURI__.core.invoke('openchamber_dialog_open', { options: options || {} });
+      return window.__TAURI__.core.invoke('gridforge_dialog_open', { options: options || {} });
     },
     grantFileAccess: function(filePath) {
       if (!window.__TAURI__ || !window.__TAURI__.core || !window.__TAURI__.core.invoke) {
         return Promise.reject(new Error('Tauri core API not available'));
       }
-      return window.__TAURI__.core.invoke('openchamber_file_grant', { filePath: filePath });
+      return window.__TAURI__.core.invoke('gridforge_file_grant', { filePath: filePath });
     },
     openExternal: function(url) {
       return __ocInvoke('desktop_open_external_url', { url: url });
@@ -271,27 +271,27 @@ pub fn build_init_script(ctx: &RuntimeContext) -> String {
 /// 生成早期全局变量脚本 (在窗口创建后、后端启动前注入)。
 ///
 /// 包含 `build_static_globals_script` 的全部内容, 额外基于环境变量
-/// `OPENCHAMBER_PORT` 注入 `__OPENCHAMBER_API_BASE_URL__` 和
-/// `__OPENCHAMBER_LOCAL_ORIGIN__`, 使页面从加载第一刻起就能用绝对
+/// `GRIDFORGE_PORT` 注入 `__GRIDFORGE_API_BASE_URL__` 和
+/// `__GRIDFORGE_LOCAL_ORIGIN__`, 使页面从加载第一刻起就能用绝对
 /// API base URL, 避免 WebSocket 走 Vite proxy 导致的 ECONNRESET。
 ///
 /// 后端启动后 `inject_main_window_runtime` 会用实际端口覆盖这些值。
 pub fn build_early_globals_script() -> String {
     let mut script = build_static_globals_script();
 
-    // 仅在 OPENCHAMBER_PORT 环境变量已设置时注入基于 env 的 base URL。
-    // Dev 模式 (tauri-dev.mjs) 设 `OPENCHAMBER_PORT=3001` → 注入。
+    // 仅在 GRIDFORGE_PORT 环境变量已设置时注入基于 env 的 base URL。
+    // Dev 模式 (tauri-dev.mjs) 设 `GRIDFORGE_PORT=3001` → 注入。
     // Production 模式无此 env → 跳过, 由后端启动后注入。
-    if let Ok(port) = std::env::var("OPENCHAMBER_PORT") {
+    if let Ok(port) = std::env::var("GRIDFORGE_PORT") {
         if let Ok(port_num) = port.trim().parse::<u16>() {
             if port_num > 0 {
                 let origin = format!("http://127.0.0.1:{}", port_num);
                 script.push_str(&format_js_global(
-                    "__OPENCHAMBER_LOCAL_ORIGIN__",
+                    "__GRIDFORGE_LOCAL_ORIGIN__",
                     &serde_json::json!(origin),
                 ));
                 script.push_str(&format_js_global(
-                    "__OPENCHAMBER_API_BASE_URL__",
+                    "__GRIDFORGE_API_BASE_URL__",
                     &serde_json::json!(origin),
                 ));
                 script.push('\n');
@@ -305,23 +305,23 @@ pub fn build_early_globals_script() -> String {
 /// 生成仅含"静态"全局变量的 init 脚本 (不依赖后端端口/运行时上下文)。
 ///
 /// 这些变量在窗口创建时即可注入, 无需等后端启动完成:
-/// - `__OPENCHAMBER_ELECTRON__` — 壳身份标识 (`{ runtime: 'electron', … }`)
-/// - `__OPENCHAMBER_PLATFORM__` — 平台字符串 (darwin/win32/linux)
-/// - `__OPENCHAMBER_MACOS_MAJOR__` — macOS 主版本 (仅在 macOS 上)
+/// - `__GRIDFORGE_ELECTRON__` — 壳身份标识 (`{ runtime: 'electron', … }`)
+/// - `__GRIDFORGE_PLATFORM__` — 平台字符串 (darwin/win32/linux)
+/// - `__GRIDFORGE_MACOS_MAJOR__` — macOS 主版本 (仅在 macOS 上)
 ///
 /// 适用于 `configure_main_window_shell()` 中提前注入,
 /// 确保 React 首次渲染前 `isElectronShell()` / `usesFramelessElectronChrome()` 能正确检测。
 pub fn build_static_globals_script() -> String {
     let mut globals = Vec::new();
 
-    // __OPENCHAMBER_PLATFORM__
+    // __GRIDFORGE_PLATFORM__
     let platform = platform_string();
     globals.push(format_js_global(
-        "__OPENCHAMBER_PLATFORM__",
+        "__GRIDFORGE_PLATFORM__",
         &json!(platform),
     ));
 
-    // __OPENCHAMBER_ELECTRON__ (与 build_init_script 保持一致)
+    // __GRIDFORGE_ELECTRON__ (与 build_init_script 保持一致)
     let mac_vibrancy_supported = cfg!(target_os = "macos");
     let mac_vibrancy = if mac_vibrancy_supported {
         crate::settings::SettingsStore::get_bool("desktopVibrancy", true)
@@ -329,14 +329,14 @@ pub fn build_static_globals_script() -> String {
         false
     };
     globals.push(format!(
-        "(function(){{window.__OPENCHAMBER_ELECTRON__={{runtime:'electron',macVibrancy:{},macVibrancySupported:{}}};}})();",
+        "(function(){{window.__GRIDFORGE_ELECTRON__={{runtime:'electron',macVibrancy:{},macVibrancySupported:{}}};}})();",
         mac_vibrancy, mac_vibrancy_supported
     ));
 
-    // __OPENCHAMBER_MACOS_MAJOR__ (macOS 上检测)
+    // __GRIDFORGE_MACOS_MAJOR__ (macOS 上检测)
     if let Some(major) = detect_macos_major() {
         globals.push(format_js_global(
-            "__OPENCHAMBER_MACOS_MAJOR__",
+            "__GRIDFORGE_MACOS_MAJOR__",
             &json!(major),
         ));
     }
@@ -362,12 +362,12 @@ mod tests {
         let script = build_init_script(&ctx);
 
         // 核心全局变量必须存在
-        assert!(script.contains("__OPENCHAMBER_LOCAL_ORIGIN__"));
+        assert!(script.contains("__GRIDFORGE_LOCAL_ORIGIN__"));
         assert!(script.contains("http://127.0.0.1:12345"));
-        assert!(script.contains("__OPENCHAMBER_API_BASE_URL__"));
-        assert!(script.contains("__OPENCHAMBER_PLATFORM__"));
-        assert!(script.contains("__OPENCHAMBER_ELECTRON__"));
-        assert!(script.contains("__OPENCHAMBER_DESKTOP__"));
+        assert!(script.contains("__GRIDFORGE_API_BASE_URL__"));
+        assert!(script.contains("__GRIDFORGE_PLATFORM__"));
+        assert!(script.contains("__GRIDFORGE_ELECTRON__"));
+        assert!(script.contains("__GRIDFORGE_DESKTOP__"));
     }
 
     #[test]
@@ -375,9 +375,9 @@ mod tests {
         let ctx = RuntimeContext::from_sidecar_port(0);
         let script = build_init_script(&ctx);
 
-        assert!(script.contains("openchamber_invoke"));
-        assert!(script.contains("openchamber_dialog_open"));
-        assert!(script.contains("openchamber_file_grant"));
+        assert!(script.contains("gridforge_invoke"));
+        assert!(script.contains("gridforge_dialog_open"));
+        assert!(script.contains("gridforge_file_grant"));
         assert!(script.contains("desktop_open_external_url"));
         assert!(script.contains("__ocDispatchNativeEvent"));
     }
@@ -414,8 +414,8 @@ mod tests {
     #[test]
     fn build_static_globals_script_includes_platform_and_electron() {
         let script = build_static_globals_script();
-        assert!(script.contains("__OPENCHAMBER_PLATFORM__"));
-        assert!(script.contains("__OPENCHAMBER_ELECTRON__"));
+        assert!(script.contains("__GRIDFORGE_PLATFORM__"));
+        assert!(script.contains("__GRIDFORGE_ELECTRON__"));
         assert!(script.contains("runtime:'electron'"));
         assert!(
             script.contains("\"win32\"")
@@ -429,9 +429,9 @@ mod tests {
     fn build_static_globals_script_has_no_port_dependent_values() {
         let script = build_static_globals_script();
         // 静态脚本不应包含端口/URL 绑定变量
-        assert!(!script.contains("__OPENCHAMBER_API_BASE_URL__"));
-        assert!(!script.contains("__OPENCHAMBER_LOCAL_ORIGIN__"));
-        assert!(!script.contains("__OPENCHAMBER_DESKTOP__"));
+        assert!(!script.contains("__GRIDFORGE_API_BASE_URL__"));
+        assert!(!script.contains("__GRIDFORGE_LOCAL_ORIGIN__"));
+        assert!(!script.contains("__GRIDFORGE_DESKTOP__"));
         assert!(!script.contains("http://"));
     }
 }

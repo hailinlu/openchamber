@@ -3,8 +3,8 @@
 //! 移植自 `packages/web/server/lib/github/auth.js` 的 `readSettingsFile` /
 //! `writeSettingsFile` 部分。
 //!
-//! settings 文件: `$OPENCHAMBER_DATA_DIR/settings.json` 或
-//! `~/.config/openchamber/settings.json`。
+//! settings 文件: `$GRIDFORGE_DATA_DIR/settings.json` 或
+//! `~/.config/gridforge/settings.json`。
 //! 原子写: `.tmp → rename`, mode 0o600。
 
 use std::path::PathBuf;
@@ -18,23 +18,23 @@ pub fn settings_file() -> PathBuf {
     data_dir().join("settings.json")
 }
 
-/// `~/.config/openchamber` — 对应 Node `OPENCHAMBER_USER_CONFIG_ROOT` (硬编码, 不读 env)。
+/// `~/.config/gridforge` — 对应 Node `GRIDFORGE_USER_CONFIG_ROOT` (硬编码, 不读 env)。
 ///
-/// 与 `data_dir()` 不同: `data_dir` 读 `OPENCHAMBER_DATA_DIR` env;
-/// `user_config_root` 始终是 `~/.config/openchamber`。
-/// projects/ 配置文件存放在这里 (Node `OPENCHAMBER_PROJECTS_CONFIG_DIR`)。
+/// 与 `data_dir()` 不同: `data_dir` 读 `GRIDFORGE_DATA_DIR` env;
+/// `user_config_root` 始终是 `~/.config/gridforge`。
+/// projects/ 配置文件存放在这里 (Node `GRIDFORGE_PROJECTS_CONFIG_DIR`)。
 pub fn user_config_root() -> PathBuf {
-    home_dir().join(".config").join("openchamber")
+    home_dir().join(".config").join("gridforge")
 }
 
-/// OPENCHAMBER_DATA_DIR 或 ~/.config/openchamber。
+/// GRIDFORGE_DATA_DIR 或 ~/.config/gridforge。
 pub fn data_dir() -> PathBuf {
-    if let Ok(dir) = std::env::var("OPENCHAMBER_DATA_DIR") {
+    if let Ok(dir) = std::env::var("GRIDFORGE_DATA_DIR") {
         if !dir.is_empty() {
             return PathBuf::from(dir);
         }
     }
-    home_dir().join(".config").join("openchamber")
+    home_dir().join(".config").join("gridforge")
 }
 
 /// github-auth.json 路径。
@@ -87,7 +87,7 @@ pub fn write_settings(settings: &Value) -> oc_core::Result<()> {
 
 /// 读取 githubClientId: env → settings → default。
 pub fn get_github_client_id() -> String {
-    if let Ok(raw) = std::env::var("OPENCHAMBER_GITHUB_CLIENT_ID") {
+    if let Ok(raw) = std::env::var("GRIDFORGE_GITHUB_CLIENT_ID") {
         let trimmed = raw.trim();
         if !trimmed.is_empty() {
             return trimmed.to_string();
@@ -105,7 +105,7 @@ pub fn get_github_client_id() -> String {
 
 /// 读取 githubScopes: env → settings → default。
 pub fn get_github_scopes() -> String {
-    if let Ok(raw) = std::env::var("OPENCHAMBER_GITHUB_SCOPES") {
+    if let Ok(raw) = std::env::var("GRIDFORGE_GITHUB_SCOPES") {
         let trimmed = raw.trim();
         if !trimmed.is_empty() {
             return trimmed.to_string();
@@ -177,14 +177,14 @@ mod tests {
 
     #[test]
     fn client_id_env_override() {
-        std::env::set_var("OPENCHAMBER_GITHUB_CLIENT_ID", "env_client_id");
+        std::env::set_var("GRIDFORGE_GITHUB_CLIENT_ID", "env_client_id");
         assert_eq!(get_github_client_id(), "env_client_id");
-        std::env::remove_var("OPENCHAMBER_GITHUB_CLIENT_ID");
+        std::env::remove_var("GRIDFORGE_GITHUB_CLIENT_ID");
     }
 
     #[test]
     fn client_id_default() {
-        std::env::remove_var("OPENCHAMBER_GITHUB_CLIENT_ID");
+        std::env::remove_var("GRIDFORGE_GITHUB_CLIENT_ID");
         // 不依赖 settings.json 内容
         let id = get_github_client_id();
         assert!(!id.is_empty());
@@ -192,8 +192,8 @@ mod tests {
 
     #[test]
     fn scopes_env_override() {
-        std::env::set_var("OPENCHAMBER_GITHUB_SCOPES", "repo");
+        std::env::set_var("GRIDFORGE_GITHUB_SCOPES", "repo");
         assert_eq!(get_github_scopes(), "repo");
-        std::env::remove_var("OPENCHAMBER_GITHUB_SCOPES");
+        std::env::remove_var("GRIDFORGE_GITHUB_SCOPES");
     }
 }

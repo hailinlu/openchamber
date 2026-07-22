@@ -2,12 +2,12 @@ import type { DesktopBootOutcome } from '@/lib/desktopBoot';
 
 declare global {
   interface Window {
-    __OPENCHAMBER_HOME__?: string;
-    __OPENCHAMBER_MACOS_MAJOR__?: number;
-    __OPENCHAMBER_LOCAL_ORIGIN__?: string;
-    __OPENCHAMBER_ELECTRON__?: { runtime?: string; macVibrancy?: boolean; macVibrancySupported?: boolean };
-    __OPENCHAMBER_PLATFORM__?: string;
-    __OPENCHAMBER_DESKTOP_BOOT_OUTCOME__?: DesktopBootOutcome;
+    __GRIDFORGE_HOME__?: string;
+    __GRIDFORGE_MACOS_MAJOR__?: number;
+    __GRIDFORGE_LOCAL_ORIGIN__?: string;
+    __GRIDFORGE_ELECTRON__?: { runtime?: string; macVibrancy?: boolean; macVibrancySupported?: boolean };
+    __GRIDFORGE_PLATFORM__?: string;
+    __GRIDFORGE_DESKTOP_BOOT_OUTCOME__?: DesktopBootOutcome;
   }
 
   interface WebviewElement extends HTMLElement {

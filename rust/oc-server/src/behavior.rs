@@ -1,6 +1,6 @@
 //! `/api/config/settings` + `/api/behavior/agents-md` 路由。
 //!
-//! Tauri 模式下 `__OPENCHAMBER_API_BASE_URL__` 指向 Rust server,
+//! Tauri 模式下 `__GRIDFORGE_API_BASE_URL__` 指向 Rust server,
 //! 但 settings 相关的路由原本只在 Node 后端实现。
 //! 此处提供简单的文件读写实现，覆盖 BehaviorPage 所需字段。
 //!
@@ -21,17 +21,17 @@ use crate::state::AppState;
 #[cfg(not(target_os = "windows"))]
 fn default_settings_path() -> PathBuf {
     let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
-    PathBuf::from(home).join(".config/openchamber/settings.json")
+    PathBuf::from(home).join(".config/gridforge/settings.json")
 }
 
 #[cfg(target_os = "windows")]
 fn default_settings_path() -> PathBuf {
     let home = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\".to_string());
-    PathBuf::from(home).join(".config/openchamber/settings.json")
+    PathBuf::from(home).join(".config/gridforge/settings.json")
 }
 
 fn resolve_settings_path() -> PathBuf {
-    if let Ok(dir) = std::env::var("OPENCHAMBER_DATA_DIR") {
+    if let Ok(dir) = std::env::var("GRIDFORGE_DATA_DIR") {
         PathBuf::from(dir).join("settings.json")
     } else {
         default_settings_path()

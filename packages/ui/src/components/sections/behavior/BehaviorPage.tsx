@@ -142,7 +142,7 @@ export const BehaviorPage: React.FC = () => {
         }
 
         // Auto-seed: if AGENTS.md is still empty (no settings value, no file
-        // content), pre-fill with the OpenChamber default constraint so a
+        // content), pre-fill with the GridForge default constraint so a
         // user who immediately clicks Save ships the rule to disk. Existing
         // custom content is never touched.
         if (!nextSettings.prompt.trim()) {

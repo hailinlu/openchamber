@@ -127,8 +127,8 @@ pub fn is_trusted_device_request(value: &serde_json::Value) -> bool {
 pub fn is_url_auth_readable_http_path(pathname: &str) -> bool {
     pathname == "/api/event"
         || pathname == "/api/global/event"
-        || pathname == "/api/openchamber/events"
-        || pathname == "/api/openchamber/realtime-proxy/sse"
+        || pathname == "/api/gridforge/events"
+        || pathname == "/api/gridforge/realtime-proxy/sse"
         || pathname == "/api/notifications/stream"
         || pathname == "/api/fs/raw"
         || pathname == "/api/fs/serve"
@@ -144,7 +144,7 @@ pub fn is_url_auth_readable_http_path(pathname: &str) -> bool {
 pub fn is_url_auth_websocket_path(pathname: &str) -> bool {
     pathname == "/api/event/ws"
         || pathname == "/api/global/event/ws"
-        || pathname == "/api/openchamber/realtime-proxy/ws"
+        || pathname == "/api/gridforge/realtime-proxy/ws"
         || pathname == "/api/terminal/ws"
         || pathname == "/api/dictation/ws"
         || pathname.starts_with("/api/preview/proxy/")
@@ -361,7 +361,7 @@ mod tests {
     fn test_is_url_auth_readable_http_path() {
         assert!(is_url_auth_readable_http_path("/api/event"));
         assert!(is_url_auth_readable_http_path("/api/global/event"));
-        assert!(is_url_auth_readable_http_path("/api/openchamber/events"));
+        assert!(is_url_auth_readable_http_path("/api/gridforge/events"));
         assert!(is_url_auth_readable_http_path("/api/notifications/stream"));
         assert!(is_url_auth_readable_http_path("/api/fs/raw"));
         assert!(is_url_auth_readable_http_path("/api/fs/serve"));
@@ -379,7 +379,7 @@ mod tests {
     fn test_is_url_auth_websocket_path() {
         assert!(is_url_auth_websocket_path("/api/event/ws"));
         assert!(is_url_auth_websocket_path("/api/global/event/ws"));
-        assert!(is_url_auth_websocket_path("/api/openchamber/realtime-proxy/ws"));
+        assert!(is_url_auth_websocket_path("/api/gridforge/realtime-proxy/ws"));
         assert!(is_url_auth_websocket_path("/api/terminal/ws"));
         assert!(is_url_auth_websocket_path("/api/dictation/ws"));
         assert!(is_url_auth_websocket_path("/api/preview/proxy/abc"));

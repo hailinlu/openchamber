@@ -112,7 +112,7 @@ async function resolveDoctorPortStatuses(options = {}) {
         available: false,
         status: 'warning',
         line: `port ${requestedPort} not available (desktop runtime)`,
-        detail: 'Use a CLI instance port from `openchamber serve` for tunneling.',
+        detail: 'Use a CLI instance port from `gridforge serve` for tunneling.',
       });
       return { statuses, availableEntries: [] };
     }
@@ -122,7 +122,7 @@ async function resolveDoctorPortStatuses(options = {}) {
       available: false,
       status: 'error',
       line: `port ${requestedPort} not available (no running instance)`,
-      detail: `Start one with \`openchamber serve --port ${requestedPort}\`.`,
+      detail: `Start one with \`gridforge serve --port ${requestedPort}\`.`,
     });
     return { statuses, availableEntries: [] };
   }
@@ -143,7 +143,7 @@ async function resolveDoctorPortStatuses(options = {}) {
       available: false,
       status: 'warning',
       line: `port ${desktopEntry.port} not available (desktop runtime)`,
-      detail: 'Use a CLI instance port from `openchamber serve` for tunneling.',
+      detail: 'Use a CLI instance port from `gridforge serve` for tunneling.',
     });
   }
 
@@ -153,7 +153,7 @@ async function resolveDoctorPortStatuses(options = {}) {
       available: false,
       status: 'warning',
       line: 'no CLI ports available for tunneling',
-      detail: 'Start one with `openchamber serve`.',
+      detail: 'Start one with `gridforge serve`.',
     });
   }
 
@@ -247,7 +247,7 @@ async function discoverRunningInstances(options = {}) {
   return instances;
 }
 
-async function discoverOpenChamberInstanceOnPort(port, options = {}) {
+async function discoverGridforgeInstanceOnPort(port, options = {}) {
   if (!Number.isFinite(port) || port <= 0) return null;
   const runningInstances = Array.isArray(options.runningInstances)
     ? options.runningInstances
@@ -273,7 +273,7 @@ async function discoverLifecycleInstances(options = {}, deps = {}) {
   }
   const found = runningInstances.find((entry) => entry.port === options.port);
   if (found) return [found];
-  const liveInstance = await discoverOpenChamberInstanceOnPort(options.port, {
+  const liveInstance = await discoverGridforgeInstanceOnPort(options.port, {
     ...deps,
     host: options.host,
     runningInstances,
@@ -410,7 +410,7 @@ async function resolveTunnelProviders(options = {}, deps = {}) {
 export {
   resolveDoctorPortStatuses,
   discoverRunningInstances,
-  discoverOpenChamberInstanceOnPort,
+  discoverGridforgeInstanceOnPort,
   discoverLifecycleInstances,
   discoverUnconfirmedRegistryInstanceOnPort,
   getLatestInstance,

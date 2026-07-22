@@ -1,6 +1,6 @@
-//! 设置持久化模块 — 原子读写 `~/.config/openchamber/settings.json`。
+//! 设置持久化模块 — 原子读写 `~/.config/gridforge/settings.json`。
 //!
-//! 与 Electron 共享同一文件。路径可通过 `OPENCHAMBER_DATA_DIR` 环境变量覆盖。
+//! 与 Electron 共享同一文件。路径可通过 `GRIDFORGE_DATA_DIR` 环境变量覆盖。
 //!
 //! 写入是原子的 (tmp 文件 + rename)，防止并发读者看到半写文件。
 //! 进程内通过 Mutex 序列化 read-modify-write，防止多次 RMW 交叉覆盖。
@@ -33,17 +33,17 @@ impl SettingsStore {
 
     /// 解析 settings.json 的路径。
     ///
-    /// `OPENCHAMBER_DATA_DIR` 环境变量优先 (trim 后非空才用);
-    /// 否则 `~/.config/openchamber/settings.json`。
+    /// `GRIDFORGE_DATA_DIR` 环境变量优先 (trim 后非空才用);
+    /// 否则 `~/.config/gridforge/settings.json`。
     pub fn settings_file_path() -> PathBuf {
-        if let Ok(dir) = std::env::var("OPENCHAMBER_DATA_DIR") {
+        if let Ok(dir) = std::env::var("GRIDFORGE_DATA_DIR") {
             let trimmed = dir.trim();
             if !trimmed.is_empty() {
                 return PathBuf::from(trimmed).join("settings.json");
             }
         }
         let home = dirs_or_env();
-        home.join(".config").join("openchamber").join("settings.json")
+        home.join(".config").join("gridforge").join("settings.json")
     }
 
     /// 读取整个 settings root。文件不存在或解析失败返回 `{}`。
@@ -365,11 +365,11 @@ mod tests {
     #[test]
     fn settings_path_respects_env_override() {
         // 此测试仅验证逻辑路径构建 (不依赖实际 env)
-        // 在真实运行时 settings_file_path() 会检查 OPENCHAMBER_DATA_DIR
+        // 在真实运行时 settings_file_path() 会检查 GRIDFORGE_DATA_DIR
         let home = dirs_or_env();
-        let default_path = home.join(".config").join("openchamber").join("settings.json");
+        let default_path = home.join(".config").join("gridforge").join("settings.json");
         // 验证路径结构
-        assert!(default_path.to_string_lossy().contains("openchamber"));
+        assert!(default_path.to_string_lossy().contains("gridforge"));
         assert!(default_path.to_string_lossy().contains("settings.json"));
     }
 }

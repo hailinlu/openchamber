@@ -186,7 +186,7 @@ async fn proxy_http(
         let name_str = name.as_str();
         if name_str == "cookie"
             || name_str == "authorization"
-            || name_str == "x-openchamber-ui-session"
+            || name_str == "x-gridforge-ui-session"
         {
             continue;
         }

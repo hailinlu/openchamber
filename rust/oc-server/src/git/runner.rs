@@ -222,8 +222,8 @@ impl GitRunner {
 fn resolve_git_binary_windows() -> Option<String> {
     use std::path::Path;
 
-    // 1. 环境变量 GIT_BINARY / OPENCHAMBER_GIT_BINARY
-    for var in &["GIT_BINARY", "OPENCHAMBER_GIT_BINARY"] {
+    // 1. 环境变量 GIT_BINARY / GRIDFORGE_GIT_BINARY
+    for var in &["GIT_BINARY", "GRIDFORGE_GIT_BINARY"] {
         if let Ok(val) = std::env::var(var) {
             let trimmed = val.trim();
             if !trimmed.is_empty() && is_executable_file(Path::new(trimmed)) {

@@ -70,8 +70,8 @@ export const PluginsSidebar: React.FC<PluginsSidebarProps> = ({
 
   React.useEffect(() => {
     const handleOpenAdd = () => setIsAddOpen(true);
-    window.addEventListener('openchamber:settings-open-plugin-add', handleOpenAdd);
-    return () => window.removeEventListener('openchamber:settings-open-plugin-add', handleOpenAdd);
+    window.addEventListener('gridforge:settings-open-plugin-add', handleOpenAdd);
+    return () => window.removeEventListener('gridforge:settings-open-plugin-add', handleOpenAdd);
   }, []);
 
   const updateCounts = React.useMemo(() => {

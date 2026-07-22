@@ -1,9 +1,9 @@
 //! GridForge 桌面壳 (Tauri)。
 //!
 //! 阶段 4A (sidecar 过渡态 + IPC 契约对等):
-//! - Tauri 进程以子进程方式拉起 `@openchamber/web` CLI (`openchamber serve --foreground`)
+//! - Tauri 进程以子进程方式拉起 `@openchamber/web` CLI (`gridforge serve --foreground`)
 //! - WebView 通过 loopback 加载 UI
-//! - init_script 注入 `window.__OPENCHAMBER_DESKTOP__` 桥 + 标量全局变量 (UI 零改动)
+//! - init_script 注入 `window.__GRIDFORGE_DESKTOP__` 桥 + 标量全局变量 (UI 零改动)
 //! - IPC 分发器复现 Electron handleInvoke + origin 门 + SAFE_FOR_REMOTE
 //! - 静态托盘 + 应用菜单 + 深链注册
 //! - settings.json 原子持久化 (与 Electron 共享)
@@ -115,12 +115,12 @@ fn configure_main_window_shell(app: &tauri::AppHandle, background_start: bool) {
 
     // 3. 注入静态全局变量 (提前注入, 不依赖后端端口)
     //
-    // 设 `window.__OPENCHAMBER_ELECTRON__` / `__OPENCHAMBER_PLATFORM__`。
+    // 设 `window.__GRIDFORGE_ELECTRON__` / `__GRIDFORGE_PLATFORM__`。
     // 这些值在编译期即确定, 不等后端启动: 确保 React hydration 时
     // `isElectronShell()` / `usesFramelessElectronChrome()` 能正确检测。
     //
-    // 同时注入 `__OPENCHAMBER_API_BASE_URL__` 和 `__OPENCHAMBER_LOCAL_ORIGIN__`
-    // (基于 OPENCHAMBER_PORT env), 以防页面加载快于后端启动导致 WS 请求
+    // 同时注入 `__GRIDFORGE_API_BASE_URL__` 和 `__GRIDFORGE_LOCAL_ORIGIN__`
+    // (基于 GRIDFORGE_PORT env), 以防页面加载快于后端启动导致 WS 请求
     // 走相对路径经 Vite proxy 转发时 ECONNRESET。
     // 后端启动后 `inject_main_window_runtime` 会用实际端口覆盖。
     //
@@ -166,7 +166,7 @@ fn inject_main_window_runtime(app: &tauri::AppHandle, init_script: &str) {
 /// 获取后端 base_url (供 IPC 命令 HTTP 调用后端端点)。
 ///
 /// 返回 `http://127.0.0.1:<port>`，后端未启动时返回 None。
-/// 用例: `dialog_cmd::openchamber_file_grant` 调 `POST /api/fs/grant`。
+/// 用例: `dialog_cmd::gridforge_file_grant` 调 `POST /api/fs/grant`。
 pub fn backend_base_url() -> Option<String> {
     BACKEND
         .lock()
@@ -220,11 +220,11 @@ pub fn run() {
             // 仅 production 模式覆盖为 macOS 标准 userData 位置
             // (~/Library/Application Support/GridForge) 对齐 Electron。
             // Dev 模式 (cargo tauri dev) **不**覆盖, 让 Rust oc-server 走默认的
-            // ~/.config/openchamber/ 路径 —— 与 Node 模式同位置, 用户已有的
+            // ~/.config/gridforge/ 路径 —— 与 Node 模式同位置, 用户已有的
             // projects 能直接被 Tauri dev 读到, 不会每次启动都弹"添加项目"对话框。
-            // 用户仍可通过显式设置 OPENCHAMBER_DATA_DIR 覆盖。
+            // 用户仍可通过显式设置 GRIDFORGE_DATA_DIR 覆盖。
             if !cfg!(debug_assertions)
-                && !std::env::var("OPENCHAMBER_DATA_DIR").is_ok_and(|v| !v.trim().is_empty())
+                && !std::env::var("GRIDFORGE_DATA_DIR").is_ok_and(|v| !v.trim().is_empty())
             {
                 let dir_name = "GridForge";
                 // 借用 Tauri 的 app_data_dir 父目录 (平台自适应:
@@ -254,8 +254,8 @@ pub fn run() {
                     log::error!("failed to create app data dir {:?}: {}", dir, e);
                 } else {
                     let dir_str = dir.to_string_lossy().to_string();
-                    log::info!("setting OPENCHAMBER_DATA_DIR={}", dir_str);
-                    std::env::set_var("OPENCHAMBER_DATA_DIR", &dir_str);
+                    log::info!("setting GRIDFORGE_DATA_DIR={}", dir_str);
+                    std::env::set_var("GRIDFORGE_DATA_DIR", &dir_str);
                 }
             }
 
@@ -271,10 +271,10 @@ pub fn run() {
                     let mut builder = SidecarBuilder::new()
                         .ready_timeout(std::time::Duration::from_secs(45))
                         .arg("--api-only");
-                    // Dev 模式: 如果 OPENCHAMBER_PORT 已设置，使用固定端口确保
+                    // Dev 模式: 如果 GRIDFORGE_PORT 已设置，使用固定端口确保
                     // Vite early injection、proxy 和 sidecar 使用同一个端口。
                     if cfg!(debug_assertions) {
-                        if let Ok(port_str) = std::env::var("OPENCHAMBER_PORT") {
+                        if let Ok(port_str) = std::env::var("GRIDFORGE_PORT") {
                             if let Ok(port) = port_str.parse::<u16>() {
                                 builder = builder.port(port);
                             }
@@ -398,9 +398,9 @@ pub fn run() {
         })
         // --- IPC invoke_handler 注册 ---
         .invoke_handler(tauri::generate_handler![
-            ipc::openchamber_invoke,
-            ipc::dialog_cmd::openchamber_dialog_open,
-            ipc::dialog_cmd::openchamber_file_grant,
+            ipc::gridforge_invoke,
+            ipc::dialog_cmd::gridforge_dialog_open,
+            ipc::dialog_cmd::gridforge_file_grant,
         ])
         // --- 菜单事件 ---
         .on_menu_event(|app, event| {
@@ -454,9 +454,9 @@ pub fn run() {
                         std::thread::spawn(move || {
                             std::thread::sleep(std::time::Duration::from_millis(160));
                             let _ = app_clone.emit(
-                                "openchamber:emit",
+                                "gridforge:emit",
                                 serde_json::json!({
-                                    "event": "openchamber:vibrancy-ready",
+                                    "event": "gridforge:vibrancy-ready",
                                     "detail": { "ready": true }
                                 }),
                             );

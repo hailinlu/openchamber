@@ -495,7 +495,7 @@ async fn resolve_base_dir(state: &AppState) -> PathBuf {
     }
 }
 
-/// 用户配置目录 (~/.config/openchamber)。
+/// 用户配置目录 (~/.config/gridforge)。
 fn user_config_root(state: &AppState) -> Option<PathBuf> {
     state.settings_path.parent().map(|p| p.to_path_buf())
 }
@@ -528,7 +528,7 @@ async fn resolve_read_path(
 
 /// 命令执行超时 (环境变量覆盖)。
 fn exec_timeout_secs() -> u64 {
-    std::env::var("OPENCHAMBER_FS_EXEC_TIMEOUT_MS")
+    std::env::var("GRIDFORGE_FS_EXEC_TIMEOUT_MS")
         .ok()
         .and_then(|s| s.parse::<u64>().ok())
         .filter(|&v| v > 0)
@@ -553,14 +553,14 @@ mod tests {
 
     #[test]
     fn exec_timeout_default() {
-        std::env::remove_var("OPENCHAMBER_FS_EXEC_TIMEOUT_MS");
+        std::env::remove_var("GRIDFORGE_FS_EXEC_TIMEOUT_MS");
         assert_eq!(exec_timeout_secs(), super::super::DEFAULT_EXEC_TIMEOUT_SECS);
     }
 
     #[test]
     fn exec_timeout_env_override() {
-        std::env::set_var("OPENCHAMBER_FS_EXEC_TIMEOUT_MS", "120000");
+        std::env::set_var("GRIDFORGE_FS_EXEC_TIMEOUT_MS", "120000");
         assert_eq!(exec_timeout_secs(), 120);
-        std::env::remove_var("OPENCHAMBER_FS_EXEC_TIMEOUT_MS");
+        std::env::remove_var("GRIDFORGE_FS_EXEC_TIMEOUT_MS");
     }
 }

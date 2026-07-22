@@ -1,7 +1,7 @@
 //! 持久化 + 序列化/反序列化 scheduled-tasks 配置 — 移植自 Node
 //! `projects/project-config.js`。
 //!
-//! 持久化格式: `$OPENCHAMBER_USER_CONFIG_ROOT/projects/{project_id}.json`
+//! 持久化格式: `$GRIDFORGE_USER_CONFIG_ROOT/projects/{project_id}.json`
 //! (flat 文件, 与 Node 布局完全一致), atomic write (`.tmp → rename`, 0o600)。
 //!
 //! 写入时 merge 现有 sibling keys (projectNotes/projectTodos 等),
@@ -326,8 +326,8 @@ impl ProjectConfigRuntime {
     }
 }
 
-/// 默认 base dir: `$OPENCHAMBER_USER_CONFIG_ROOT/projects` 或 `~/.config/openchamber/projects`。
-/// 与 Node 一致, 用 user_config_root (不读 OPENCHAMBER_DATA_DIR)。
+/// 默认 base dir: `$GRIDFORGE_USER_CONFIG_ROOT/projects` 或 `~/.config/gridforge/projects`。
+/// 与 Node 一致, 用 user_config_root (不读 GRIDFORGE_DATA_DIR)。
 pub fn default_projects_dir() -> PathBuf {
     user_config_root().join("projects")
 }

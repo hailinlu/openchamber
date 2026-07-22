@@ -119,7 +119,7 @@ export const openExternalUrl = async (url: string): Promise<boolean> => {
     }
   }
 
-  const desktop = (window as unknown as { __OPENCHAMBER_DESKTOP__?: DesktopBridgeGlobal }).__OPENCHAMBER_DESKTOP__;
+  const desktop = (window as unknown as { __GRIDFORGE_DESKTOP__?: DesktopBridgeGlobal }).__GRIDFORGE_DESKTOP__;
   if (desktop?.openExternal) {
     try {
       await desktop.openExternal(normalizedTarget);

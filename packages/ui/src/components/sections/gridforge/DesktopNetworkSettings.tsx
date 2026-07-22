@@ -25,9 +25,9 @@ import { useUIStore } from '@/stores/useUIStore';
 import { cn } from '@/lib/utils';
 
 const WINDOW_CONTROLS_POSITION_OPTIONS: Array<{ id: DesktopWindowControlsPosition; labelKey: string }> = [
-  { id: 'auto', labelKey: 'settings.openchamber.desktopNetwork.option.windowControlsAuto' },
-  { id: 'left', labelKey: 'settings.openchamber.desktopNetwork.option.windowControlsLeft' },
-  { id: 'right', labelKey: 'settings.openchamber.desktopNetwork.option.windowControlsRight' },
+  { id: 'auto', labelKey: 'settings.gridforge.desktopNetwork.option.windowControlsAuto' },
+  { id: 'left', labelKey: 'settings.gridforge.desktopNetwork.option.windowControlsLeft' },
+  { id: 'right', labelKey: 'settings.gridforge.desktopNetwork.option.windowControlsRight' },
 ];
 
 export const DesktopNetworkSettings: React.FC = () => {
@@ -71,7 +71,7 @@ export const DesktopNetworkSettings: React.FC = () => {
           headers: { Accept: 'application/json' },
         });
         if (!response.ok) {
-          throw new Error(t('settings.openchamber.desktopNetwork.error.loadFailed'));
+          throw new Error(t('settings.gridforge.desktopNetwork.error.loadFailed'));
         }
 
         const data = (await response.json().catch(() => null)) as null | {
@@ -97,7 +97,7 @@ export const DesktopNetworkSettings: React.FC = () => {
         setError(null);
       } catch (cause) {
         if (!cancelled) {
-          setError(cause instanceof Error ? cause.message : t('settings.openchamber.desktopNetwork.error.loadFailed'));
+          setError(cause instanceof Error ? cause.message : t('settings.gridforge.desktopNetwork.error.loadFailed'));
         }
       } finally {
         if (!cancelled) {
@@ -244,12 +244,12 @@ export const DesktopNetworkSettings: React.FC = () => {
     try {
       const status = await setDesktopLaunchAtLogin(nextValue);
       if (!status?.supported) {
-        throw new Error(t('settings.openchamber.desktopNetwork.error.launchAtLoginUnsupported'));
+        throw new Error(t('settings.gridforge.desktopNetwork.error.launchAtLoginUnsupported'));
       }
       setLaunchAtLoginEnabled(status.enabled);
     } catch (cause) {
       setLaunchAtLoginEnabled(!nextValue);
-      setError(cause instanceof Error ? cause.message : t('settings.openchamber.desktopNetwork.error.launchAtLoginSaveFailed'));
+      setError(cause instanceof Error ? cause.message : t('settings.gridforge.desktopNetwork.error.launchAtLoginSaveFailed'));
     } finally {
       setIsSavingLaunchAtLogin(false);
     }
@@ -268,15 +268,15 @@ export const DesktopNetworkSettings: React.FC = () => {
     try {
       const status = await setDesktopMinimizeToTray(nextValue);
       if (!status) {
-        throw new Error(t('settings.openchamber.desktopNetwork.error.minimizeToTraySaveFailed'));
+        throw new Error(t('settings.gridforge.desktopNetwork.error.minimizeToTraySaveFailed'));
       }
       if (!status.supported) {
-        throw new Error(t('settings.openchamber.desktopNetwork.error.minimizeToTrayUnsupported'));
+        throw new Error(t('settings.gridforge.desktopNetwork.error.minimizeToTrayUnsupported'));
       }
       setMinimizeToTrayEnabled(status.enabled);
     } catch (cause) {
       setMinimizeToTrayEnabled(!nextValue);
-      setError(cause instanceof Error ? cause.message : t('settings.openchamber.desktopNetwork.error.minimizeToTraySaveFailed'));
+      setError(cause instanceof Error ? cause.message : t('settings.gridforge.desktopNetwork.error.minimizeToTraySaveFailed'));
     } finally {
       setIsSavingMinimizeToTray(false);
     }
@@ -295,12 +295,12 @@ export const DesktopNetworkSettings: React.FC = () => {
     try {
       const status = await setDesktopKeepAwake(nextValue);
       if (!status?.supported) {
-        throw new Error(t('settings.openchamber.desktopNetwork.error.keepAwakeUnsupported'));
+        throw new Error(t('settings.gridforge.desktopNetwork.error.keepAwakeUnsupported'));
       }
       setKeepAwakeEnabled(status.enabled);
     } catch (cause) {
       setKeepAwakeEnabled(!nextValue);
-      setError(cause instanceof Error ? cause.message : t('settings.openchamber.desktopNetwork.error.keepAwakeSaveFailed'));
+      setError(cause instanceof Error ? cause.message : t('settings.gridforge.desktopNetwork.error.keepAwakeSaveFailed'));
     } finally {
       setIsSavingKeepAwake(false);
     }
@@ -328,7 +328,7 @@ export const DesktopNetworkSettings: React.FC = () => {
       });
 
       if (!response.ok) {
-        throw new Error(t('settings.openchamber.desktopNetwork.error.saveFailed'));
+        throw new Error(t('settings.gridforge.desktopNetwork.error.saveFailed'));
       }
 
       setSavedValue(draftValue);
@@ -336,10 +336,10 @@ export const DesktopNetworkSettings: React.FC = () => {
 
       const restarted = await restartDesktopApp();
       if (!restarted) {
-        throw new Error(t('settings.openchamber.desktopNetwork.error.savedRestartFailed'));
+        throw new Error(t('settings.gridforge.desktopNetwork.error.savedRestartFailed'));
       }
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t('settings.openchamber.desktopNetwork.error.saveFailed'));
+      setError(cause instanceof Error ? cause.message : t('settings.gridforge.desktopNetwork.error.saveFailed'));
       setIsSaving(false);
     }
   }, [draftPassword, draftValue, isDirty, t]);
@@ -353,17 +353,17 @@ export const DesktopNetworkSettings: React.FC = () => {
       {showWindowControlsPosition ? (
         <>
           <div className="mb-1 px-1">
-            <h3 className="typography-ui-header font-medium text-foreground">{t('settings.openchamber.desktopNetwork.field.windowControlsPosition')}</h3>
+            <h3 className="typography-ui-header font-medium text-foreground">{t('settings.gridforge.desktopNetwork.field.windowControlsPosition')}</h3>
           </div>
           <section className="space-y-2 px-2 pb-2 pt-0">
             <div data-settings-item="sessions.desktop-window-controls-position" className="space-y-1 py-1.5">
               <div className="typography-micro text-muted-foreground/70">
-                {t('settings.openchamber.desktopNetwork.field.windowControlsPositionDescription')}
+                {t('settings.gridforge.desktopNetwork.field.windowControlsPositionDescription')}
               </div>
               <div
                 className="mt-1 flex flex-wrap items-center gap-1"
                 role="group"
-                aria-label={t('settings.openchamber.desktopNetwork.field.windowControlsPositionAria')}
+                aria-label={t('settings.gridforge.desktopNetwork.field.windowControlsPositionAria')}
               >
                 {WINDOW_CONTROLS_POSITION_OPTIONS.map((option) => {
                   const selected = desktopWindowControlsPosition === option.id;
@@ -393,7 +393,7 @@ export const DesktopNetworkSettings: React.FC = () => {
       {!isLocalDesktop ? null : (
         <>
       <div className="mb-1 px-1">
-        <h3 className="typography-ui-header font-medium text-foreground">{t('settings.openchamber.desktopNetwork.title')}</h3>
+        <h3 className="typography-ui-header font-medium text-foreground">{t('settings.gridforge.desktopNetwork.title')}</h3>
       </div>
 
       <section className="space-y-2 px-2 pb-2 pt-0">
@@ -414,13 +414,13 @@ export const DesktopNetworkSettings: React.FC = () => {
             <Checkbox
               checked={launchAtLoginEnabled}
               onChange={handleLaunchAtLoginToggle}
-              ariaLabel={t('settings.openchamber.desktopNetwork.field.launchAtLoginAria')}
+              ariaLabel={t('settings.gridforge.desktopNetwork.field.launchAtLoginAria')}
               disabled={isSavingLaunchAtLogin}
             />
             <div className="min-w-0 flex-1">
-              <div className="typography-ui-label text-foreground">{t('settings.openchamber.desktopNetwork.field.launchAtLogin')}</div>
+              <div className="typography-ui-label text-foreground">{t('settings.gridforge.desktopNetwork.field.launchAtLogin')}</div>
               <div className="typography-micro text-muted-foreground/70">
-                {t('settings.openchamber.desktopNetwork.field.launchAtLoginDescription')}
+                {t('settings.gridforge.desktopNetwork.field.launchAtLoginDescription')}
               </div>
             </div>
           </div>
@@ -443,13 +443,13 @@ export const DesktopNetworkSettings: React.FC = () => {
             <Checkbox
               checked={minimizeToTrayEnabled}
               onChange={handleMinimizeToTrayToggle}
-              ariaLabel={t('settings.openchamber.desktopNetwork.field.minimizeToTrayAria')}
+              ariaLabel={t('settings.gridforge.desktopNetwork.field.minimizeToTrayAria')}
               disabled={isSavingMinimizeToTray}
             />
             <div className="min-w-0 flex-1">
-              <div className="typography-ui-label text-foreground">{t('settings.openchamber.desktopNetwork.field.minimizeToTray')}</div>
+              <div className="typography-ui-label text-foreground">{t('settings.gridforge.desktopNetwork.field.minimizeToTray')}</div>
               <div className="typography-micro text-muted-foreground/70">
-                {t('settings.openchamber.desktopNetwork.field.minimizeToTrayDescription')}
+                {t('settings.gridforge.desktopNetwork.field.minimizeToTrayDescription')}
               </div>
             </div>
           </div>
@@ -472,13 +472,13 @@ export const DesktopNetworkSettings: React.FC = () => {
             <Checkbox
               checked={keepAwakeEnabled}
               onChange={handleKeepAwakeToggle}
-              ariaLabel={t('settings.openchamber.desktopNetwork.field.keepAwakeAria')}
+              ariaLabel={t('settings.gridforge.desktopNetwork.field.keepAwakeAria')}
               disabled={isSavingKeepAwake}
             />
             <div className="min-w-0 flex-1">
-              <div className="typography-ui-label text-foreground">{t('settings.openchamber.desktopNetwork.field.keepAwake')}</div>
+              <div className="typography-ui-label text-foreground">{t('settings.gridforge.desktopNetwork.field.keepAwake')}</div>
               <div className="typography-micro text-muted-foreground/70">
-                {t('settings.openchamber.desktopNetwork.field.keepAwakeDescription')}
+                {t('settings.gridforge.desktopNetwork.field.keepAwakeDescription')}
               </div>
             </div>
           </div>
@@ -486,7 +486,7 @@ export const DesktopNetworkSettings: React.FC = () => {
 
         <div data-settings-item="sessions.desktop-ui-password" className="space-y-1 py-1.5">
           <label className="typography-ui-label text-foreground" htmlFor="desktop-ui-password">
-            {t('settings.openchamber.desktopPassword.field.password')}
+            {t('settings.gridforge.desktopPassword.field.password')}
           </label>
           <Input
             id="desktop-ui-password"
@@ -494,13 +494,13 @@ export const DesktopNetworkSettings: React.FC = () => {
             className="h-7 max-w-sm"
             value={draftPassword}
             onChange={(event) => handlePasswordChange(event.target.value)}
-            placeholder={t('settings.openchamber.desktopPassword.field.passwordPlaceholder')}
+            placeholder={t('settings.gridforge.desktopPassword.field.passwordPlaceholder')}
             disabled={isLoading || isSaving}
             required={draftValue}
             aria-invalid={lanRequiresPassword}
           />
           <div className="typography-micro text-muted-foreground/70">
-            {t('settings.openchamber.desktopPassword.field.passwordDescription')}
+            {t('settings.gridforge.desktopPassword.field.passwordDescription')}
           </div>
         </div>
 
@@ -520,20 +520,20 @@ export const DesktopNetworkSettings: React.FC = () => {
           <Checkbox
             checked={draftValue}
             onChange={handleToggle}
-            ariaLabel={t('settings.openchamber.desktopNetwork.field.allowLanAccessAria')}
+            ariaLabel={t('settings.gridforge.desktopNetwork.field.allowLanAccessAria')}
             disabled={isLoading || isSaving}
           />
           <div className="min-w-0 flex-1">
-            <div className="typography-ui-label text-foreground">{t('settings.openchamber.desktopNetwork.field.allowLanAccess')}</div>
+            <div className="typography-ui-label text-foreground">{t('settings.gridforge.desktopNetwork.field.allowLanAccess')}</div>
             <div className="typography-micro text-muted-foreground/70">
-              {t('settings.openchamber.desktopNetwork.field.allowLanAccessDescription')}
+              {t('settings.gridforge.desktopNetwork.field.allowLanAccessDescription')}
             </div>
             <div className="typography-micro text-[var(--status-warning)]/85">
-              {t('settings.openchamber.desktopNetwork.field.warning')}
+              {t('settings.gridforge.desktopNetwork.field.warning')}
             </div>
             {lanRequiresPassword || lanBlockedByMissingPassword ? (
               <div className="typography-micro text-[var(--status-warning)]/85">
-                {t('settings.openchamber.desktopNetwork.field.passwordRequiredWarning')}
+                {t('settings.gridforge.desktopNetwork.field.passwordRequiredWarning')}
               </div>
             ) : null}
           </div>
@@ -546,8 +546,8 @@ export const DesktopNetworkSettings: React.FC = () => {
         {lanUrl ? (
           <div className="px-2 typography-micro text-muted-foreground/80">
             {isDirty && !savedValue
-              ? t('settings.openchamber.desktopNetwork.hint.openAfterRestart')
-              : t('settings.openchamber.desktopNetwork.hint.openNow')}
+              ? t('settings.gridforge.desktopNetwork.hint.openAfterRestart')
+              : t('settings.gridforge.desktopNetwork.hint.openNow')}
             <span className="font-mono text-foreground">{lanUrl}</span>
           </div>
         ) : null}
@@ -560,7 +560,7 @@ export const DesktopNetworkSettings: React.FC = () => {
             disabled={saveDisabled}
             className="shrink-0 !font-normal"
           >
-            {isSaving ? t('settings.common.actions.saving') : t('settings.openchamber.desktopNetwork.actions.saveAndRestart')}
+            {isSaving ? t('settings.common.actions.saving') : t('settings.gridforge.desktopNetwork.actions.saveAndRestart')}
           </Button>
         </div>
       </section>

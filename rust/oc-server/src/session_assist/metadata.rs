@@ -1,7 +1,7 @@
 //! Session-assist metadata — AssistMetadata 序列化与字段 clamp。
 //!
 //! 对应 Node `session-assist/runtime.js` 中生成 recap/suggestion 后的
-//! `metadata.openchamber.assist` 写入。
+//! `metadata.gridforge.assist` 写入。
 
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
@@ -11,7 +11,7 @@ pub const RECAP_CHAR_LIMIT: usize = 320;
 /// suggestion 字符上限。
 pub const SUGGESTION_CHAR_LIMIT: usize = 500;
 
-/// AssistMetadata — session.metadata.openchamber.assist 内容。
+/// AssistMetadata — session.metadata.gridforge.assist 内容。
 ///
 /// UI 客户端读取此对象显示 recap + suggestion; stale 检查通过 `forMessageID`。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -37,15 +37,15 @@ pub fn clamp_suggestion(value: &str) -> String {
     value.trim().chars().take(SUGGESTION_CHAR_LIMIT).collect()
 }
 
-/// 把 AssistMetadata 转为 JSON value, 写入 session metadata.openchamber.assist。
+/// 把 AssistMetadata 转为 JSON value, 写入 session metadata.gridforge.assist。
 pub fn to_value(assist: &AssistMetadata) -> Value {
     serde_json::to_value(assist).expect("AssistMetadata always serializable")
 }
 
-/// 在 session metadata.openchamber 上合并 assist 子对象 (保留其他 openchamber 字段)。
+/// 在 session metadata.gridforge 上合并 assist 子对象 (保留其他 openchamber 字段)。
 ///
-/// 对应 Node `currentNamespace = metadata.openchamber || {}` + 写入新 assist 对象。
-pub fn merge_assist_into_openchamber(session: &Value, assist: &AssistMetadata) -> Value {
+/// 对应 Node `currentNamespace = metadata.gridforge || {}` + 写入新 assist 对象。
+pub fn merge_assist_into_gridforge(session: &Value, assist: &AssistMetadata) -> Value {
     let metadata = session
         .get("metadata")
         .and_then(Value::as_object)
@@ -54,14 +54,14 @@ pub fn merge_assist_into_openchamber(session: &Value, assist: &AssistMetadata) -
     let mut metadata = metadata;
 
     let namespace = metadata
-        .get("openchamber")
+        .get("gridforge")
         .and_then(Value::as_object)
         .cloned()
         .unwrap_or_else(Map::new);
     let mut namespace = namespace;
     namespace.insert("assist".to_string(), to_value(assist));
 
-    metadata.insert("openchamber".to_string(), Value::Object(namespace));
+    metadata.insert("gridforge".to_string(), Value::Object(namespace));
     json!({ "metadata": Value::Object(metadata) })
 }
 
@@ -100,10 +100,10 @@ mod tests {
     }
 
     #[test]
-    fn merge_preserves_other_openchamber_fields() {
+    fn merge_preserves_other_gridforge_fields() {
         let session = json!({
             "metadata": {
-                "openchamber": {
+                "gridforge": {
                     "goal": {"id": "g1"},
                     "dismissals": ["msg_1"]
                 }
@@ -115,10 +115,10 @@ mod tests {
             for_message_id: "msg_2".into(),
             generated_at: 100,
         };
-        let merged = merge_assist_into_openchamber(&session, &assist);
-        assert_eq!(merged["metadata"]["openchamber"]["assist"]["recap"], "r");
-        assert_eq!(merged["metadata"]["openchamber"]["goal"]["id"], "g1");
-        assert_eq!(merged["metadata"]["openchamber"]["dismissals"][0], "msg_1");
+        let merged = merge_assist_into_gridforge(&session, &assist);
+        assert_eq!(merged["metadata"]["gridforge"]["assist"]["recap"], "r");
+        assert_eq!(merged["metadata"]["gridforge"]["goal"]["id"], "g1");
+        assert_eq!(merged["metadata"]["gridforge"]["dismissals"][0], "msg_1");
     }
 
     #[test]
@@ -130,7 +130,7 @@ mod tests {
             for_message_id: "msg_1".into(),
             generated_at: 100,
         };
-        let merged = merge_assist_into_openchamber(&session, &assist);
-        assert_eq!(merged["metadata"]["openchamber"]["assist"]["recap"], "r");
+        let merged = merge_assist_into_gridforge(&session, &assist);
+        assert_eq!(merged["metadata"]["gridforge"]["assist"]["recap"], "r");
     }
 }

@@ -334,7 +334,7 @@ mod tests {
 
         let (http, base) = client_for_port(port);
         let c = OpenCodeClient { http: &http, base_url: &base, auth_header: "Basic xyz" };
-        c.patch_session_metadata("sess_1", Some("/tmp"), &json!({"openchamber": {"goal": {"id": "g1"}}}))
+        c.patch_session_metadata("sess_1", Some("/tmp"), &json!({"gridforge": {"goal": {"id": "g1"}}}))
             .await
             .unwrap();
         assert_eq!(count.load(Ordering::SeqCst), 1);

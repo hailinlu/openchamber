@@ -1,6 +1,6 @@
 //! CORS 中间件 — 对齐 Node `packages/web/server/index.js:1328-1344`。
 //!
-//! 允许 packaged client origins (openchamber-ui/capacitor) 和本地开发 origin
+//! 允许 packaged client origins (gridforge-ui/capacitor) 和本地开发 origin
 //! (localhost/127.0.0.1:any-port)。OPTIONS 预检返回 204 + CORS 头。
 //!
 //! 必要性: Tauri dev 模式下 UI (vite :5180) 与 API (oc-server :<port>) 跨域,
@@ -19,11 +19,11 @@ use axum::response::Response;
 /// 判断 origin 是否为允许的 client origin (packaged 或本地开发)。
 ///
 /// 对齐 Node:
-/// - `packagedClientOrigins` (`index.js:1307-1312`): openchamber-ui / capacitor / localhost (无端口)
+/// - `packagedClientOrigins` (`index.js:1307-1312`): gridforge-ui / capacitor / localhost (无端口)
 /// - `isLocalDevClientOrigin` (`index.js:1313`): `/^https?:\/\/(localhost|127\.0\.0\.1):\d+$/`
 fn is_allowed_origin(origin: &str) -> bool {
     const PACKAGED: &[&str] = &[
-        "openchamber-ui://app",
+        "gridforge-ui://app",
         "capacitor://localhost",
         "http://localhost",
         "https://localhost",
@@ -116,7 +116,7 @@ mod tests {
     #[test]
     fn allows_packaged_origins() {
         for origin in [
-            "openchamber-ui://app",
+            "gridforge-ui://app",
             "capacitor://localhost",
             "http://localhost",
             "https://localhost",

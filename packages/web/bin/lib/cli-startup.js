@@ -20,7 +20,7 @@ function getStartupServicePaths() {
   if (process.platform === 'linux') {
     return {
       platform: 'linux',
-      servicePath: path.join(os.homedir(), '.config', 'systemd', 'user', 'openchamber.service'),
+      servicePath: path.join(os.homedir(), '.config', 'systemd', 'user', 'gridforge.service'),
     };
   }
   if (process.platform === 'win32') {
@@ -89,13 +89,13 @@ function collectStartupEnv(options = {}) {
   }
   const uiPassword = hasUiPasswordConfigured(options.uiPassword) ? options.uiPassword : undefined;
   if (uiPassword) {
-    env.OPENCHAMBER_UI_PASSWORD = uiPassword;
+    env.GRIDFORGE_UI_PASSWORD = uiPassword;
   }
   if (options.apiOnly === true) {
-    env.OPENCHAMBER_API_ONLY = 'true';
+    env.GRIDFORGE_API_ONLY = 'true';
   }
-  if (typeof process.env.OPENCHAMBER_DATA_DIR === 'string' && process.env.OPENCHAMBER_DATA_DIR.trim().length > 0) {
-    env.OPENCHAMBER_DATA_DIR = path.resolve(process.env.OPENCHAMBER_DATA_DIR.trim());
+  if (typeof process.env.GRIDFORGE_DATA_DIR === 'string' && process.env.GRIDFORGE_DATA_DIR.trim().length > 0) {
+    env.GRIDFORGE_DATA_DIR = path.resolve(process.env.GRIDFORGE_DATA_DIR.trim());
   }
   return env;
 }
@@ -271,8 +271,8 @@ function getStartupStatus() {
     return { supported: true, platform: paths.platform, enabled: result.status === 0, active: null, servicePath: paths.servicePath };
   }
   if (paths.platform === 'linux') {
-    const enabledResult = runStartupCommand('systemctl', ['--user', 'is-enabled', 'openchamber.service'], { allowFailure: true });
-    const activeResult = runStartupCommand('systemctl', ['--user', 'is-active', 'openchamber.service'], { allowFailure: true });
+    const enabledResult = runStartupCommand('systemctl', ['--user', 'is-enabled', 'gridforge.service'], { allowFailure: true });
+    const activeResult = runStartupCommand('systemctl', ['--user', 'is-active', 'gridforge.service'], { allowFailure: true });
     const activeState = (activeResult.stdout || '').trim() || 'inactive';
     return {
       supported: true,
@@ -314,7 +314,7 @@ function enableStartupService(options = {}) {
     fs.mkdirSync(path.dirname(paths.servicePath), { recursive: true, mode: 0o700 });
     fs.writeFileSync(paths.servicePath, buildSystemdUserService(options), { mode: 0o600 });
     runStartupCommand('systemctl', ['--user', 'daemon-reload']);
-    runStartupCommand('systemctl', ['--user', 'enable', '--now', 'openchamber.service']);
+    runStartupCommand('systemctl', ['--user', 'enable', '--now', 'gridforge.service']);
     return getStartupStatus();
   }
 
@@ -351,7 +351,7 @@ function disableStartupService() {
   }
 
   if (paths.platform === 'linux') {
-    runStartupCommand('systemctl', ['--user', 'disable', '--now', 'openchamber.service'], { allowFailure: true });
+    runStartupCommand('systemctl', ['--user', 'disable', '--now', 'gridforge.service'], { allowFailure: true });
     try { fs.unlinkSync(paths.servicePath); } catch {}
     runStartupCommand('systemctl', ['--user', 'daemon-reload'], { allowFailure: true });
     return getStartupStatus();

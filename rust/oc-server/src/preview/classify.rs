@@ -393,10 +393,10 @@ mod tests {
         let d = classify_preview_navigation(
             "http://127.0.0.1:57123/support",
             CURRENT,
-            Some("https://openchamber.dev"),
+            Some("https://gridforge.dev"),
         );
         assert_eq!(d.action, "proxy");
-        assert_eq!(d.url, "https://openchamber.dev/support");
+        assert_eq!(d.url, "https://gridforge.dev/support");
     }
 
     #[test]

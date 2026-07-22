@@ -282,7 +282,7 @@ mod inner {
 
             let user_uuid = uuid_from_bytes(&user_id);
             let (ccr, reg_state) = webauthn
-                .start_passkey_registration(user_uuid, "openchamber-ui", "GridForge UI", exclude)
+                .start_passkey_registration(user_uuid, "gridforge-ui", "GridForge UI", exclude)
                 .map_err(|e| PasskeyError::Webauthn(format!("{e:?}")))?;
 
             let request_id = generate_request_id();

@@ -53,8 +53,8 @@ const copyCurrentSelectionFallback = async (): Promise<boolean> => {
   return document.execCommand('copy');
 };
 
-const MENU_ACTION_EVENT = 'openchamber:menu-action';
-const CHECK_FOR_UPDATES_EVENT = 'openchamber:check-for-updates';
+const MENU_ACTION_EVENT = 'gridforge:menu-action';
+const CHECK_FOR_UPDATES_EVENT = 'gridforge:check-for-updates';
 
 type DesktopBridgeGlobal = {
   listen?: (
@@ -232,7 +232,7 @@ export const useMenuActions = (
           break;
 
         case 'copy': {
-          const copyEvent = new Event('openchamber:copy', { cancelable: true });
+          const copyEvent = new Event('gridforge:copy', { cancelable: true });
           const wasHandled = !window.dispatchEvent(copyEvent);
           if (!wasHandled) {
             void copyCurrentSelectionFallback();
@@ -340,14 +340,14 @@ export const useMenuActions = (
 
   React.useEffect(() => {
     if (typeof window === 'undefined') return;
-    const desktop = (window as unknown as { __OPENCHAMBER_DESKTOP__?: DesktopBridgeGlobal }).__OPENCHAMBER_DESKTOP__;
+    const desktop = (window as unknown as { __GRIDFORGE_DESKTOP__?: DesktopBridgeGlobal }).__GRIDFORGE_DESKTOP__;
     const listen = desktop?.listen;
     if (typeof listen !== 'function') return;
 
     let unlistenMenu: null | (() => void | Promise<void>) = null;
     let unlistenUpdate: null | (() => void | Promise<void>) = null;
 
-    listen('openchamber:menu-action', (evt) => {
+    listen('gridforge:menu-action', (evt) => {
       const action = evt?.payload;
       if (typeof action !== 'string') return;
       handleAction(action as MenuAction);
@@ -359,7 +359,7 @@ export const useMenuActions = (
         // ignore
       });
 
-    listen('openchamber:check-for-updates', () => {
+    listen('gridforge:check-for-updates', () => {
       window.dispatchEvent(new Event(CHECK_FOR_UPDATES_EVENT));
     })
       .then((fn) => {

@@ -122,7 +122,7 @@ function createCliPairingRuntime() {
 // query, so the one-time secret rides the link, never the network.
 function encodePairingConnectUrl(payload) {
   const encoded = bytesToBase64Url(new TextEncoder().encode(JSON.stringify(payload)));
-  return `openchamber://connect?v=2&p=${encoded}`;
+  return `gridforge://connect?v=2&p=${encoded}`;
 }
 
 function buildPairingPayload({ pairing, label, candidates }) {
@@ -139,7 +139,7 @@ function buildPairingPayload({ pairing, label, candidates }) {
 
 async function resolveConnectUrlServerUrl(options) {
   let hostOverride = options.host;
-  if (typeof hostOverride !== 'string' && !process.env.OPENCHAMBER_HOST) {
+  if (typeof hostOverride !== 'string' && !process.env.GRIDFORGE_HOST) {
     const storedOptions = readInstanceOptions(await getInstanceFilePath(options.port));
     if (typeof storedOptions?.host === 'string' && storedOptions.host.trim()) {
       hostOverride = storedOptions.host.trim();
@@ -207,8 +207,8 @@ function normalizeServerUrlForConnection(value) {
 }
 
 function getOpenChamberDataDir() {
-  return process.env.OPENCHAMBER_DATA_DIR
-    ? path.resolve(process.env.OPENCHAMBER_DATA_DIR)
+  return process.env.GRIDFORGE_DATA_DIR
+    ? path.resolve(process.env.GRIDFORGE_DATA_DIR)
     : path.join(os.homedir(), '.config', 'openchamber');
 }
 
@@ -292,7 +292,7 @@ function createConnectUrlCommand({ serveCommand }) {
 
     clackIntro('OpenChamber pairing link');
     if (serverState.autoStarted) {
-      logStatus('success', `started OpenChamber on port ${options.port}`);
+      logStatus('success', `started GridForge on port ${options.port}`);
     }
     logStatus('success', connectUrl);
     clackLog.info(`Server URL: ${serverUrl}`);

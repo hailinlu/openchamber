@@ -379,7 +379,7 @@ pub fn write_config(config: &Value, file_path: &Path) -> Result<(), ConfigError>
             .map_err(|e| ConfigError::Write(format!("create_dir_all: {}", e)))?;
     }
     if file_path.exists() {
-        let backup = format!("{}.openchamber.backup", file_path.display());
+        let backup = format!("{}.gridforge.backup", file_path.display());
         std::fs::copy(file_path, &backup)
             .map_err(|e| ConfigError::Write(format!("backup to {}: {}", backup, e)))?;
     }
@@ -918,7 +918,7 @@ mod tests {
             let path = dir.join("c.json");
             write_config(&json!({"v":1}), &path).unwrap();
             write_config(&json!({"v":2}), &path).unwrap();
-            let backup = format!("{}.openchamber.backup", path.display());
+            let backup = format!("{}.gridforge.backup", path.display());
             assert!(std::path::PathBuf::from(&backup).exists());
             assert_eq!(read_config_file(&path).unwrap(), json!({"v":2}));
             let backup_content = std::fs::read_to_string(&backup).unwrap();

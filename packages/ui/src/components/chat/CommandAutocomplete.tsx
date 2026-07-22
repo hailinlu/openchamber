@@ -11,7 +11,7 @@ import { useUIStore } from '@/stores/useUIStore';
 import { isVSCodeRuntime } from '@/lib/desktop';
 import { useMobileAutocompleteMaxHeight } from './useMobileAutocompleteMaxHeight';
 
-type CommandSource = 'openchamber' | 'opencode' | 'skill';
+type CommandSource = 'gridforge' | 'opencode' | 'skill';
 
 export interface CommandInfo {
   id: string;
@@ -21,7 +21,7 @@ export interface CommandInfo {
   agent?: string;
   model?: string;
   isBuiltIn?: boolean;
-  isOpenChamber?: boolean;
+  isGridforge?: boolean;
   isSkill?: boolean;
   scope?: string;
 }
@@ -138,52 +138,52 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
 
         const builtInCommands: CommandInfo[] = [
           ...(hasSession && !hasMessagesInCurrentSession
-            ? [{ id: 'openchamber:init', name: 'init', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.initDescription'), isBuiltIn: true }]
+            ? [{ id: 'gridforge:init', name: 'init', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.initDescription'), isBuiltIn: true }]
             : []
           ),
           ...(hasSession  // Show when session exists, not when hasMessages
             ? [
-                { id: 'openchamber:undo', name: 'undo', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.undoDescription'), isBuiltIn: true },
-                { id: 'openchamber:redo', name: 'redo', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.redoDescription'), isBuiltIn: true },
-                { id: 'openchamber:timeline', name: 'timeline', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.timelineDescription'), isBuiltIn: true },
+                { id: 'gridforge:undo', name: 'undo', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.undoDescription'), isBuiltIn: true },
+                { id: 'gridforge:redo', name: 'redo', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.redoDescription'), isBuiltIn: true },
+                { id: 'gridforge:timeline', name: 'timeline', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.timelineDescription'), isBuiltIn: true },
               ]
             : []
           ),
-          { id: 'openchamber:compact', name: 'compact', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.compactDescription'), isBuiltIn: true },
+          { id: 'gridforge:compact', name: 'compact', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.compactDescription'), isBuiltIn: true },
           ...(hasSession
-            ? [{ id: 'openchamber:summary', name: 'summary', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.summaryDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:summary', name: 'summary', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.summaryDescription'), isGridforge: true }]
             : []
           ),
           ...(canStartSessionCommand
-            ? [{ id: 'openchamber:workspace-review', name: 'workspace-review', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.workspaceReviewDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:workspace-review', name: 'workspace-review', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.workspaceReviewDescription'), isGridforge: true }]
             : []
           ),
           ...(canUseReviewHandoffFlow
-            ? [{ id: 'openchamber:handoff-review', name: 'handoff-review', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.handoffReviewDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:handoff-review', name: 'handoff-review', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.handoffReviewDescription'), isGridforge: true }]
             : []
           ),
           ...(canStartSessionCommand
-            ? [{ id: 'openchamber:plan-feature', name: 'plan-feature', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.featurePlanDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:plan-feature', name: 'plan-feature', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.featurePlanDescription'), isGridforge: true }]
             : []
           ),
           ...(canStartSessionCommand
-            ? [{ id: 'openchamber:craft-goal', name: 'craft-goal', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.craftGoalDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:craft-goal', name: 'craft-goal', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.craftGoalDescription'), isGridforge: true }]
             : []
           ),
           ...(canStartSessionCommand
-            ? [{ id: 'openchamber:catch-up', name: 'catch-up', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.catchUpDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:catch-up', name: 'catch-up', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.catchUpDescription'), isGridforge: true }]
             : []
           ),
           ...(canStartSessionCommand
-            ? [{ id: 'openchamber:debug', name: 'debug', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.debugDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:debug', name: 'debug', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.debugDescription'), isGridforge: true }]
             : []
           ),
           ...(canStartSessionCommand
-            ? [{ id: 'openchamber:weigh', name: 'weigh', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.weighDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:weigh', name: 'weigh', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.weighDescription'), isGridforge: true }]
             : []
           ),
           ...(canStartSessionCommand
-            ? [{ id: 'openchamber:explore', name: 'explore', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.exploreDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:explore', name: 'explore', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.exploreDescription'), isGridforge: true }]
             : []
           ),
         ];
@@ -211,52 +211,52 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
         const allowInitCommand = !hasMessagesInCurrentSession;
         const builtInCommands: CommandInfo[] = [
           ...(hasSession && !hasMessagesInCurrentSession
-            ? [{ id: 'openchamber:init', name: 'init', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.initDescription'), isBuiltIn: true }]
+            ? [{ id: 'gridforge:init', name: 'init', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.initDescription'), isBuiltIn: true }]
             : []
           ),
           ...(hasSession  // Show when session exists, not when hasMessages
             ? [
-                { id: 'openchamber:undo', name: 'undo', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.undoDescription'), isBuiltIn: true },
-                { id: 'openchamber:redo', name: 'redo', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.redoDescription'), isBuiltIn: true },
-                { id: 'openchamber:timeline', name: 'timeline', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.timelineDescription'), isBuiltIn: true },
+                { id: 'gridforge:undo', name: 'undo', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.undoDescription'), isBuiltIn: true },
+                { id: 'gridforge:redo', name: 'redo', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.redoDescription'), isBuiltIn: true },
+                { id: 'gridforge:timeline', name: 'timeline', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.timelineDescription'), isBuiltIn: true },
               ]
             : []
           ),
-          { id: 'openchamber:compact', name: 'compact', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.compactDescription'), isBuiltIn: true },
+          { id: 'gridforge:compact', name: 'compact', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.compactDescription'), isBuiltIn: true },
           ...(hasSession
-            ? [{ id: 'openchamber:summary', name: 'summary', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.summaryDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:summary', name: 'summary', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.summaryDescription'), isGridforge: true }]
             : []
           ),
           ...(canStartSessionCommand
-            ? [{ id: 'openchamber:workspace-review', name: 'workspace-review', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.workspaceReviewDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:workspace-review', name: 'workspace-review', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.workspaceReviewDescription'), isGridforge: true }]
             : []
           ),
           ...(canUseReviewHandoffFlow
-            ? [{ id: 'openchamber:handoff-review', name: 'handoff-review', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.handoffReviewDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:handoff-review', name: 'handoff-review', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.handoffReviewDescription'), isGridforge: true }]
             : []
           ),
           ...(canStartSessionCommand
-            ? [{ id: 'openchamber:plan-feature', name: 'plan-feature', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.featurePlanDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:plan-feature', name: 'plan-feature', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.featurePlanDescription'), isGridforge: true }]
             : []
           ),
           ...(canStartSessionCommand
-            ? [{ id: 'openchamber:craft-goal', name: 'craft-goal', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.craftGoalDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:craft-goal', name: 'craft-goal', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.craftGoalDescription'), isGridforge: true }]
             : []
           ),
           ...(canStartSessionCommand
-            ? [{ id: 'openchamber:catch-up', name: 'catch-up', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.catchUpDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:catch-up', name: 'catch-up', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.catchUpDescription'), isGridforge: true }]
             : []
           ),
           ...(canStartSessionCommand
-            ? [{ id: 'openchamber:debug', name: 'debug', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.debugDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:debug', name: 'debug', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.debugDescription'), isGridforge: true }]
             : []
           ),
           ...(canStartSessionCommand
-            ? [{ id: 'openchamber:weigh', name: 'weigh', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.weighDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:weigh', name: 'weigh', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.weighDescription'), isGridforge: true }]
             : []
           ),
           ...(canStartSessionCommand
-            ? [{ id: 'openchamber:explore', name: 'explore', source: 'openchamber' as const, description: t('chat.commandAutocomplete.command.exploreDescription'), isOpenChamber: true }]
+            ? [{ id: 'gridforge:explore', name: 'explore', source: 'gridforge' as const, description: t('chat.commandAutocomplete.command.exploreDescription'), isGridforge: true }]
             : []
           ),
         ];
@@ -367,7 +367,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
           <div>
             {commands.map((command, index) => {
               const isSystem = command.isBuiltIn;
-              const isOpenChamberBadge = command.isOpenChamber;
+              const isGridforgeBadge = command.isGridforge;
               return (
                 <div
                   key={command.id}
@@ -445,7 +445,7 @@ export const CommandAutocomplete = React.forwardRef<CommandAutocompleteHandle, C
                           {t('chat.commandAutocomplete.badge.command')}
                         </span>
                       )}
-                      {isOpenChamberBadge ? (
+                      {isGridforgeBadge ? (
                         <span className={NEUTRAL_BADGE_CLASS}>
                           GridForge
                         </span>

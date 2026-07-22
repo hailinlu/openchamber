@@ -29,7 +29,7 @@ pub const DEFAULT_GITHUB_SCOPES: &str = "repo read:org workflow read:user user:e
 
 /// GitHub API base URL (可通过 env 覆盖, 测试用)。
 pub fn api_base_url() -> String {
-    match std::env::var("OPENCHAMBER_GITHUB_API_URL") {
+    match std::env::var("GRIDFORGE_GITHUB_API_URL") {
         Ok(url) if !url.is_empty() => url,
         _ => "https://api.github.com".to_string(),
     }

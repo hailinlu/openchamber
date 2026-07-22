@@ -9,12 +9,12 @@ import '@openchamber/ui/styles/fonts';
 
 declare global {
   interface Window {
-    __OPENCHAMBER_RUNTIME_APIS__?: RuntimeAPIs;
-    __OPENCHAMBER_SURFACE__?: HostedSurface;
+    __GRIDFORGE_RUNTIME_APIS__?: RuntimeAPIs;
+    __GRIDFORGE_SURFACE__?: HostedSurface;
   }
 }
 
-window.__OPENCHAMBER_RUNTIME_APIS__ = createConfiguredWebAPIs();
+window.__GRIDFORGE_RUNTIME_APIS__ = createConfiguredWebAPIs();
 
 const isCoarsePointer = (): boolean => {
   if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
@@ -37,7 +37,7 @@ const detectHostedSurface = (): HostedSurface => {
 };
 
 const hostedSurface = detectHostedSurface();
-window.__OPENCHAMBER_SURFACE__ = hostedSurface;
+window.__GRIDFORGE_SURFACE__ = hostedSurface;
 
 type PrerenderingDocument = Document & {
   prerendering?: boolean;
@@ -107,7 +107,7 @@ const unregisterDevelopmentServiceWorkers = (): void => {
 if (hostedSurface === 'mobile') {
   void import('@openchamber/ui/apps/renderMobileApp')
     .then(({ renderMobileApp }) => {
-      renderMobileApp(window.__OPENCHAMBER_RUNTIME_APIS__ ?? createConfiguredWebAPIs());
+      renderMobileApp(window.__GRIDFORGE_RUNTIME_APIS__ ?? createConfiguredWebAPIs());
     });
 } else {
   // Hold the render (HTML splash stays up) until a desktop relay-host restore

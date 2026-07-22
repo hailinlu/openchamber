@@ -1,4 +1,4 @@
-import { substituteCommandVariables } from '@/lib/openchamberConfig';
+import { substituteCommandVariables } from '@/lib/gridforgeConfig';
 import type { WorktreeMetadata } from '@/types/worktree';
 import {
   deleteRemoteBranch,

@@ -14,7 +14,7 @@ type ProbeResult = {
   summary: string;
 };
 
-type OpenChamberHealthSnapshot = {
+type GridforgeHealthSnapshot = {
   openCodePort?: unknown;
   openCodeRunning?: unknown;
   openCodeSecureConnection?: unknown;
@@ -31,7 +31,7 @@ type OpenChamberHealthSnapshot = {
   bunBinaryResolved?: unknown;
 };
 
-type OpenChamberOpencodeResolution = {
+type GridforgeOpencodeResolution = {
   configured?: unknown;
   resolved?: unknown;
   resolvedDir?: unknown;
@@ -159,7 +159,7 @@ const buildOpenCodeStatusReport = async (): Promise<string> => {
   const healthUrl = urls.health();
   const apiBase = urls.api('/api/');
 
-  const openChamberHealth: OpenChamberHealthSnapshot | null = await (async () => {
+  const gridforgeHealth: GridforgeHealthSnapshot | null = await (async () => {
     if (!healthUrl) return null;
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 5000);
@@ -172,7 +172,7 @@ const buildOpenCodeStatusReport = async (): Promise<string> => {
       if (!resp.ok) return null;
       const json = (await resp.json().catch(() => null)) as unknown;
       if (!json || typeof json !== 'object' || Array.isArray(json)) return null;
-      return json as OpenChamberHealthSnapshot;
+      return json as GridforgeHealthSnapshot;
     } catch {
       return null;
     } finally {
@@ -180,8 +180,8 @@ const buildOpenCodeStatusReport = async (): Promise<string> => {
     }
   })();
 
-  const openChamberOpencodeResolutionResult: {
-    data: OpenChamberOpencodeResolution | null;
+  const gridforgeOpencodeResolutionResult: {
+    data: GridforgeOpencodeResolution | null;
     status: number | null;
     error: string | null;
   } = await (async () => {
@@ -213,7 +213,7 @@ const buildOpenCodeStatusReport = async (): Promise<string> => {
       if (!json || typeof json !== 'object' || Array.isArray(json)) {
         return { data: null, status: resp.status, error: `invalid json-shape content-type=${contentType}` };
       }
-      return { data: json as OpenChamberOpencodeResolution, status: resp.status, error: null };
+      return { data: json as GridforgeOpencodeResolution, status: resp.status, error: null };
     } catch (error) {
       return {
         data: null,
@@ -259,27 +259,27 @@ const buildOpenCodeStatusReport = async (): Promise<string> => {
 
   const lines: string[] = [];
   lines.push(`Time: ${now.toISOString()}`);
-  lines.push(`OpenChamber version: ${appVersion}`);
+  lines.push(`GridForge version: ${appVersion}`);
   lines.push(`Runtime: ${origin || '(unknown)'} (api=${apiBase || '(unknown)'})`);
   lines.push(`OpenCode SDK base: ${opencodeClient.getBaseUrl()}`);
   lines.push(`Event stream: ${eventStreamStatus}`);
   lines.push(`Directory: ${directory || '(none)'}`);
   lines.push(`Platform: ${platform}`);
 
-  const runtimeOpenCodePort = normalizePort(openChamberHealth?.openCodePort);
+  const runtimeOpenCodePort = normalizePort(gridforgeHealth?.openCodePort);
   lines.push(`OpenCode runtime port: ${runtimeOpenCodePort ?? '(unknown)'}`);
-  if (typeof openChamberHealth?.openCodeRunning === 'boolean') {
-    lines.push(`OpenCode runtime running: ${openChamberHealth.openCodeRunning ? 'yes' : 'no'}`);
+  if (typeof gridforgeHealth?.openCodeRunning === 'boolean') {
+    lines.push(`OpenCode runtime running: ${gridforgeHealth.openCodeRunning ? 'yes' : 'no'}`);
   }
-  if (typeof openChamberHealth?.openCodeSecureConnection === 'boolean') {
-    lines.push(`Secure OpenCode connection: ${openChamberHealth.openCodeSecureConnection ? 'true' : 'false'}`);
+  if (typeof gridforgeHealth?.openCodeSecureConnection === 'boolean') {
+    lines.push(`Secure OpenCode connection: ${gridforgeHealth.openCodeSecureConnection ? 'true' : 'false'}`);
   }
-  if (typeof openChamberHealth?.openCodeAuthSource === 'string' && openChamberHealth.openCodeAuthSource.trim()) {
-    lines.push(`OpenCode auth source: ${openChamberHealth.openCodeAuthSource}`);
+  if (typeof gridforgeHealth?.openCodeAuthSource === 'string' && gridforgeHealth.openCodeAuthSource.trim()) {
+    lines.push(`OpenCode auth source: ${gridforgeHealth.openCodeAuthSource}`);
   }
 
   if (typeof window !== 'undefined') {
-    const injected = (window as unknown as { __OPENCHAMBER_MACOS_MAJOR__?: unknown }).__OPENCHAMBER_MACOS_MAJOR__;
+    const injected = (window as unknown as { __GRIDFORGE_MACOS_MAJOR__?: unknown }).__GRIDFORGE_MACOS_MAJOR__;
     if (typeof injected === 'number' && Number.isFinite(injected) && injected > 0) {
       lines.push(`macOS major: ${injected}`);
     }
@@ -290,58 +290,58 @@ const buildOpenCodeStatusReport = async (): Promise<string> => {
     lines.push('');
     lines.push('OpenCode CLI resolution:');
 
-    const launchDiagnostics = isRecord(openChamberHealth?.lastOpenCodeLaunchDiagnostics)
-      ? openChamberHealth.lastOpenCodeLaunchDiagnostics
+    const launchDiagnostics = isRecord(gridforgeHealth?.lastOpenCodeLaunchDiagnostics)
+      ? gridforgeHealth.lastOpenCodeLaunchDiagnostics
       : null;
     const actualLaunchArgs = launchDiagnostics && Array.isArray(launchDiagnostics.args)
       ? launchDiagnostics.args.filter((value): value is string => typeof value === 'string')
       : [];
-    const openChamberOpencodeResolution = openChamberOpencodeResolutionResult.data;
+    const gridforgeOpencodeResolution = gridforgeOpencodeResolutionResult.data;
     const configured =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.configured === 'string'
-        ? openChamberOpencodeResolution.configured
+      gridforgeOpencodeResolution && typeof gridforgeOpencodeResolution.configured === 'string'
+        ? gridforgeOpencodeResolution.configured
         : null;
     const resolved =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.resolved === 'string'
-        ? openChamberOpencodeResolution.resolved
-        : (openChamberHealth && typeof openChamberHealth.opencodeBinaryResolved === 'string' ? openChamberHealth.opencodeBinaryResolved : '');
+      gridforgeOpencodeResolution && typeof gridforgeOpencodeResolution.resolved === 'string'
+        ? gridforgeOpencodeResolution.resolved
+        : (gridforgeHealth && typeof gridforgeHealth.opencodeBinaryResolved === 'string' ? gridforgeHealth.opencodeBinaryResolved : '');
     const resolvedDir =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.resolvedDir === 'string'
-        ? openChamberOpencodeResolution.resolvedDir
+      gridforgeOpencodeResolution && typeof gridforgeOpencodeResolution.resolvedDir === 'string'
+        ? gridforgeOpencodeResolution.resolvedDir
         : '';
     const source =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.source === 'string'
-        ? openChamberOpencodeResolution.source
-        : (openChamberHealth && typeof openChamberHealth.opencodeBinarySource === 'string' ? openChamberHealth.opencodeBinarySource : '');
+      gridforgeOpencodeResolution && typeof gridforgeOpencodeResolution.source === 'string'
+        ? gridforgeOpencodeResolution.source
+        : (gridforgeHealth && typeof gridforgeHealth.opencodeBinarySource === 'string' ? gridforgeHealth.opencodeBinarySource : '');
     const configuredLaunchBinary =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.launchBinary === 'string'
-        ? openChamberOpencodeResolution.launchBinary
-        : (openChamberHealth && typeof openChamberHealth.opencodeLaunchBinary === 'string' ? openChamberHealth.opencodeLaunchBinary : '');
+      gridforgeOpencodeResolution && typeof gridforgeOpencodeResolution.launchBinary === 'string'
+        ? gridforgeOpencodeResolution.launchBinary
+        : (gridforgeHealth && typeof gridforgeHealth.opencodeLaunchBinary === 'string' ? gridforgeHealth.opencodeLaunchBinary : '');
     const configuredLaunchWrapperType =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.launchWrapperType === 'string'
-        ? openChamberOpencodeResolution.launchWrapperType
-        : (openChamberHealth && typeof openChamberHealth.opencodeLaunchWrapperType === 'string' ? openChamberHealth.opencodeLaunchWrapperType : '');
+      gridforgeOpencodeResolution && typeof gridforgeOpencodeResolution.launchWrapperType === 'string'
+        ? gridforgeOpencodeResolution.launchWrapperType
+        : (gridforgeHealth && typeof gridforgeHealth.opencodeLaunchWrapperType === 'string' ? gridforgeHealth.opencodeLaunchWrapperType : '');
     const configuredLaunchArgs =
-      openChamberOpencodeResolution && Array.isArray(openChamberOpencodeResolution.launchArgs)
-        ? openChamberOpencodeResolution.launchArgs.filter((value): value is string => typeof value === 'string')
-        : (openChamberHealth && Array.isArray(openChamberHealth.opencodeLaunchArgs)
-          ? openChamberHealth.opencodeLaunchArgs.filter((value): value is string => typeof value === 'string')
+      gridforgeOpencodeResolution && Array.isArray(gridforgeOpencodeResolution.launchArgs)
+        ? gridforgeOpencodeResolution.launchArgs.filter((value): value is string => typeof value === 'string')
+        : (gridforgeHealth && Array.isArray(gridforgeHealth.opencodeLaunchArgs)
+          ? gridforgeHealth.opencodeLaunchArgs.filter((value): value is string => typeof value === 'string')
           : []);
     const node =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.node === 'string'
-        ? openChamberOpencodeResolution.node
-        : (openChamberHealth && typeof openChamberHealth.nodeBinaryResolved === 'string' ? openChamberHealth.nodeBinaryResolved : '');
+      gridforgeOpencodeResolution && typeof gridforgeOpencodeResolution.node === 'string'
+        ? gridforgeOpencodeResolution.node
+        : (gridforgeHealth && typeof gridforgeHealth.nodeBinaryResolved === 'string' ? gridforgeHealth.nodeBinaryResolved : '');
     const bun =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.bun === 'string'
-        ? openChamberOpencodeResolution.bun
-        : (openChamberHealth && typeof openChamberHealth.bunBinaryResolved === 'string' ? openChamberHealth.bunBinaryResolved : '');
+      gridforgeOpencodeResolution && typeof gridforgeOpencodeResolution.bun === 'string'
+        ? gridforgeOpencodeResolution.bun
+        : (gridforgeHealth && typeof gridforgeHealth.bunBinaryResolved === 'string' ? gridforgeHealth.bunBinaryResolved : '');
     const detectedNow =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.detectedNow === 'string'
-        ? openChamberOpencodeResolution.detectedNow
+      gridforgeOpencodeResolution && typeof gridforgeOpencodeResolution.detectedNow === 'string'
+        ? gridforgeOpencodeResolution.detectedNow
         : '';
     const detectedSourceNow =
-      openChamberOpencodeResolution && typeof openChamberOpencodeResolution.detectedSourceNow === 'string'
-        ? openChamberOpencodeResolution.detectedSourceNow
+      gridforgeOpencodeResolution && typeof gridforgeOpencodeResolution.detectedSourceNow === 'string'
+        ? gridforgeOpencodeResolution.detectedSourceNow
         : '';
 
     if (configured !== null) {
@@ -374,8 +374,8 @@ const buildOpenCodeStatusReport = async (): Promise<string> => {
       lines.push(`- launch-args: ${configuredLaunchArgs.length ? configuredLaunchArgs.join(' ') : '(none)'}`);
       lines.push(`- runtime: ${formatLaunchRuntime(configuredLaunchWrapperType || '', node, bun)}`);
     }
-    if (!openChamberOpencodeResolution && openChamberOpencodeResolutionResult.error) {
-      lines.push(`- resolution-endpoint: ${openChamberOpencodeResolutionResult.error}`);
+    if (!gridforgeOpencodeResolution && gridforgeOpencodeResolutionResult.error) {
+      lines.push(`- resolution-endpoint: ${gridforgeOpencodeResolutionResult.error}`);
     }
   }
 

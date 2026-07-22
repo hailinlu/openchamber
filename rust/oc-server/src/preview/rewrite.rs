@@ -48,7 +48,7 @@ fn append_proxy_auth_to_proxy_url(value: &str, preview_token: &str, url_auth_tok
         return value.to_string();
     }
     // 用占位 origin 解析相对路径
-    let base = Url::parse("http://openchamber-preview.local").unwrap();
+    let base = Url::parse("http://gridforge-preview.local").unwrap();
     let mut parsed = match base.join(value) {
         Ok(u) => u,
         Err(_) => return value.to_string(),
@@ -699,7 +699,7 @@ pub fn inject_preview_bridge(body_text: &str, target_origin: &str, bridge_nonce:
         format!(" nonce=\"{}\"", bridge_nonce)
     };
     let target_origin_script = format!(
-        "<script{}>window.__openchamberPreviewTargetOrigin={};</script>",
+        "<script{}>window.__gridforgePreviewTargetOrigin={};</script>",
         nonce_attr,
         serde_json::to_string(target_origin).unwrap_or_else(|_| "\"\"".to_string())
     );

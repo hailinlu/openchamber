@@ -189,7 +189,7 @@ fn generate_uuid() -> String {
 // Route handlers
 // ============================================================
 
-/// `GET /api/openchamber/tunnel/check` — 依赖可用性检查。
+/// `GET /api/gridforge/tunnel/check` — 依赖可用性检查。
 pub async fn tunnel_check(
     State(state): State<Arc<AppState>>,
     Query(params): Query<HashMap<String, String>>,
@@ -235,7 +235,7 @@ pub async fn tunnel_check(
     }
 }
 
-/// `GET/POST /api/openchamber/tunnel/doctor` — 诊断检查。
+/// `GET/POST /api/gridforge/tunnel/doctor` — 诊断检查。
 pub async fn tunnel_doctor(
     State(state): State<Arc<AppState>>,
     Query(params): Query<HashMap<String, String>>,
@@ -411,14 +411,14 @@ async fn run_tunnel_doctor(
     }))
 }
 
-/// `GET /api/openchamber/tunnel/providers` — 列出 provider capabilities。
+/// `GET /api/gridforge/tunnel/providers` — 列出 provider capabilities。
 pub async fn tunnel_providers() -> Json<Value> {
     Json(json!({
         "providers": crate::tunnels::providers::list_capabilities(),
     }))
 }
 
-/// `GET /api/openchamber/tunnel/status` — 隧道状态。
+/// `GET /api/gridforge/tunnel/status` — 隧道状态。
 pub async fn tunnel_status(State(state): State<Arc<AppState>>) -> Response {
     let settings = read_settings();
     let normalized_mode = normalize_tunnel_mode(settings.get("tunnelMode").and_then(|v| v.as_str()));
@@ -551,7 +551,7 @@ async fn resolve_active_normalized_mode(state: &Arc<AppState>) -> String {
     }
 }
 
-/// `PUT /api/openchamber/tunnel/managed-remote-token` — upsert managed remote token。
+/// `PUT /api/gridforge/tunnel/managed-remote-token` — upsert managed remote token。
 pub async fn tunnel_managed_remote_token(
     State(state): State<Arc<AppState>>,
     Json(body): Json<Value>,
@@ -594,7 +594,7 @@ pub async fn tunnel_managed_remote_token(
     .into_response()
 }
 
-/// `POST /api/openchamber/tunnel/start` — 启动隧道。
+/// `POST /api/gridforge/tunnel/start` — 启动隧道。
 pub async fn tunnel_start(
     State(state): State<Arc<AppState>>,
     Json(body): Json<Value>,
@@ -839,7 +839,7 @@ enum ModeInput {
     Default,
 }
 
-/// `POST /api/openchamber/tunnel/stop` — 停止活动隧道。
+/// `POST /api/gridforge/tunnel/stop` — 停止活动隧道。
 pub async fn tunnel_stop(State(state): State<Arc<AppState>>) -> Json<Value> {
     let mut revoked_bootstrap_count = 0u32;
     let mut invalidated_session_count = 0u32;

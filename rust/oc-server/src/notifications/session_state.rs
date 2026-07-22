@@ -63,7 +63,7 @@ pub struct SessionStateRuntime {
     attention_states: Mutex<HashMap<String, AttentionState>>,
     /// cooldown 定时器 handle (per session)。
     cooldown_handles: Mutex<HashMap<String, JoinHandle<()>>>,
-    /// 事件广播 channel (SSE 事件: openchamber:session-status, openchamber:session-activity)。
+    /// 事件广播 channel (SSE 事件: gridforge:session-status, gridforge:session-activity)。
     event_tx: broadcast::Sender<Value>,
 }
 
@@ -79,7 +79,7 @@ impl SessionStateRuntime {
         }
     }
 
-    /// 订阅 SSE 事件 (openchamber:session-status / openchamber:session-activity)。
+    /// 订阅 SSE 事件 (gridforge:session-status / gridforge:session-activity)。
     pub fn subscribe_events(&self) -> broadcast::Receiver<Value> {
         self.event_tx.subscribe()
     }
@@ -152,9 +152,9 @@ impl SessionStateRuntime {
             handles.insert(session_id.to_string(), handle);
         }
 
-        // 广播 openchamber:session-activity
+        // 广播 gridforge:session-activity
         self.broadcast_event(json!({
-            "type": "openchamber:session-activity",
+            "type": "gridforge:session-activity",
             "properties": {
                 "sessionId": session_id,
                 "phase": phase,
@@ -269,7 +269,7 @@ impl SessionStateRuntime {
                 )
             };
             self.broadcast_event(json!({
-                "type": "openchamber:session-status",
+                "type": "gridforge:session-status",
                 "properties": {
                     "sessionID": session_id,
                     "status": status_val,
@@ -316,7 +316,7 @@ impl SessionStateRuntime {
             let now = now_millis();
             drop(states);
             self.broadcast_event(json!({
-                "type": "openchamber:session-status",
+                "type": "gridforge:session-status",
                 "properties": {
                     "sessionID": session_id,
                     "status": "idle",

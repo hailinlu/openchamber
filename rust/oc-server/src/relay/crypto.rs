@@ -32,7 +32,7 @@ use thiserror::Error;
 use crate::relay::tunnel_codec::MAX_PLAINTEXT_FRAME_BYTES;
 
 pub const RELAY_PROTOCOL_VERSION: u32 = 1;
-pub const RELAY_HKDF_INFO: &[u8] = b"openchamber-relay-v1";
+pub const RELAY_HKDF_INFO: &[u8] = b"gridforge-relay-v1";
 
 pub const ENCRYPTED_FRAME_VERSION: u8 = 1;
 pub const ENCRYPTED_FRAME_IV_BYTES: usize = 12;
@@ -200,7 +200,7 @@ impl std::fmt::Debug for SessionKeys {
 }
 
 /// Derive both AES session keys from ECDH shared secret + handshake nonce.
-/// HKDF-SHA256 with salt = nonce, info = "openchamber-relay-v1", L = 64 bytes.
+/// HKDF-SHA256 with salt = nonce, info = "gridforge-relay-v1", L = 64 bytes.
 pub fn derive_session_keys(
     own_private_key: &SecretKey,
     peer_public_key: &PublicKey,

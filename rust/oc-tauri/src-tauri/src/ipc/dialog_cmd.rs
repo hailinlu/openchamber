@@ -1,8 +1,8 @@
 //! 文件对话框 + 文件授权命令。
 //!
 //! 这两个命令对应 Electron 的独立 IPC 通道 (不是 desktop_* 命令):
-//! - `openchamber:dialog:open` → `openchamber_dialog_open`
-//! - `openchamber:file:grant-existing` → `openchamber_file_grant`
+//! - `openchamber:dialog:open` → `gridforge_dialog_open`
+//! - `openchamber:file:grant-existing` → `gridforge_file_grant`
 //!
 //! origin 门: 仅 local-origin 可用 (复现 main.mjs:4543-4548 的 isLocalSender 门)。
 //!
@@ -13,13 +13,13 @@ use serde_json::{json, Value};
 use tauri::{AppHandle, WebviewWindow};
 use tauri_plugin_dialog::DialogExt;
 
-/// `openchamber_dialog_open` — args: `{ options: { directory, multiple, returnGrant, title, filters, defaultPath } }`
+/// `gridforge_dialog_open` — args: `{ options: { directory, multiple, returnGrant, title, filters, defaultPath } }`
 ///
 /// 复现 Electron dialog.showOpenDialog。
 /// 返回: string | string[] | null (multiple → 数组, single → string, 取消 → null)。
 /// 当 returnGrant=true 时返回 `{ path, outsideFileGrant, expiresAt }` (或数组)。
 #[tauri::command]
-pub async fn openchamber_dialog_open(
+pub async fn gridforge_dialog_open(
     options: Value,
     app: AppHandle,
     window: WebviewWindow,
@@ -137,13 +137,13 @@ async fn mint_grants_for_paths(paths: Vec<String>) -> Vec<Value> {
     results
 }
 
-/// `openchamber_file_grant` — args: `{ filePath: string }`
+/// `gridforge_file_grant` — args: `{ filePath: string }`
 ///
 /// 复现 Electron `mintOutsideFileGrant` (security-scoped read token)。
 /// Tauri 进程不能直接 import Node 的 grant Map, 改为 HTTP 调 sidecar `POST /api/fs/grant`。
 /// 失败时返回路径本身 (无 grant), 与 Electron `grantFilePath` 的降级行为一致。
 #[tauri::command]
-pub async fn openchamber_file_grant(
+pub async fn gridforge_file_grant(
     file_path: String,
     window: WebviewWindow,
 ) -> Result<Value, String> {
@@ -189,15 +189,15 @@ async fn mint_grant_via_backend(file_path: &str) -> Result<Value, String> {
         .map_err(|e| format!("failed to parse grant response: {}", e))
 }
 
-/// 判断窗口 origin 是否 local (loopback 或 openchamber-ui:// 协议)。
+/// 判断窗口 origin 是否 local (loopback 或 gridforge-ui:// 协议)。
 fn is_local_origin(window: &WebviewWindow) -> bool {
     let url = match window.url() {
         Ok(u) => u,
         Err(_) => return false,
     };
     let scheme = url.scheme();
-    // openchamber-ui://app (packaged UI) 或 http://127.0.0.1:* (loopback)
-    scheme == "openchamber-ui"
+    // gridforge-ui://app (packaged UI) 或 http://127.0.0.1:* (loopback)
+    scheme == "gridforge-ui"
         || (scheme == "http" || scheme == "https")
             && url
                 .host_str()

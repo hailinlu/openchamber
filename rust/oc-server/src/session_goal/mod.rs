@@ -1,5 +1,5 @@
 //! Session goal — persisted self-continuing objective attached to a session
-//! (`metadata.openchamber.goal`). Active goals are ticked after each busy→idle
+//! (`metadata.gridforge.goal`). Active goals are ticked after each busy→idle
 //! transition: token usage is accounted, the small model is asked to audit
 //! progress (`continue` / `complete` / `blocked`), and either a continuation
 //! prompt is re-sent to the session's own model or the goal is settled.
@@ -563,7 +563,7 @@ impl SessionGoalRuntime {
             obj.insert("updatedAt".to_string(), json!(now_millis()));
         }
 
-        let merged = persistence::merge_key_into_openchamber(&session, "goal", &next_goal_value);
+        let merged = persistence::merge_key_into_gridforge(&session, "goal", &next_goal_value);
         let _ = client.patch_session_metadata(session_id, Some(directory), &merged).await;
         Some(next_goal_value)
     }
@@ -717,13 +717,13 @@ pub fn extract_session_update(payload: &Value) -> Option<SessionUpdate> {
     let directory = info.get("directory").and_then(Value::as_str).unwrap_or("").to_string();
     let parent_id = info.get("parentID").and_then(Value::as_str).unwrap_or("").to_string();
 
-    let goal_value = info.get("metadata").and_then(|m| m.get("openchamber")).and_then(|oc| oc.get("goal")).cloned();
+    let goal_value = info.get("metadata").and_then(|m| m.get("gridforge")).and_then(|oc| oc.get("goal")).cloned();
     let goal = goal_value.and_then(|gv| {
         let mut session = serde_json::Map::new();
         let mut metadata = serde_json::Map::new();
-        let mut openchamber = serde_json::Map::new();
-        openchamber.insert("goal".to_string(), gv);
-        metadata.insert("openchamber".to_string(), Value::Object(openchamber));
+        let mut gridforge_namespace = serde_json::Map::new();
+        gridforge_namespace.insert("goal".to_string(), gv);
+        metadata.insert("gridforge".to_string(), Value::Object(gridforge_namespace));
         session.insert("metadata".to_string(), Value::Object(metadata));
         parse_goal_metadata(&Value::Object(session))
     });
@@ -1065,7 +1065,7 @@ mod tests {
                     "id": "s1",
                     "directory": "/d",
                     "metadata": {
-                        "openchamber": {
+                        "gridforge": {
                             "goal": { "id": "g1", "objective": "x", "status": "active" }
                         }
                     }

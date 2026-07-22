@@ -50,7 +50,7 @@ const MAX_RECONNECT_ATTEMPTS: u32 = 5;
 const CONTROL_PERSIST_SEC: u32 = 300;
 
 /// SSH 状态事件名 (复现 SSH_STATUS_EVENT)。
-const SSH_STATUS_EVENT: &str = "openchamber:ssh-instance-status";
+const SSH_STATUS_EVENT: &str = "gridforge:ssh-instance-status";
 
 // ============================================================================
 // 状态结构
@@ -485,7 +485,7 @@ fn set_status_and_emit(app: &AppHandle, id: &str, phase: Phase, detail: Option<S
         state.set_status(id, phase, detail)
     };
     let _ = app.emit(
-        "openchamber:emit",
+        "gridforge:emit",
         json!({ "event": SSH_STATUS_EVENT, "detail": status }),
     );
 }
@@ -575,7 +575,7 @@ async fn connect_blocking(app: &AppHandle, instance: &Instance) -> Result<(), St
         master_cmd.env("SSH_ASKPASS", askpass);
         master_cmd.env("DISPLAY", "1");
         if let Some(pw) = instance.auth.ssh_password.as_ref().and_then(|s| s.value.as_ref()) {
-            master_cmd.env("OPENCHAMBER_SSH_ASKPASS_VALUE", pw);
+            master_cmd.env("GRIDFORGE_SSH_ASKPASS_VALUE", pw);
         }
     }
 
@@ -606,7 +606,7 @@ async fn connect_blocking(app: &AppHandle, instance: &Instance) -> Result<(), St
     let started_by_us;
     let final_remote_port;
 
-    if instance.remote_openchamber.mode == "managed" {
+    if instance.remote_gridforge.mode == "managed" {
         // 检查远程版本
         let app_version = app.package_info().version.to_string();
         let remote_version = check_remote_version(&parsed, &control_socket).await;
@@ -628,7 +628,7 @@ async fn connect_blocking(app: &AppHandle, instance: &Instance) -> Result<(), St
                 None,
             );
 
-            install_remote(&parsed, &control_socket, &instance.remote_openchamber.install_method, &app_version)
+            install_remote(&parsed, &control_socket, &instance.remote_gridforge.install_method, &app_version)
                 .await
                 .map_err(|e| format!("Remote install failed: {}", e))?;
 
@@ -638,7 +638,7 @@ async fn connect_blocking(app: &AppHandle, instance: &Instance) -> Result<(), St
         set_status_and_emit(app, id, Phase::ServerDetecting, None);
 
         // 探测是否已有 server 在运行
-        let running_port = check_remote_server_running(&parsed, &control_socket, instance.remote_openchamber.preferred_port)
+        let running_port = check_remote_server_running(&parsed, &control_socket, instance.remote_gridforge.preferred_port)
             .await
             .unwrap_or(None);
 
@@ -649,7 +649,7 @@ async fn connect_blocking(app: &AppHandle, instance: &Instance) -> Result<(), St
         } else {
             // 启动远程 server
             set_status_and_emit(app, id, Phase::ServerStarting, None);
-            let desired_port = instance.remote_openchamber.preferred_port.unwrap_or(0);
+            let desired_port = instance.remote_gridforge.preferred_port.unwrap_or(0);
             let port = start_remote_server(&parsed, &control_socket, desired_port, &instance.auth)
                 .await?;
             final_remote_port = port;
@@ -659,7 +659,7 @@ async fn connect_blocking(app: &AppHandle, instance: &Instance) -> Result<(), St
     } else {
         // external 模式: 使用 preferred_port
         final_remote_port = instance
-            .remote_openchamber
+            .remote_gridforge
             .preferred_port
             .ok_or("external mode requires preferredPort")?;
         started_by_us = false;
@@ -717,7 +717,7 @@ async fn connect_blocking(app: &AppHandle, instance: &Instance) -> Result<(), St
     }
 
     let _ = app.emit(
-        "openchamber:emit",
+        "gridforge:emit",
         json!({ "event": SSH_STATUS_EVENT, "detail": ready_status }),
     );
 
@@ -837,7 +837,7 @@ fn spawn_monitor(
                     }
                 }
                 let _ = app_handle.emit(
-                    "openchamber:emit",
+                    "gridforge:emit",
                     json!({ "event": SSH_STATUS_EVENT, "detail": err_status }),
                 );
                 return;
@@ -998,7 +998,7 @@ async fn check_remote_version(
     control_socket: &PathBuf,
 ) -> Result<String, String> {
     let output =
-        run_remote_command(parsed, control_socket, "openchamber --version 2>/dev/null || true", 10)
+        run_remote_command(parsed, control_socket, "gridforge --version 2>/dev/null || true", 10)
             .await?;
     // 解析版本号: 取 stdout 中的第一个 x.y.z 格式的 token
     parse_version_token(&output)
@@ -1077,15 +1077,15 @@ async fn start_remote_server(
     };
 
     let password_env = auth
-        .openchamber_password
+        .gridforge_password
         .as_ref()
         .filter(|s| s.enabled)
         .and_then(|s| s.value.as_ref())
-        .map(|v| format!("OPENCHAMBER_UI_PASSWORD={}", parser::shell_quote(v)))
+        .map(|v| format!("GRIDFORGE_UI_PASSWORD={}", parser::shell_quote(v)))
         .unwrap_or_default();
 
     let script = format!(
-        "{} OPENCHAMBER_RUNTIME=ssh-remote nohup openchamber serve --hostname 127.0.0.1 {} > /tmp/oc-serve.log 2>&1 &\nsleep 2\ncat /tmp/oc-serve.log",
+        "{} GRIDFORGE_RUNTIME=ssh-remote nohup gridforge serve --hostname 127.0.0.1 {} > /tmp/oc-serve.log 2>&1 &\nsleep 2\ncat /tmp/oc-serve.log",
         password_env, port_arg
     );
 
@@ -1300,10 +1300,10 @@ fn control_path_for_instance(id: &str) -> PathBuf {
 
 /// session 目录路径。
 fn session_dir_for_instance(id: &str) -> PathBuf {
-    let base = if let Ok(dir) = std::env::var("OPENCHAMBER_DATA_DIR") {
+    let base = if let Ok(dir) = std::env::var("GRIDFORGE_DATA_DIR") {
         PathBuf::from(dir.trim())
     } else if let Ok(home) = std::env::var("HOME") {
-        PathBuf::from(home).join(".config").join("openchamber")
+        PathBuf::from(home).join(".config").join("gridforge")
     } else {
         std::env::temp_dir()
     };
@@ -1315,9 +1315,9 @@ fn write_askpass_script(path: &PathBuf, _password: &str) -> Result<(), String> {
     let content = "#!/bin/bash
 PROMPT=\"$1\"
 
-if [[ -n \"$OPENCHAMBER_SSH_ASKPASS_VALUE\" ]]; then
+if [[ -n \"$GRIDFORGE_SSH_ASKPASS_VALUE\" ]]; then
   if [[ \"$PROMPT\" == *\"assword\"* || \"$PROMPT\" == *\"passphrase\"* ]]; then
-    printf '%s\\n' \"$OPENCHAMBER_SSH_ASKPASS_VALUE\"
+    printf '%s\\n' \"$GRIDFORGE_SSH_ASKPASS_VALUE\"
     exit 0
   fi
 fi
@@ -1408,7 +1408,7 @@ mod tests {
     #[test]
     fn parse_version_from_output() {
         assert_eq!(
-            parse_version_token("OpenChamber v1.2.3"),
+            parse_version_token("GridForge v1.2.3"),
             Some("1.2.3".to_string())
         );
         assert_eq!(parse_version_token("1.0.0"), Some("1.0.0".to_string()));

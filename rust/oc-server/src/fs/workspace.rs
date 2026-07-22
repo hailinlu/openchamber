@@ -195,9 +195,9 @@ mod tests {
     #[test]
     fn resolve_user_config_root() {
         let base = Path::new("/home/user/project");
-        let config_root = Path::new("/home/user/.config/openchamber");
+        let config_root = Path::new("/home/user/.config/gridforge");
         let result = resolve_workspace_path(
-            "/home/user/.config/openchamber/settings.json",
+            "/home/user/.config/gridforge/settings.json",
             base,
             Some(config_root),
         );

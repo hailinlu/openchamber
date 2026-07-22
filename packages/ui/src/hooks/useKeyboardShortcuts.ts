@@ -224,7 +224,7 @@ export const useKeyboardShortcuts = () => {
       if (eventMatchesShortcut(e, combo('cycle_theme'))) {
         e.preventDefault();
         if (readEmbeddedThemeSearchParams() !== null && window.parent && window.parent !== window) {
-          window.parent.postMessage({ type: 'openchamber:cycle-theme-request' }, window.location.origin);
+          window.parent.postMessage({ type: 'gridforge:cycle-theme-request' }, window.location.origin);
           return;
         }
         const modes: Array<'light' | 'dark' | 'system'> = ['light', 'dark', 'system'];
@@ -520,7 +520,7 @@ export const useKeyboardShortcuts = () => {
         e.preventDefault();
         // Dictation state lives inside the composer's isolated component;
         // toggle it via an event instead of subscribing this hot hook to it.
-        window.dispatchEvent(new CustomEvent('openchamber:dictation-toggle'));
+        window.dispatchEvent(new CustomEvent('gridforge:dictation-toggle'));
         return;
       }
 

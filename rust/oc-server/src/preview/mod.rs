@@ -60,7 +60,7 @@ pub const PREVIEW_PASSTHROUGH_REQUEST_HEADERS: &[&str] = &["x-inertia", "x-inert
 pub const PREVIEW_PASSTHROUGH_RESPONSE_HEADERS: &[&str] = &["x-inertia", "x-inertia-location"];
 
 /// Preview bridge 脚本的 DOM id。
-pub const PREVIEW_BRIDGE_SCRIPT_ID: &str = "openchamber-preview-bridge";
+pub const PREVIEW_BRIDGE_SCRIPT_ID: &str = "gridforge-preview-bridge";
 
 /// Loopback 主机名集合 (仅这些允许非 allowExternal 代理)。
 pub const LOOPBACK_HOSTS: &[&str] = &[

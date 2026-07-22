@@ -19,7 +19,7 @@ import { useI18n } from "@/lib/i18n";
 const STATUS_ROW_CONTAINER_STYLE = { containerType: "inline-size" as const, containerName: "status-row" };
 
 /** Custom event dispatched when a user clicks a todo item to navigate to its source message. */
-const CHAT_SCROLL_TO_MESSAGE_EVENT = 'openchamber:chat-scroll-to-message';
+const CHAT_SCROLL_TO_MESSAGE_EVENT = 'gridforge:chat-scroll-to-message';
 
 /** Normalize todo content for fuzzy matching: strip 【...】 and （...） segments, then trim. */
 const normalizeTodoContentForMatch = (content: string): string =>

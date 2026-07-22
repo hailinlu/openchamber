@@ -86,7 +86,7 @@ pub struct RunNowResult {
     pub error: Option<String>,
 }
 
-/// Status snapshot — what the routes return via `GET /api/openchamber/scheduled-tasks/status`.
+/// Status snapshot — what the routes return via `GET /api/gridforge/scheduled-tasks/status`.
 #[derive(Debug, Clone, Default)]
 pub struct StatusSnapshot {
     pub has_enabled_scheduled_tasks: bool,

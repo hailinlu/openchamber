@@ -75,6 +75,7 @@ pub struct ListSkillsQuery {
 
 #[derive(Deserialize)]
 pub struct CatalogSourceQuery {
+    #[serde(rename = "sourceId")]
     source_id: Option<String>,
     refresh: Option<bool>,
     cursor: Option<String>,

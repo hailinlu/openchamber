@@ -241,7 +241,7 @@ describe('getInjectedBootOutcome', () => {
 
   test('returns null for malformed payload with unknown kind', () => {
     const w = mockWindow();
-    w.__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ = { kind: 'unknown-kind' };
+    w.__GRIDFORGE_DESKTOP_BOOT_OUTCOME__ = { kind: 'unknown-kind' };
     try {
       expect(getInjectedBootOutcome()).toBeNull();
     } finally {
@@ -251,7 +251,7 @@ describe('getInjectedBootOutcome', () => {
 
   test('returns null for payload missing required hostId', () => {
     const w = mockWindow();
-    w.__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ = { kind: 'main-remote', url: 'https://x.test' };
+    w.__GRIDFORGE_DESKTOP_BOOT_OUTCOME__ = { kind: 'main-remote', url: 'https://x.test' };
     try {
       expect(getInjectedBootOutcome()).toBeNull();
     } finally {
@@ -261,7 +261,7 @@ describe('getInjectedBootOutcome', () => {
 
   test('returns null for non-object payload', () => {
     const w = mockWindow();
-    w.__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ = 'not-an-object';
+    w.__GRIDFORGE_DESKTOP_BOOT_OUTCOME__ = 'not-an-object';
     try {
       expect(getInjectedBootOutcome()).toBeNull();
     } finally {
@@ -271,7 +271,7 @@ describe('getInjectedBootOutcome', () => {
 
   test('returns valid outcome for well-formed main-local', () => {
     const w = mockWindow();
-    w.__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ = { target: 'local', status: 'ok' };
+    w.__GRIDFORGE_DESKTOP_BOOT_OUTCOME__ = { target: 'local', status: 'ok' };
     try {
       expect(getInjectedBootOutcome()).toEqual({ target: 'local', status: 'ok' });
     } finally {
@@ -281,7 +281,7 @@ describe('getInjectedBootOutcome', () => {
 
   test('returns null for payload with numeric kind', () => {
     const w = mockWindow();
-    w.__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ = { kind: 42 };
+    w.__GRIDFORGE_DESKTOP_BOOT_OUTCOME__ = { kind: 42 };
     try {
       expect(getInjectedBootOutcome()).toBeNull();
     } finally {
@@ -333,7 +333,7 @@ describe('getBootInjectionStatus', () => {
 
   test('returns "not-injected" when global is explicitly null', () => {
     const w = mockWindow();
-    w.__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ = null;
+    w.__GRIDFORGE_DESKTOP_BOOT_OUTCOME__ = null;
     try {
       expect(getBootInjectionStatus()).toBe('not-injected');
     } finally {
@@ -343,7 +343,7 @@ describe('getBootInjectionStatus', () => {
 
   test('returns "malformed" when global is present but invalid', () => {
     const w = mockWindow();
-    w.__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ = { kind: 'bad' };
+    w.__GRIDFORGE_DESKTOP_BOOT_OUTCOME__ = { kind: 'bad' };
     try {
       expect(getBootInjectionStatus()).toBe('malformed');
     } finally {
@@ -353,7 +353,7 @@ describe('getBootInjectionStatus', () => {
 
   test('returns "valid" when global is present and well-formed', () => {
     const w = mockWindow();
-    w.__OPENCHAMBER_DESKTOP_BOOT_OUTCOME__ = { target: 'local', status: 'ok' };
+    w.__GRIDFORGE_DESKTOP_BOOT_OUTCOME__ = { target: 'local', status: 'ok' };
     try {
       expect(getBootInjectionStatus()).toBe('valid');
     } finally {

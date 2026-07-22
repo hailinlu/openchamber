@@ -31,7 +31,7 @@
 //!   `reqwest` recomputes framing on its own.
 //! - **No credential injection**: tunneled requests authenticate exactly like
 //!   any remote client (`oc_client_*` header / `oc_url_token` query). The
-//!   dispatcher only adds `x-openchamber-relay-connection` for traceability
+//!   dispatcher only adds `x-gridforge-relay-connection` for traceability
 //!   and (for WS) a same-origin `Origin` header so the loopback server's WS
 //!   origin check passes reliably.
 //! - **CR/LF rejection**: any header name or value containing `\r` or `\n` is
@@ -562,7 +562,7 @@ pub fn close(&self) {
         // Build filtered headers + inject relay-connection tag.
         let mut headers = build_request_headers(&raw_headers);
         headers.insert(
-            "x-openchamber-relay-connection".to_string(),
+            "x-gridforge-relay-connection".to_string(),
             self.connection_id.clone(),
         );
 
@@ -805,7 +805,7 @@ pub fn close(&self) {
         // by the tunneled `oc_url_token`, not by this Origin.
         let mut dial_headers = HashMap::new();
         dial_headers.insert(
-            "x-openchamber-relay-connection".to_string(),
+            "x-gridforge-relay-connection".to_string(),
             self.connection_id.clone(),
         );
         let local_port = (self.get_local_port)();
@@ -1635,7 +1635,7 @@ mod tests {
             "Host": "evil.example.com",
             "Content-Length": "999",
             "Authorization": "Bearer oc_client_xxx",
-            "X-OpenChamber-Real": "abc",
+            "X-GridForge-Real": "abc",
         })
         .as_object()
         .cloned()
@@ -1649,7 +1649,7 @@ mod tests {
         assert!(!headers.contains_key("content-length"));
         assert!(headers.contains_key("authorization"));
         assert_eq!(headers.get("authorization").unwrap(), "Bearer oc_client_xxx");
-        assert_eq!(headers.get("x-openchamber-real").unwrap(), "abc");
+        assert_eq!(headers.get("x-gridforge-real").unwrap(), "abc");
     }
 
     #[test]
@@ -2106,7 +2106,7 @@ mod tests {
         assert_eq!(
             captured[0]
                 .headers
-                .get("x-openchamber-relay-connection")
+                .get("x-gridforge-relay-connection")
                 .unwrap(),
             "conn-1"
         );
@@ -2587,7 +2587,7 @@ mod tests {
             serde_json::Value::String(loopback_url.clone()),
         );
         headers.insert(
-            "x-openchamber-relay-connection".to_string(),
+            "x-gridforge-relay-connection".to_string(),
             serde_json::Value::String("conn-loopback".to_string()),
         );
         let body = serde_json::json!({

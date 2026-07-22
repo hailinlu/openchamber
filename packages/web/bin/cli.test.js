@@ -18,14 +18,14 @@ import {
 import {
   assertAuthenticatedNetworkExposure,
   commands,
-  discoverOpenChamberInstanceOnPort,
+  discoverGridforgeInstanceOnPort,
   discoverLifecycleInstances,
   discoverRunningInstances,
   discoverUnconfirmedRegistryInstanceOnPort,
   ensureTunnelProfilesMigrated,
   getInstanceFilePath,
   getPidFilePath,
-  isOpenchamberCmdline,
+  isGridforgeCmdline,
   isOpenchamberProcessRunning,
   parseArgs,
   resolveServeHost,
@@ -33,7 +33,7 @@ import {
 
 async function withTempOpenChamberDataDir(fn) {
   const previous = process.env.OPENCHAMBER_DATA_DIR;
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'openchamber-cli-test-'));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'gridforge-cli-test-'));
   process.env.OPENCHAMBER_DATA_DIR = dir;
   try {
     return await fn(dir);
@@ -160,7 +160,7 @@ async function waitForTcpPort(port, timeoutMs = 3000) {
 }
 
 function spawnOpenChamberLikeIdleProcess() {
-  return spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)', 'openchamber-idle'], { stdio: 'ignore' });
+  return spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)', 'gridforge-idle'], { stdio: 'ignore' });
 }
 
 function spawnOpenChamberLikeHungServer(port) {
@@ -174,7 +174,7 @@ function spawnOpenChamberLikeHungServer(port) {
     server.listen(${port}, '127.0.0.1');
     setInterval(() => {}, 1000);
   `;
-  return spawn(process.execPath, ['-e', script, 'openchamber-hung-server'], { stdio: 'ignore' });
+  return spawn(process.execPath, ['-e', script, 'gridforge-hung-server'], { stdio: 'ignore' });
 }
 
 describe('cli args', () => {
@@ -191,10 +191,10 @@ describe('cli args', () => {
   });
 
   it('parses explicit connect-url server overrides', () => {
-    const parsed = parseArgs(['connect-url', '--server', 'https://openchamber.example.com', '--port', '3002']);
+    const parsed = parseArgs(['connect-url', '--server', 'https://gridforge.example.com', '--port', '3002']);
 
     expect(parsed.command).toBe('connect-url');
-    expect(parsed.options.server).toBe('https://openchamber.example.com');
+    expect(parsed.options.server).toBe('https://gridforge.example.com');
     expect(parsed.options.port).toBe(3002);
   });
 
@@ -465,18 +465,18 @@ describe('cli entry detection', () => {
   });
 });
 
-describe('isOpenchamberCmdline', () => {
+describe('isGridforgeCmdline', () => {
   it('accepts OpenChamber CLI and daemon cmdlines', () => {
-    expect(isOpenchamberCmdline('node /x/@openchamber/web/bin/cli.js serve')).toBe(true);
-    expect(isOpenchamberCmdline('node /x/@openchamber/web/server/index.js --port 9090')).toBe(true);
-    expect(isOpenchamberCmdline('bun /home/u/projects/openchamber/packages/web/server/index.js --port 3001')).toBe(true);
+    expect(isGridforgeCmdline('node /x/@openchamber/web/bin/cli.js serve')).toBe(true);
+    expect(isGridforgeCmdline('node /x/@openchamber/web/server/index.js --port 9090')).toBe(true);
+    expect(isGridforgeCmdline('bun /home/u/projects/openchamber/packages/web/server/index.js --port 3001')).toBe(true);
   });
 
   it('rejects recycled and unrelated processes (issue #1721)', () => {
-    expect(isOpenchamberCmdline('node /home/herjarsa/npm-global/bin/agentmemory')).toBe(false);
-    expect(isOpenchamberCmdline('node /usr/lib/node_modules/npm/bin/npm-cli.js install')).toBe(false);
-    expect(isOpenchamberCmdline('')).toBe(false);
-    expect(isOpenchamberCmdline(null)).toBe(false);
+    expect(isGridforgeCmdline('node /home/herjarsa/npm-global/bin/agentmemory')).toBe(false);
+    expect(isGridforgeCmdline('node /usr/lib/node_modules/npm/bin/npm-cli.js install')).toBe(false);
+    expect(isGridforgeCmdline('')).toBe(false);
+    expect(isGridforgeCmdline(null)).toBe(false);
   });
 });
 
@@ -507,7 +507,7 @@ describe('lifecycle instance discovery', () => {
     await withTempOpenChamberDataDir(async (dir) => {
       fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ desktopLocalPort: 57123 }, null, 2));
 
-      const instance = await discoverOpenChamberInstanceOnPort(3003, {
+      const instance = await discoverGridforgeInstanceOnPort(3003, {
         fetchImpl: async () => createMockJsonResponse({ runtime: 'desktop', pid: 934 }),
       });
 
@@ -519,7 +519,7 @@ describe('lifecycle instance discovery', () => {
     await withTempOpenChamberDataDir(async (dir) => {
       fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ desktopLocalPort: 57123 }, null, 2));
 
-      const instance = await discoverOpenChamberInstanceOnPort(57123, {
+      const instance = await discoverGridforgeInstanceOnPort(57123, {
         fetchImpl: async () => createMockJsonResponse({ runtime: 'desktop', pid: 934 }),
       });
 

@@ -3,7 +3,7 @@
 //! macOS: 完整菜单 (App/File/Edit/View/Window/Help + 自定义项)
 //! Win/Linux: 简化菜单 (File/View/Help)
 //!
-//! 自定义项点击 → emit `openchamber:menu-action` 事件到 UI。
+//! 自定义项点击 → emit `gridforge:menu-action` 事件到 UI。
 
 use serde_json::json;
 use tauri::{
@@ -155,7 +155,7 @@ fn build_cross_platform_menu(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>>
 }
 
 /// 菜单点击事件处理。
-/// 自定义项 → emit `openchamber:menu-action` (action name)
+/// 自定义项 → emit `gridforge:menu-action` (action name)
 /// 特殊项 → 特殊处理 (quit / reload / devtools / check_updates)
 pub fn handle_menu_event(app: &AppHandle, id: &str) {
     match id {
@@ -175,24 +175,24 @@ pub fn handle_menu_event(app: &AppHandle, id: &str) {
         }
         "menu_check_updates" => {
             let _ = app.emit(
-                "openchamber:emit",
-                json!({ "event": "openchamber:check-for-updates", "detail": null }),
+                "gridforge:emit",
+                json!({ "event": "gridforge:check-for-updates", "detail": null }),
             );
         }
         "menu_report_bug" => {
             let _ = app.emit(
-                "openchamber:emit",
+                "gridforge:emit",
                 json!({
-                    "event": "openchamber:menu-action",
+                    "event": "gridforge:menu-action",
                     "detail": "report-bug"
                 }),
             );
         }
         "menu_request_feature" => {
             let _ = app.emit(
-                "openchamber:emit",
+                "gridforge:emit",
                 json!({
-                    "event": "openchamber:menu-action",
+                    "event": "gridforge:menu-action",
                     "detail": "request-feature"
                 }),
             );
@@ -202,8 +202,8 @@ pub fn handle_menu_event(app: &AppHandle, id: &str) {
             // 去掉 menu_ 前缀作为 action name
             let action = other.strip_prefix("menu_").unwrap_or(other);
             let _ = app.emit(
-                "openchamber:emit",
-                json!({ "event": "openchamber:menu-action", "detail": action }),
+                "gridforge:emit",
+                json!({ "event": "gridforge:menu-action", "detail": action }),
             );
         }
     }

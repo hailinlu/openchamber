@@ -87,18 +87,18 @@ async fn read_settings() -> Option<Value> {
 }
 
 fn resolve_settings_path() -> PathBuf {
-    if let Ok(dir) = std::env::var("OPENCHAMBER_DATA_DIR") {
+    if let Ok(dir) = std::env::var("GRIDFORGE_DATA_DIR") {
         PathBuf::from(dir).join("settings.json")
     } else {
         #[cfg(not(target_os = "windows"))]
         {
             let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
-            PathBuf::from(home).join(".config/openchamber/settings.json")
+            PathBuf::from(home).join(".config/gridforge/settings.json")
         }
         #[cfg(target_os = "windows")]
         {
             let home = std::env::var("USERPROFILE").unwrap_or_else(|_| "C:\\".to_string());
-            PathBuf::from(home).join(".config/openchamber/settings.json")
+            PathBuf::from(home).join(".config/gridforge/settings.json")
         }
     }
 }

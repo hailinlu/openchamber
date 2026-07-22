@@ -98,7 +98,7 @@ impl GitHubClient {
         );
         headers.insert(
             reqwest::header::USER_AGENT,
-            HeaderValue::from_static("openchamber"),
+            HeaderValue::from_static("gridforge"),
         );
         if let Some((name, value)) = extra {
             if let Ok(name) = reqwest::header::HeaderName::from_bytes(name.as_bytes()) {
@@ -619,7 +619,7 @@ mod tests {
 
     #[test]
     fn github_client_constructs() {
-        // 注意: base_url 受 OPENCHAMBER_GITHUB_API_URL 环境变量影响 (测试并行运行可能被
+        // 注意: base_url 受 GRIDFORGE_GITHUB_API_URL 环境变量影响 (测试并行运行可能被
         // github_client_custom_base_url 污染), 所以这里只验证 token 正确设置。
         let client = GitHubClient::new("test_token".to_string());
         assert_eq!(client.token, "test_token");
@@ -630,10 +630,10 @@ mod tests {
     fn github_client_custom_base_url() {
         // 注意: 环境变量是进程全局的, 测试并行运行可能相互干扰。
         // 先清除可能残留的值, 设置自定义值, 验证, 然后清除。
-        std::env::remove_var("OPENCHAMBER_GITHUB_API_URL");
-        std::env::set_var("OPENCHAMBER_GITHUB_API_URL", "http://localhost:9999");
+        std::env::remove_var("GRIDFORGE_GITHUB_API_URL");
+        std::env::set_var("GRIDFORGE_GITHUB_API_URL", "http://localhost:9999");
         let client = GitHubClient::new("test".to_string());
         assert_eq!(client.base_url, "http://localhost:9999");
-        std::env::remove_var("OPENCHAMBER_GITHUB_API_URL");
+        std::env::remove_var("GRIDFORGE_GITHUB_API_URL");
     }
 }

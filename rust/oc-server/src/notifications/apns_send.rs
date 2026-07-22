@@ -4,7 +4,7 @@
 //!
 //! **两种模式**:
 //! - Relay (默认): POST tokens + generic text 到 relay URL, relay 持有 Apple Key。
-//! - Direct (fallback): `OPENCHAMBER_PUSH_RELAY_DISABLED=true` + `OPENCHAMBER_APNS_*`,
+//! - Direct (fallback): `GRIDFORGE_PUSH_RELAY_DISABLED=true` + `GRIDFORGE_APNS_*`,
 //!   自己签 ES256 JWT + HTTP/2 连接 api.push.apple.com。
 //!
 //! **签名兼容**: ECDSA P-256 IEEE-P1363 (raw r||s), base64url 编码。
@@ -72,9 +72,9 @@ impl ApnsSendRuntime {
     ///
     /// 对应 Node `resolveRelayConfig`。relay 未禁用时返回 Some。
     pub fn resolve_relay_config() -> Option<RelayConfig> {
-        let disabled = trimmed_env("OPENCHAMBER_PUSH_RELAY_DISABLED");
-        let relay_url = trimmed_env("OPENCHAMBER_PUSH_RELAY_URL");
-        let apns_env = trimmed_env("OPENCHAMBER_APNS_ENVIRONMENT");
+        let disabled = trimmed_env("GRIDFORGE_PUSH_RELAY_DISABLED");
+        let relay_url = trimmed_env("GRIDFORGE_PUSH_RELAY_URL");
+        let apns_env = trimmed_env("GRIDFORGE_APNS_ENVIRONMENT");
         Self::resolve_relay_config_from(disabled.as_deref(), relay_url.as_deref(), apns_env.as_deref())
     }
 
@@ -107,17 +107,17 @@ impl ApnsSendRuntime {
     ///
     /// 对应 Node `resolveApnsConfig`。env 优先, 然后 settings.apnsConfig。
     pub fn resolve_apns_config() -> Option<ApnsConfig> {
-        let mut key_id = trimmed_env("OPENCHAMBER_APNS_KEY_ID");
-        let mut team_id = trimmed_env("OPENCHAMBER_APNS_TEAM_ID");
-        let mut bundle_id = trimmed_env("OPENCHAMBER_APNS_BUNDLE_ID");
-        let mut environment = trimmed_env("OPENCHAMBER_APNS_ENVIRONMENT")
+        let mut key_id = trimmed_env("GRIDFORGE_APNS_KEY_ID");
+        let mut team_id = trimmed_env("GRIDFORGE_APNS_TEAM_ID");
+        let mut bundle_id = trimmed_env("GRIDFORGE_APNS_BUNDLE_ID");
+        let mut environment = trimmed_env("GRIDFORGE_APNS_ENVIRONMENT")
             .map(|e| e.to_lowercase())
             .unwrap_or_default();
-        let mut p8 = super::types::normalize_pem(&std::env::var("OPENCHAMBER_APNS_P8").unwrap_or_default());
+        let mut p8 = super::types::normalize_pem(&std::env::var("GRIDFORGE_APNS_P8").unwrap_or_default());
 
         // 从文件读取 p8
         if p8.is_empty() {
-            if let Some(p8_path) = trimmed_env("OPENCHAMBER_APNS_P8_PATH") {
+            if let Some(p8_path) = trimmed_env("GRIDFORGE_APNS_P8_PATH") {
                 if let Ok(content) = std::fs::read_to_string(&p8_path) {
                     p8 = super::types::normalize_pem(content.trim());
                 }
@@ -375,7 +375,7 @@ impl ApnsSendRuntime {
             None => {
                 tracing::warn!(
                     "[APNs] Relay disabled and no direct config; set \
-                     OPENCHAMBER_APNS_KEY_ID / OPENCHAMBER_APNS_TEAM_ID / OPENCHAMBER_APNS_P8 \
+                     GRIDFORGE_APNS_KEY_ID / GRIDFORGE_APNS_TEAM_ID / GRIDFORGE_APNS_P8 \
                      for direct send."
                 );
                 return;
@@ -465,7 +465,7 @@ mod tests {
         assert!(config.is_some());
         let config = config.unwrap();
         assert_eq!(config.url, DEFAULT_RELAY_URL);
-        assert_eq!(config.register_url, "https://api.openchamber.dev/v1/push/register-token");
+        assert_eq!(config.register_url, "https://api.gridforge.dev/v1/push/register-token");
     }
 
     #[test]
@@ -558,24 +558,24 @@ mod tests {
 
     #[test]
     fn trimmed_env_missing() {
-        std::env::remove_var("OPENCHAMBER_NONEXISTENT_VAR_TEST_12345");
-        assert!(trimmed_env("OPENCHAMBER_NONEXISTENT_VAR_TEST_12345").is_none());
+        std::env::remove_var("GRIDFORGE_NONEXISTENT_VAR_TEST_12345");
+        assert!(trimmed_env("GRIDFORGE_NONEXISTENT_VAR_TEST_12345").is_none());
     }
 
     #[test]
     fn trimmed_env_empty() {
-        std::env::set_var("OPENCHAMBER_TEST_EMPTY_VAR", "  ");
-        assert!(trimmed_env("OPENCHAMBER_TEST_EMPTY_VAR").is_none());
-        std::env::remove_var("OPENCHAMBER_TEST_EMPTY_VAR");
+        std::env::set_var("GRIDFORGE_TEST_EMPTY_VAR", "  ");
+        assert!(trimmed_env("GRIDFORGE_TEST_EMPTY_VAR").is_none());
+        std::env::remove_var("GRIDFORGE_TEST_EMPTY_VAR");
     }
 
     #[test]
     fn trimmed_env_valid() {
-        std::env::set_var("OPENCHAMBER_TEST_VAR_12345", "  value  ");
+        std::env::set_var("GRIDFORGE_TEST_VAR_12345", "  value  ");
         assert_eq!(
-            trimmed_env("OPENCHAMBER_TEST_VAR_12345"),
+            trimmed_env("GRIDFORGE_TEST_VAR_12345"),
             Some("value".to_string())
         );
-        std::env::remove_var("OPENCHAMBER_TEST_VAR_12345");
+        std::env::remove_var("GRIDFORGE_TEST_VAR_12345");
     }
 }
