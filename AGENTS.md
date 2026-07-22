@@ -14,6 +14,38 @@ There are two desktop shells in active development:
 Backend/domain logic for the Node path lives in `packages/web/server/*` (and `packages/vscode/*` for VS Code bridge/runtime parity). The Rust port of the same backend lives in `rust/oc-server/src/*`. The desktop shell owns the security boundary: windows, menus, dialogs, notifications, updater, deep-links, runtime host switching, local IPC gates, and SSH/tunnel management.
 - Do not add OpenCode feature backends to the native shell. Shared UI features should remain server/runtime APIs unless the capability is inherently native.
 
+### Startup latency sources (Tauri desktop)
+
+Cold-starting the Tauri desktop shell, the entire splash window is dominated by four cost categories stacked in series. Before touching any startup-pipeline code, re-read this table and re-measure on the current branch — the numbers below are anchored to a single `bun run tauri:dev` run on 2026-07-22 (`/tmp/tauri-dev-verify.log`).
+
+| #  | Bottleneck                                                | File:line                                                 | Measured window                            | Notes |
+|----|-----------------------------------------------------------|-----------------------------------------------------------|--------------------------------------------|-------|
+| 1  | Cargo cold compile of Tauri shell + oc-server (5 crates)  | `scripts/tauri-dev.mjs:233` → `cargo run --no-default-features --features vibrancy` | ~10 s cold; ~1–3 s warm                    | Top contributor. Dev debug build, not release. |
+| 2  | `OcServer::start` binds TCP listener AFTER OpenCode is healthy (serial ordering) | `rust/oc-server/src/lib.rs:89-105`                        | ~0–3 s (OpenCode spawn ≈ 2 s)              | The Node Express path (`packages/web/server/lib/opencode/startup-pipeline-runtime.js:100-102`) binds first then fires OpenCode. The Rust port inverted this when it landed in `ca3ea2f7 feat(tauri): Vite-only dev launcher (drop Node Express backend)`. Structural regression — fix in a separate PR. |
+| 3  | `SessionAuthGate` runs parallel fetches with no `AbortSignal.timeout` | `packages/ui/src/components/auth/SessionAuthGate.tsx:99-108, 420-488` | unbounded if backend stalls                 | Adding `AbortSignal.timeout(2000)` is the minimum viable guardrail. Auth-boundary change → own PR. |
+| 4  | Tauri injects runtime AFTER dynamic port is determined (Vite proxy target is static) | `rust/oc-tauri/src-tauri/src/lib.rs:307-321`              | ~10 ms once `setup` returns                | Correct as-is. The static proxy target (`OPENCHAMBER_PORT||3001` in `vite.config.ts:103-119`) cannot match a dynamic port; the injection is what carries the real URL. |
+
+**Critical cross-check facts (do not re-derive these):**
+
+- The OpenCode subprocess reaches `healthy` in **~2 seconds**, not the 3–7 s previously assumed. Do not make "OpenCode is slow to start" the headline diagnosis.
+- The dominant cost is always **cargo cold compile**. Tauri contributors eat this on every cold start.
+- Spec re-baselining: `docs/superpowers/specs/2026-07-22-tauri-splash-latency-design.md`.
+
+**Self-check checklist before modifying the startup pipeline:**
+
+1. Run `bun run tauri:dev` cold, capture stdout/stderr to a log. Time `Running DevCommand` → `spawning opencode` — that gap is usually the largest phase.
+2. If the OpenCode timing looks suspect, set `OPENCODE_DEBUG=1` and re-check the `opencode listening` line against the `opencode is healthy and ready` line.
+3. Confirm whether oc-server is in **in-process** mode (default) or **sidecar** mode (`OPENCHAMBER_SIDECAR=1`, decision site `rust/oc-tauri/src-tauri/src/backend.rs:use_sidecar()`). The two paths have different ordering invariants.
+4. Read the spec linked above before writing code. The 2026-07-22 baseline is the only one currently considered accurate.
+
+**Splash UX spec:**
+
+- `packages/web/index.html:519-625` (`#initial-loading`) is the single source of the desktop and web splash.
+- In Tauri (detected via `window.__GRIDFORGE_LOCAL_ORIGIN__`), if the splash is still mounted at T+3 s, populate `<div id="initial-loading-status">` (placed directly below the cube SVG) with `Warming up OpenCode…`. Color via the existing splash typography tokens; do not recolor the cube SVG — it is brand-owned.
+- The status node is removed together with `#initial-loading` by the dismissal effect in `App.tsx:322-349`. No manual cleanup needed.
+- The 10 s hard fallback at `index.html:608-625` is unchanged. It still no-ops in Tauri.
+- English-only copy for now. If translation is needed later, lift it into `packages/ui/src/lib/i18n` — the `id="initial-loading-status"` selector is the stable contract.
+
 ### Desktop Shell
 
 - **Tauri (migration target):** `rust/oc-tauri/src-tauri/src/`. `lib.rs::run()` builds the app; `setup` spawns the backend (in-process oc-server or sidecar), injects `window.__OPENCHAMBER_DESKTOP__` via `init_main_window`, applies macOS vibrancy, and installs SIGTERM/SIGINT cleanup. Modules: `backend.rs` (handle enum + sidecar decision), `ipc/` (window/system/dialog/shell commands), `tray.rs` (breathing animation), `ssh/` (ControlMaster, 1:1 port of `ssh-manager.mjs`), `settings.rs`, `power.rs`, `updater.rs`, `menu.rs`. Config: `rust/oc-tauri/src-tauri/tauri.conf.json`. Capabilities ACL: `capabilities/default.json`.

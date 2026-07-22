@@ -602,8 +602,28 @@
             </g>
           </svg>
         </div>
+        <div id="initial-loading-status" aria-live="polite" style="margin-top: 1.25rem; min-height: 1.25rem; font-size: 0.875rem; letter-spacing: 0.04em; color: rgba(255, 255, 255, 0.55); text-align: center; font-family: 'JetBrainsMono Nerd Font', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;"></div>
       </div>
     </div>
+
+    <script>
+      // Progress hint: if the splash is still mounted at T+3s on Tauri desktop,
+      // surface a "Warming up OpenCode..." line under the cube spinner. The status
+      // node is removed together with #initial-loading by App.tsx dismissal, so no
+      // cleanup is needed here. See AGENTS.md § "Startup latency sources".
+      (function() {
+        setTimeout(function() {
+          if (typeof window.__GRIDFORGE_LOCAL_ORIGIN__ !== 'string' || window.__GRIDFORGE_LOCAL_ORIGIN__.length === 0) {
+            return;
+          }
+          var splash = document.getElementById('initial-loading');
+          var status = document.getElementById('initial-loading-status');
+          if (splash && status && !status.textContent) {
+            status.textContent = 'Warming up OpenCode\u2026';
+          }
+        }, 3000);
+      })();
+    </script>
 
     <script>
       // Fallback: hide loading screen after 10 seconds if React fails to load.
