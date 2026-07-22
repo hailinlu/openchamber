@@ -233,7 +233,7 @@ async function main() {
   const tauri = spawnProcess('cargo', ['tauri', 'dev'], {
     cwd: tauriSrcDir,
     env: {
-      OPENCHAMBER_HMR_UI_URL: `http://127.0.0.1:${uiPort}`,
+      GRIDFORGE_HMR_UI_URL: `http://127.0.0.1:${uiPort}`,
       OPENCHAMBER_PORT: apiPort,
     },
   });

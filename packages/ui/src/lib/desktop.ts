@@ -309,7 +309,7 @@ export const hasDesktopInvoke = (): boolean => {
   return false;
 };
 
-export const canUseElectronDesktopIPC = (): boolean => isElectronShell() && hasDesktopInvoke();
+export const canUseElectronDesktopIPC = (): boolean => (isElectronShell() || isTauriShell()) && hasDesktopInvoke();
 
 export const invokeDesktop = async <T = unknown>(command: string, args?: Record<string, unknown>): Promise<T | null> => {
   const bridge = getDesktopBridge();
