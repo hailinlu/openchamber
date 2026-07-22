@@ -212,6 +212,80 @@ mod percent_encoding {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::http::{HeaderMap, HeaderValue};
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_test_dir(label: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before epoch")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "openchamber-project-dir-{label}-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&path).expect("create temp project directory");
+        path
+    }
+
+    fn percent_encode_path(path: &str) -> String {
+        path.bytes()
+            .map(|byte| match byte {
+                b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
+                    (byte as char).to_string()
+                }
+                _ => format!("%{byte:02X}"),
+            })
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn request_header_directory_wins_over_settings() {
+        let request_dir = temp_test_dir("request");
+        let settings_dir = temp_test_dir("settings");
+        let settings_path = settings_dir.join("settings.json");
+        std::fs::write(
+            &settings_path,
+            serde_json::json!({ "lastDirectory": settings_dir }).to_string(),
+        )
+        .expect("write settings");
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "x-opencode-directory",
+            HeaderValue::from_str(request_dir.to_str().expect("utf-8 path"))
+                .expect("valid header path"),
+        );
+
+        let resolved = resolve_project_directory(&headers, None, &settings_path).await;
+        assert_eq!(resolved, request_dir.canonicalize().ok());
+
+        std::fs::remove_dir_all(request_dir).ok();
+        std::fs::remove_dir_all(settings_dir).ok();
+    }
+
+    #[tokio::test]
+    async fn uri_encoded_request_header_directory_is_decoded() {
+        let request_dir = temp_test_dir("encoded request");
+        let settings_path = request_dir.join("missing-settings.json");
+        let encoded = percent_encode_path(request_dir.to_str().expect("utf-8 path"));
+
+        let mut headers = HeaderMap::new();
+        headers.insert(
+            "x-opencode-directory",
+            HeaderValue::from_str(&encoded).expect("valid encoded header"),
+        );
+        headers.insert(
+            "x-opencode-directory-encoding",
+            HeaderValue::from_static("uri"),
+        );
+
+        let resolved = resolve_project_directory(&headers, None, &settings_path).await;
+        assert_eq!(resolved, request_dir.canonicalize().ok());
+
+        std::fs::remove_dir_all(request_dir).ok();
+    }
 
     #[test]
     fn normalize_empty() {
@@ -228,8 +302,8 @@ mod tests {
     fn normalize_tilde_only() {
         // 取决于 HOME 环境变量
         let result = normalize_directory_path("~");
-        // 在测试环境中 HOME 通常设置
-        assert!(result.is_empty() || result.contains('/'));
+        // 在不同平台上 home 可能是盘符根目录，例如 `C:`；只验证结果不是未展开的 `~`。
+        assert_ne!(result, "~");
     }
 
     #[test]

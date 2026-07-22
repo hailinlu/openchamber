@@ -135,6 +135,56 @@ fn normalize_path_lexical(path: &Path) -> PathBuf {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_workspace(label: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system clock before epoch")
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "openchamber-workspace-{label}-{}-{unique}",
+            std::process::id()
+        ));
+        std::fs::create_dir_all(&path).expect("create temp workspace");
+        path
+    }
+
+    #[test]
+    fn existing_workspace_root_and_child_are_allowed() {
+        let root = temp_workspace("root");
+        let child = root.join("src");
+        std::fs::create_dir_all(&child).expect("create child");
+
+        let canonical_root = root.canonicalize().expect("canonical root");
+        assert!(resolve_workspace_path(
+            canonical_root.to_str().expect("utf-8 root"),
+            &canonical_root,
+            None,
+        )
+        .is_ok());
+        assert!(resolve_workspace_path(child.to_str().expect("utf-8 child"), &canonical_root, None).is_ok());
+
+        std::fs::remove_dir_all(root).ok();
+    }
+
+    #[test]
+    fn existing_sibling_workspace_is_rejected() {
+        let parent = temp_workspace("parent");
+        let root = parent.join("active");
+        let sibling = parent.join("sibling");
+        std::fs::create_dir_all(&root).expect("create active root");
+        std::fs::create_dir_all(&sibling).expect("create sibling");
+
+        let result = resolve_workspace_path(
+            sibling.to_str().expect("utf-8 sibling"),
+            &root.canonicalize().expect("canonical root"),
+            None,
+        );
+        assert!(matches!(result, Err(oc_core::Error::BadRequest(message)) if message == "Path is outside of active workspace"));
+
+        std::fs::remove_dir_all(parent).ok();
+    }
 
     #[test]
     fn within_root_same() {

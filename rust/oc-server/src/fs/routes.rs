@@ -95,11 +95,19 @@ pub struct PathQuery {
     #[serde(rename = "outsideFileGrant")]
     pub outside_file_grant: Option<String>,
     pub download: Option<String>,
+    /// 工作区目录候选 — 对应 Node 版本的 `req.query.directory`。
+    /// 与 `x-opencode-directory` 头并列, 由 `resolve_project_directory`
+    /// 优先取第一个存在的目录。
+    #[serde(default)]
+    pub directory: Option<String>,
 }
 
 #[derive(Deserialize)]
 pub struct ListQuery {
     pub path: Option<String>,
+    /// 同 `PathQuery::directory` — list 路由也接受工作区目录候选。
+    #[serde(default)]
+    pub directory: Option<String>,
 }
 
 // ---------------------------------------------------------------------------
@@ -130,6 +138,7 @@ pub async fn home() -> ApiResult<Json<Value>> {
 /// `POST /api/fs/mkdir`
 pub async fn mkdir(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(body): Json<MkdirBody>,
 ) -> ApiResult<Json<Value>> {
     // Node 版本: allowOutsideWorkspace=true 始终返回 403 (需要 grant)
@@ -139,7 +148,7 @@ pub async fn mkdir(
         )));
     }
 
-    let base_dir = resolve_base_dir(&state).await;
+    let base_dir = resolve_base_dir(&state, &headers, None).await;
     let user_config_root = user_config_root(&state);
     let resolved = workspace::resolve_workspace_path(&body.path, &base_dir, user_config_root.as_deref())?;
 
@@ -149,9 +158,10 @@ pub async fn mkdir(
 /// `POST /api/fs/write`
 pub async fn write(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(body): Json<WriteBody>,
 ) -> ApiResult<Json<Value>> {
-    let base_dir = resolve_base_dir(&state).await;
+    let base_dir = resolve_base_dir(&state, &headers, None).await;
     let user_config_root = user_config_root(&state);
     let resolved = workspace::resolve_workspace_path(&body.path, &base_dir, user_config_root.as_deref())?;
 
@@ -161,9 +171,10 @@ pub async fn write(
 /// `POST /api/fs/delete`
 pub async fn delete(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(body): Json<DeleteBody>,
 ) -> ApiResult<Json<Value>> {
-    let base_dir = resolve_base_dir(&state).await;
+    let base_dir = resolve_base_dir(&state, &headers, None).await;
     let user_config_root = user_config_root(&state);
     let resolved = workspace::resolve_workspace_path(&body.path, &base_dir, user_config_root.as_deref())?;
 
@@ -173,9 +184,10 @@ pub async fn delete(
 /// `POST /api/fs/rename`
 pub async fn rename(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(body): Json<RenameBody>,
 ) -> ApiResult<Json<Value>> {
-    let base_dir = resolve_base_dir(&state).await;
+    let base_dir = resolve_base_dir(&state, &headers, None).await;
     let user_config_root = user_config_root(&state);
 
     let old_resolved =
@@ -189,9 +201,10 @@ pub async fn rename(
 /// `POST /api/fs/reveal`
 pub async fn reveal(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(body): Json<RevealBody>,
 ) -> ApiResult<Json<Value>> {
-    let base_dir = resolve_base_dir(&state).await;
+    let base_dir = resolve_base_dir(&state, &headers, None).await;
     let user_config_root = user_config_root(&state);
     let resolved = workspace::resolve_workspace_path(&body.path, &base_dir, user_config_root.as_deref())?;
 
@@ -205,6 +218,7 @@ pub async fn reveal(
 /// `GET /api/fs/stat`
 pub async fn stat(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Query(query): Query<PathQuery>,
 ) -> ApiResult<Json<Value>> {
     let path = query
@@ -212,7 +226,7 @@ pub async fn stat(
         .as_deref()
         .ok_or_else(|| ApiError(oc_core::Error::BadRequest("Path is required".into())))?;
 
-    let resolved = resolve_read_path(&state, path, "stat", &query).await?;
+    let resolved = resolve_read_path(&state, &headers, path, "stat", &query).await?;
 
     // optional 模式: 文件不存在时返回 { exists: false } 而不是 404
     let is_optional = query.optional.as_deref() == Some("true");
@@ -230,6 +244,7 @@ pub async fn stat(
 /// `GET /api/fs/read`
 pub async fn read(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Query(query): Query<PathQuery>,
 ) -> ApiResult<Response> {
     let path = query
@@ -237,7 +252,7 @@ pub async fn read(
         .as_deref()
         .ok_or_else(|| ApiError(oc_core::Error::BadRequest("Path is required".into())))?;
 
-    let resolved = resolve_read_path(&state, path, "read", &query).await?;
+    let resolved = resolve_read_path(&state, &headers, path, "read", &query).await?;
 
     let is_optional = query.optional.as_deref() == Some("true");
 
@@ -261,6 +276,7 @@ pub async fn read(
 /// `GET /api/fs/raw`
 pub async fn raw(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Query(query): Query<PathQuery>,
 ) -> ApiResult<Response> {
     let path = query
@@ -268,7 +284,7 @@ pub async fn raw(
         .as_deref()
         .ok_or_else(|| ApiError(oc_core::Error::BadRequest("Path is required".into())))?;
 
-    let resolved = resolve_read_path(&state, path, "raw", &query).await?;
+    let resolved = resolve_read_path(&state, &headers, path, "raw", &query).await?;
     let download = query.download.as_deref() == Some("true");
 
     let data = serve_mod::serve_raw(&resolved, download).await?;
@@ -294,13 +310,14 @@ pub async fn raw(
 /// `GET /api/fs/serve/<rest>` — serve 模式 (拒绝 allowOutsideWorkspace)。
 pub async fn serve(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     AxumPath(rest): AxumPath<String>,
 ) -> ApiResult<Response> {
     // serve 路由拒绝 allowOutsideWorkspace (Node 版本始终 403)
     // path 从 `/<rest>` 解析 (绝对路径)
     let raw_path = format!("/{}", rest);
     // 补: 工作区边界校验 — 防止读取工作区外任意文件
-    let base_dir = resolve_base_dir(&state).await;
+    let base_dir = resolve_base_dir(&state, &headers, None).await;
     let user_root = user_config_root(&state);
     let resolved = workspace::resolve_workspace_path(
         &raw_path,
@@ -331,6 +348,7 @@ pub async fn serve(
 /// `GET /api/fs/list`
 pub async fn list(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Query(query): Query<ListQuery>,
 ) -> ApiResult<Json<Value>> {
     let path = query.path.as_deref().unwrap_or("~");
@@ -347,7 +365,7 @@ pub async fn list(
     // 理由: 列出 ~/Projects 用于"添加项目"对话框选目录是核心用例;
     // 仅暴露目录名不构成敏感读取 (read/write/delete 仍走严格 workspace check)。
     // resolve_workspace_path 接受 base_dir 内或 user_config_root 内的路径。
-    let base_dir = resolve_base_dir(&state).await;
+    let base_dir = resolve_base_dir(&state, &headers, query.directory.as_deref()).await;
     let user_root = user_config_root(&state);
     let home_root = std::env::var("HOME").ok().filter(|s| !s.is_empty()).map(PathBuf::from);
     let target = workspace::resolve_list_path(
@@ -367,6 +385,7 @@ pub async fn list(
 /// `POST /api/fs/exec`
 pub async fn exec(
     State(state): State<Arc<AppState>>,
+    headers: HeaderMap,
     Json(body): Json<ExecBody>,
 ) -> ApiResult<Json<Value>> {
     // background=true 始终拒绝 (Node 版本也是)
@@ -387,7 +406,7 @@ pub async fn exec(
     }
 
     // 验证 cwd 在工作区内
-    let base_dir = resolve_base_dir(&state).await;
+    let base_dir = resolve_base_dir(&state, &headers, None).await;
     let user_config_root = user_config_root(&state);
     let resolved_cwd =
         workspace::resolve_workspace_path(&body.cwd, &base_dir, user_config_root.as_deref())?;
@@ -481,18 +500,18 @@ pub async fn clone(
 // ---------------------------------------------------------------------------
 
 /// 解析工作区基础目录 (从请求上下文)。
-async fn resolve_base_dir(state: &AppState) -> PathBuf {
-    // 读 settings.json 获取项目目录
-    match crate::project_dir::resolve_project_directory(
-        &HeaderMap::new(),
-        None,
-        &state.settings_path,
-    )
-    .await
-    {
-        Some(dir) => dir,
-        None => std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/")),
-    }
+async fn resolve_base_dir_from_request(
+    headers: &HeaderMap,
+    query_directory: Option<&str>,
+    settings_path: &std::path::Path,
+) -> PathBuf {
+    crate::project_dir::resolve_project_directory(headers, query_directory, settings_path)
+        .await
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from("/")))
+}
+
+async fn resolve_base_dir(state: &AppState, headers: &HeaderMap, query_directory: Option<&str>) -> PathBuf {
+    resolve_base_dir_from_request(headers, query_directory, &state.settings_path).await
 }
 
 /// 用户配置目录 (~/.config/gridforge)。
@@ -503,6 +522,7 @@ fn user_config_root(state: &AppState) -> Option<PathBuf> {
 /// 解析 read-path (支持 outside workspace grant)。
 async fn resolve_read_path(
     state: &AppState,
+    headers: &HeaderMap,
     path: &str,
     scope: &str,
     query: &PathQuery,
@@ -519,7 +539,7 @@ async fn resolve_read_path(
         Ok(resolved.resolved)
     } else {
         // 正常工作区模式
-        let base_dir = resolve_base_dir(state).await;
+        let base_dir = resolve_base_dir(state, headers, query.directory.as_deref()).await;
         let user_config_root = user_config_root(state);
         workspace::resolve_workspace_path(path, &base_dir, user_config_root.as_deref())
             .map_err(ApiError::from)
@@ -562,5 +582,240 @@ mod tests {
         std::env::set_var("GRIDFORGE_FS_EXEC_TIMEOUT_MS", "120000");
         assert_eq!(exec_timeout_secs(), 120);
         std::env::remove_var("GRIDFORGE_FS_EXEC_TIMEOUT_MS");
+    }
+
+    /// axum-level 回归: 真实 `HeaderMap` 经 axum 传入 handler,
+    /// `/api/fs/list` 必须按 `x-opencode-directory` 解析工作区。
+    ///
+    /// 这正是原始复现 `Path is outside of active workspace` 400 的失败点:
+    /// 旧实现 `resolve_base_dir` 使用空 `HeaderMap::new()`,
+    /// 退回到 settings → `cwd`, 而非请求上下文。
+    ///
+    /// `GRIDFORGE_DATA_DIR` 在构造 AppState 前指向临时目录,
+    /// 避免触碰真实 `~/.config/gridforge/settings.json`。
+    /// 子模块 `axum_tests` 内的所有测试共享一个 `Mutex` 串行化,
+    /// 防止并行用例互相污染 env var。
+    mod axum_tests {
+        use std::path::PathBuf;
+        use std::sync::{Mutex, OnceLock};
+
+        use axum::body::Body;
+        use axum::extract::Request;
+        use axum::http::{header, StatusCode};
+        use axum::routing::get;
+        use axum::Router;
+        use serde_json::Value;
+        use tower::ServiceExt;
+
+        use crate::state::AppState;
+
+        /// 全模块共享串行锁 — 任何 `GRIDFORGE_DATA_DIR` 设置在测试结束前必须释放。
+        static ENV_GUARD: OnceLock<Mutex<()>> = OnceLock::new();
+
+        fn env_guard() -> std::sync::MutexGuard<'static, ()> {
+            ENV_GUARD
+                .get_or_init(|| Mutex::new(()))
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+        }
+
+        /// 创建带临时 GRIDFORGE_DATA_DIR 的 AppState, 同时返回 data_dir 用于清理。
+        fn build_test_state() -> (std::sync::Arc<AppState>, PathBuf) {
+            let mut tmp = std::env::temp_dir();
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0);
+            tmp.push(format!("oc-server-fs-routes-{}-{}", std::process::id(), nanos));
+            std::fs::create_dir_all(&tmp).expect("create temp data dir");
+            std::env::set_var("GRIDFORGE_DATA_DIR", &tmp);
+            let state = AppState::new_for_tests();
+            (std::sync::Arc::new(state), tmp)
+        }
+
+        fn cleanup(dir: &PathBuf) {
+            std::env::remove_var("GRIDFORGE_DATA_DIR");
+            let _ = std::fs::remove_dir_all(dir);
+        }
+
+        fn make_workspace() -> PathBuf {
+            let mut tmp = std::env::temp_dir();
+            let nanos = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0);
+            tmp.push(format!(
+                "oc-server-fs-workspace-{}-{}",
+                std::process::id(),
+                nanos
+            ));
+            std::fs::create_dir_all(&tmp).expect("create temp workspace");
+            tmp
+        }
+
+        fn router(state: std::sync::Arc<AppState>) -> Router {
+            Router::new()
+                .route("/api/fs/list", get(super::list))
+                .with_state(state)
+        }
+
+        #[tokio::test]
+        async fn list_uses_request_header_as_workspace_root() {
+            let _g = env_guard();
+            let (state, data_dir) = build_test_state();
+            let workspace = make_workspace();
+            // 临时工作区内放一个可识别的占位文件, 用于断言 list 真的看见它。
+            std::fs::write(workspace.join("marker.txt"), "hello").expect("write marker");
+
+            let app = router(state);
+
+            // 关键 header: x-opencode-directory = 临时工作区。
+            // 旧实现会忽略, 退到 settings/cwd → 返回的 entries 来自 ~/.config/gridforge
+            // 或 cwd 列表, 不会包含 marker.txt。
+            let req = Request::builder()
+                .method("GET")
+                .uri(format!(
+                    "/api/fs/list?path={}",
+                    url_encoded_path(&workspace)
+                ))
+                .header(header::HeaderName::from_static("x-opencode-directory"), workspace.to_string_lossy().to_string())
+                .body(Body::empty())
+                .expect("build request");
+
+            let response = app.oneshot(req).await.expect("oneshot");
+
+            assert_eq!(
+                response.status(),
+                StatusCode::OK,
+                "expected 200 once request header is honored, got {}",
+                response.status()
+            );
+
+            let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .expect("read body");
+            let json: Value = serde_json::from_slice(&body).expect("parse json");
+            let entries = json
+                .get("entries")
+                .and_then(|v| v.as_array())
+                .expect("entries array");
+            let names: Vec<&str> = entries
+                .iter()
+                .filter_map(|e| e.get("name").and_then(|n| n.as_str()))
+                .collect();
+            assert!(
+                names.iter().any(|n| *n == "marker.txt"),
+                "entries {:?} should include marker.txt when x-opencode-directory points to the temp workspace",
+                names
+            );
+
+            std::fs::remove_dir_all(&workspace).ok();
+            cleanup(&data_dir);
+        }
+
+        #[tokio::test]
+        async fn list_without_header_falls_back_to_home_without_panic() {
+            let _g = env_guard();
+            let (state, data_dir) = build_test_state();
+            let app = router(state);
+
+            // 不带 x-opencode-directory; list 端点放宽到 HOME 列表, 不应 panic / 5xx。
+            let req = Request::builder()
+                .method("GET")
+                .uri("/api/fs/list?path=~")
+                .body(Body::empty())
+                .expect("build request");
+
+            let response = app.oneshot(req).await.expect("oneshot");
+
+            // 200 (HOME 可读) 或 400/403 (HOME 不可读) 都算合规; 5xx 即视为 bug。
+            let status = response.status();
+            assert!(
+                status.is_success() || status == StatusCode::BAD_REQUEST || status == StatusCode::FORBIDDEN,
+                "list without header should not 5xx, got {}",
+                status
+            );
+
+            cleanup(&data_dir);
+        }
+
+        /// 回归测试: `?directory=` query 参数必须被识别为工作区候选,
+        /// FilesView.tsx 在 `files.readFile` 不可用时的回退路径
+        /// (lines 1563-1565) 就是把根目录放到 `?directory=…` 而非 header。
+        #[tokio::test]
+        async fn list_uses_query_directory_as_workspace_root() {
+            let _g = env_guard();
+            let (state, data_dir) = build_test_state();
+            let workspace = make_workspace();
+            std::fs::write(workspace.join("marker.txt"), "hello").expect("write marker");
+
+            let app = router(state);
+
+            // 不带 `x-opencode-directory` 头, 只带 `?directory=<workspace>`。
+            // 旧实现没有从 query 取 directory, 退到 settings → 找不到 marker.txt;
+            // 修复后 PathQuery/ListQuery 持有 directory, 经 resolve_project_directory
+            // 取这个存在的目录作为 base_dir, list 应能看见 marker.txt。
+            let req = Request::builder()
+                .method("GET")
+                .uri(format!(
+                    "/api/fs/list?path={}&directory={}",
+                    url_encoded_path(&workspace),
+                    url_encoded_path(&workspace),
+                ))
+                .body(Body::empty())
+                .expect("build request");
+
+            let response = app.oneshot(req).await.expect("oneshot");
+
+            assert_eq!(
+                response.status(),
+                StatusCode::OK,
+                "expected 200 once query directory is honored, got {}",
+                response.status()
+            );
+
+            let body = axum::body::to_bytes(response.into_body(), 1024 * 1024)
+                .await
+                .expect("read body");
+            let json: Value = serde_json::from_slice(&body).expect("parse json");
+            let entries = json
+                .get("entries")
+                .and_then(|v| v.as_array())
+                .expect("entries array");
+            let names: Vec<&str> = entries
+                .iter()
+                .filter_map(|e| e.get("name").and_then(|n| n.as_str()))
+                .collect();
+            assert!(
+                names.iter().any(|n| *n == "marker.txt"),
+                "entries {:?} should include marker.txt when ?directory= points to the temp workspace",
+                names
+            );
+
+            std::fs::remove_dir_all(&workspace).ok();
+            cleanup(&data_dir);
+        }
+
+        /// 极简 percent-encode, 仅用于构造测试 URI 的 path 参数。
+        fn url_encoded_path(path: &PathBuf) -> String {
+            let s = path.to_string_lossy().to_string();
+            let mut out = String::with_capacity(s.len());
+            for byte in s.bytes() {
+                match byte {
+                    b'A'..=b'Z'
+                    | b'a'..=b'z'
+                    | b'0'..=b'9'
+                    | b'-'
+                    | b'_'
+                    | b'.'
+                    | b'~'
+                    | b'/'
+                    | b':' => out.push(byte as char),
+                    b'\\' => out.push('/'),
+                    _ => out.push_str(&format!("%{:02X}", byte)),
+                }
+            }
+            out
+        }
     }
 }
