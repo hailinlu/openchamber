@@ -7,6 +7,48 @@ use std::path::{Path, PathBuf};
 use serde::Serialize;
 use serde_json::{json, Value};
 
+/// 把路径转成返回给客户端的字符串, 剥离 Windows verbatim 前缀
+/// (`\\?\` / `\\.\`)。
+///
+/// 背景: `std::fs::canonicalize` 在 Windows 上会返回带 `\\?\` 前缀的
+/// "verbatim" 路径。Node 的 `fs.realpath` 不会加这个前缀。如果把这个
+/// 前缀泄漏给客户端 (例如 `/api/fs/list` 的 `entries[].path`), UI 的
+/// `isPathWithinRoot` 比对会失败 —— `\\?\E:\...` 永远不会被认为在
+/// `E:\...` 工作区内, 于是被误判为 "工作区外", 触发
+/// `allowOutsideWorkspace=true` 但没有 grant →
+/// "Outside file grant is required"。
+///
+/// 仅用于 *输出给客户端* 的路径; 内部边界校验仍用 canonical 路径。
+fn to_client_path(path: &Path) -> String {
+    let s = path.to_string_lossy().to_string();
+    strip_verbatim_prefix(&s)
+}
+
+/// 剥离 Windows verbatim/设备命名空间前缀。
+/// 在非 Windows 平台是 no-op (编译期消除)。
+fn strip_verbatim_prefix(s: &str) -> String {
+    #[cfg(windows)]
+    {
+        // verbatim 前缀 `\\?\` (含 UNC 形式 `\\?\UNC\`) 与设备命名空间 `\\.\`
+        // Path::strip_prefix 无法处理这些 (它们不是合法的 Path 组件前缀),
+        // 所以用字符串匹配。
+        if let Some(rest) = s.strip_prefix(r"\\?\UNC\") {
+            return format!(r"\\{rest}");
+        }
+        if let Some(rest) = s.strip_prefix(r"\\?\") {
+            return rest.to_string();
+        }
+        if let Some(rest) = s.strip_prefix(r"\\.\") {
+            return rest.to_string();
+        }
+        s.to_string()
+    }
+    #[cfg(not(windows))]
+    {
+        s.to_string()
+    }
+}
+
 /// `GET /api/fs/home` → `{ home }`
 pub fn home_dir() -> Value {
     let home = std::env::var("HOME")
@@ -46,7 +88,7 @@ pub async fn stat(path: &Path) -> Result<Value, oc_core::Error> {
                 .unwrap_or(0.0);
 
             Ok(json!(StatResult {
-                path: path.to_string_lossy().to_string(),
+                path: to_client_path(path),
                 is_file: meta.is_file(),
                 size: meta.len(),
                 mtime_ms,
@@ -102,10 +144,10 @@ fn decode_text(bytes: &[u8]) -> String {
 ///   2. 写入 .tmp 文件
 ///   3. rename 到目标
 pub async fn write(path: &Path, content: &str) -> Result<Value, oc_core::Error> {
-    // 检查现有内容
-    if let Ok(existing) = tokio::fs::read_to_string(path).await {
-        if existing == content {
-            return Ok(json!({ "success": true, "path": path.to_string_lossy() }));
+    // 检查现有内容 (按字节比较, 避免非 UTF-8 文件触发 read_to_string 失败)
+    if let Ok(existing) = tokio::fs::read(path).await {
+        if existing.as_slice() == content.as_bytes() {
+            return Ok(json!({ "success": true, "path": to_client_path(path) }));
         }
     }
 
@@ -134,7 +176,7 @@ pub async fn write(path: &Path, content: &str) -> Result<Value, oc_core::Error> 
             oc_core::Error::Io(e)
         })?;
 
-    Ok(json!({ "success": true, "path": path.to_string_lossy() }))
+    Ok(json!({ "success": true, "path": to_client_path(path) }))
 }
 
 /// `POST /api/fs/delete`
@@ -155,7 +197,7 @@ pub async fn delete(path: &Path) -> Result<Value, oc_core::Error> {
         }
         Err(e) => return Err(oc_core::Error::Io(e)),
     }
-    Ok(json!({ "success": true, "path": path.to_string_lossy() }))
+    Ok(json!({ "success": true, "path": to_client_path(path) }))
 }
 
 /// `POST /api/fs/rename`
@@ -169,7 +211,7 @@ pub async fn rename(old_path: &Path, new_path: &Path) -> Result<Value, oc_core::
                 oc_core::Error::Io(e)
             }
         })?;
-    Ok(json!({ "success": true, "path": new_path.to_string_lossy() }))
+    Ok(json!({ "success": true, "path": to_client_path(new_path) }))
 }
 
 /// `POST /api/fs/mkdir`
@@ -177,7 +219,7 @@ pub async fn mkdir(path: &Path) -> Result<Value, oc_core::Error> {
     tokio::fs::create_dir_all(path)
         .await
         .map_err(oc_core::Error::Io)?;
-    Ok(json!({ "success": true, "path": path.to_string_lossy() }))
+    Ok(json!({ "success": true, "path": to_client_path(path) }))
 }
 
 /// 目录条目。
@@ -221,7 +263,7 @@ pub async fn list(path: &Path) -> Result<Value, oc_core::Error> {
 
         entries.push(DirEntry {
             name: name.clone(),
-            path: entry_path.to_string_lossy().to_string(),
+            path: to_client_path(&entry_path),
             is_directory: file_type.is_dir(),
             is_file: file_type.is_file(),
             is_symbolic_link: file_type.is_symlink(),
@@ -238,7 +280,7 @@ pub async fn list(path: &Path) -> Result<Value, oc_core::Error> {
     });
 
     Ok(json!({
-        "path": path.to_string_lossy(),
+        "path": to_client_path(path),
         "entries": entries,
     }))
 }
@@ -247,7 +289,7 @@ pub async fn list(path: &Path) -> Result<Value, oc_core::Error> {
 pub async fn reveal(path: &Path) -> Result<Value, oc_core::Error> {
     let result = reveal_in_file_manager(path).await;
     match result {
-        Ok(()) => Ok(json!({ "success": true, "path": path.to_string_lossy() })),
+        Ok(()) => Ok(json!({ "success": true, "path": to_client_path(path) })),
         Err(e) => Err(oc_core::Error::Internal(format!(
             "Failed to reveal: {}",
             e
@@ -428,5 +470,37 @@ mod tests {
     fn decode_text_utf8_bytes() {
         assert_eq!(decode_text(b"plain ascii"), "plain ascii");
         assert_eq!(decode_text("utf8 中文".as_bytes()), "utf8 中文");
+    }
+
+    /// Windows 上 `std::fs::canonicalize` 会给路径加 `\\?\` 前缀。
+    /// 返回给客户端的路径必须剥离这个前缀, 否则 UI 的 `isPathWithinRoot`
+    /// 会把工作区内文件误判为 "工作区外" → "Outside file grant is required"。
+    #[test]
+    fn strip_verbatim_prefix_removes_windows_prefixes() {
+        assert_eq!(
+            strip_verbatim_prefix(r"\\?\C:\foo\bar"),
+            r"C:\foo\bar"
+        );
+        // UNC verbatim 形式 → 还原为普通 UNC
+        assert_eq!(
+            strip_verbatim_prefix(r"\\?\UNC\server\share\foo"),
+            r"\\server\share\foo"
+        );
+        // 设备命名空间
+        assert_eq!(
+            strip_verbatim_prefix(r"\\.\COM1"),
+            r"COM1"
+        );
+        // 没有前缀的路径原样返回
+        assert_eq!(
+            strip_verbatim_prefix(r"C:\foo\bar"),
+            r"C:\foo\bar"
+        );
+    }
+
+    #[test]
+    fn to_client_path_strips_verbatim() {
+        let p = Path::new(r"\\?\C:\proj\src\main.rs");
+        assert_eq!(to_client_path(p), r"C:\proj\src\main.rs");
     }
 }
