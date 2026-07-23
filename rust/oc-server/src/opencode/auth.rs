@@ -181,20 +181,24 @@ pub(crate) mod tests {
     use std::env;
     use std::sync::Mutex;
 
-    /// 测试串行化:所有 auth/config 测试都用同一份 HOME,串行跑避免污染。
-    /// 也用于跨模块串行化(auth/config/models_metadata 都改 HOME env var)。
+    /// 测试串行化:所有 auth/config 测试都用同一份 home env var,串行跑避免污染。
+    /// 也用于跨模块串行化(auth/config/models_metadata 都改 home env var)。
     pub(crate) static TEST_LOCK: Mutex<()> = Mutex::new(());
 
-    /// 设置临时 HOME 目录,返回 guard 在 drop 时恢复。
+    /// 设置临时 home 目录,返回 guard 在 drop 时恢复。
+    ///
+    /// 注意:读取/写入的 env var 由 [`crate::git::paths::home_env_var_name()`] 决定
+    /// (Windows=`USERPROFILE`,其他=`HOME`),与生产代码 [`home_dir_string`] 对齐。
     pub(crate) struct HomeGuard {
         prev: Option<String>,
         temp: PathBuf,
     }
     impl Drop for HomeGuard {
         fn drop(&mut self) {
+            let var_name = crate::git::paths::home_env_var_name();
             match &self.prev {
-                Some(v) => env::set_var("HOME", v),
-                None => env::remove_var("HOME"),
+                Some(v) => env::set_var(var_name, v),
+                None => env::remove_var(var_name),
             }
             let _ = std::fs::remove_dir_all(&self.temp);
         }
@@ -202,7 +206,8 @@ pub(crate) mod tests {
 
     pub(crate) fn set_temp_home() -> (HomeGuard, std::sync::MutexGuard<'static, ()>) {
         let guard = TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
-        let prev = env::var("HOME").ok();
+        let var_name = crate::git::paths::home_env_var_name();
+        let prev = env::var(var_name).ok();
         let temp = std::env::temp_dir().join(format!(
             "oc-auth-test-{}-{}",
             std::process::id(),
@@ -210,7 +215,7 @@ pub(crate) mod tests {
         ));
         let _ = std::fs::remove_dir_all(&temp);
         std::fs::create_dir_all(&temp).unwrap();
-        env::set_var("HOME", &temp);
+        env::set_var(var_name, &temp);
         (HomeGuard { prev, temp }, guard)
     }
 

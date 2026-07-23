@@ -31,9 +31,35 @@ pub fn normalize_path(value: &str) -> String {
     normalized.replace('\\', "/")
 }
 
-/// home 目录字符串 (fallback ".")。
+/// home 目录字符串。
+///
+/// 对齐 Node `os.homedir()` 的平台语义:
+/// - **Windows**: 优先 `USERPROFILE`(Windows 不会为从 explorer.exe 双击启动的 GUI 进程
+///   设置 `HOME`;只读 `HOME` 会 fallback 到 `"."`,导致 `opencode_config_dir()` 等解析到
+///   `<CWD>/.config/opencode` 这类不存在的路径)。与本库 `behavior.rs`、`fs/operations.rs`、
+///   `resolution_routes.rs` 已有的正确模式一致。
+/// - **POSIX**: 读 `HOME`。
+/// - 任一平台都设置不了时 fallback `"."`(与原行为一致,保留向后兼容)。
 pub fn home_dir_string() -> String {
-    std::env::var("HOME").unwrap_or_else(|_| ".".to_string())
+    std::env::var(home_env_var_name())
+        .ok()
+        .filter(|s| !s.trim().is_empty())
+        .unwrap_or_else(|| ".".to_string())
+}
+
+/// [`home_dir_string()`] 实际读取的环境变量名。
+///
+/// - Windows: `USERPROFILE`
+/// - 其他:   `HOME`
+///
+/// 测试 helper 用它来设置/还原正确的 env var,避免在 Windows 上错误地只设 `HOME`
+/// (那不会影响 [`home_dir_string()`] 的结果)。
+pub fn home_env_var_name() -> &'static str {
+    if cfg!(target_os = "windows") {
+        "USERPROFILE"
+    } else {
+        "HOME"
+    }
 }
 
 /// home 目录 PathBuf。
@@ -173,10 +199,93 @@ pub fn slug_worktree_name(value: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    /// 串行化所有 mutate 进程 env 的测试 —— env 是全局共享状态,
+    /// `cargo test` 默认并行,不加锁会互相覆盖(参考 `backend.rs::ENV_LOCK`)。
+    static ENV_LOCK: Mutex<()> = Mutex::new(());
+
+    /// 测试期间临时设置 home 相关 env 并在退出时还原的平台抽象。
+    /// - Windows: 设置 `USERPROFILE`
+    /// - 其他:   设置 `HOME`
+    struct HomeEnvGuard {
+        #[cfg(target_os = "windows")]
+        original: Option<std::ffi::OsString>,
+        #[cfg(not(target_os = "windows"))]
+        original: Option<std::ffi::OsString>,
+    }
+
+    impl HomeEnvGuard {
+        fn set_home(value: &str) -> Self {
+            #[cfg(target_os = "windows")]
+            {
+                let original = std::env::var_os("USERPROFILE");
+                std::env::set_var("USERPROFILE", value);
+                Self { original }
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                let original = std::env::var_os("HOME");
+                std::env::set_var("HOME", value);
+                Self { original }
+            }
+        }
+    }
+
+    impl Drop for HomeEnvGuard {
+        fn drop(&mut self) {
+            #[cfg(target_os = "windows")]
+            {
+                match self.original.take() {
+                    Some(v) => std::env::set_var("USERPROFILE", &v),
+                    None => std::env::remove_var("USERPROFILE"),
+                }
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                match self.original.take() {
+                    Some(v) => std::env::set_var("HOME", &v),
+                    None => std::env::remove_var("HOME"),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn home_dir_string_resolves_correct_env_var() {
+        let _lock = ENV_LOCK.lock().expect("ENV_LOCK poisoned");
+        // Windows 读 USERPROFILE;POSIX 读 HOME。两者都应返回设置的非空值。
+        let _g = HomeEnvGuard::set_home("/home/user");
+        assert_eq!(home_dir_string(), "/home/user");
+    }
+
+    #[test]
+    fn home_dir_string_fallback_on_missing_env() {
+        let _lock = ENV_LOCK.lock().expect("ENV_LOCK poisoned");
+        #[cfg(target_os = "windows")]
+        let _g = HomeEnvGuard::set_home("");
+        #[cfg(not(target_os = "windows"))]
+        let _g = HomeEnvGuard::set_home("");
+        // 空串视为未设置 → fallback "."
+        // (Windows 下 set_var("") 的值经 trim 判空后也走 fallback)
+        // 注意: POSIX 下 var() 对空串返回 Ok(""),这里测试 fallback 行为需要先 remove。
+        #[cfg(target_os = "windows")]
+        {
+            std::env::remove_var("USERPROFILE");
+            assert_eq!(home_dir_string(), ".");
+        }
+        #[cfg(not(target_os = "windows"))]
+        {
+            std::env::remove_var("HOME");
+            assert_eq!(home_dir_string(), ".");
+        }
+        drop(_g);
+    }
 
     #[test]
     fn test_normalize_directory_path_tilde() {
-    std::env::set_var("HOME", "/home/user");
+        let _lock = ENV_LOCK.lock().expect("ENV_LOCK poisoned");
+        let _g = HomeEnvGuard::set_home("/home/user");
         assert_eq!(normalize_directory_path("~/foo"), "/home/user/foo");
         assert_eq!(normalize_directory_path("~"), "/home/user");
         assert_eq!(normalize_directory_path("  /abs/path  "), "/abs/path");
@@ -185,7 +294,8 @@ mod tests {
 
     #[test]
     fn test_normalize_path_backslash() {
-        std::env::set_var("HOME", "/home/user");
+        let _lock = ENV_LOCK.lock().expect("ENV_LOCK poisoned");
+        let _g = HomeEnvGuard::set_home("/home/user");
         assert_eq!(normalize_path("C:\\Users\\foo"), "C:/Users/foo");
         assert_eq!(normalize_path("~/proj"), "/home/user/proj");
     }

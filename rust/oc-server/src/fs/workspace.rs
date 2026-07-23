@@ -244,14 +244,24 @@ mod tests {
 
     #[test]
     fn resolve_user_config_root() {
-        let base = Path::new("/home/user/project");
-        let config_root = Path::new("/home/user/.config/gridforge");
+        // 使用真实临时目录 + canonicalize: 硬编码 Unix 路径在 Windows 上会被当成盘符根相对路径,
+        // 且 canonicalize() 返回 `\\?\` 前缀路径,与 lexical config_root 的 components 无法匹配。
+        let config_root = temp_workspace("config-root");
+        let settings = config_root.join("settings.json");
+        std::fs::write(&settings, "{}").expect("write settings");
+
+        let canonical_config_root = config_root.canonicalize().expect("canonical config root");
+        let base = temp_workspace("base");
+
         let result = resolve_workspace_path(
-            "/home/user/.config/gridforge/settings.json",
-            base,
-            Some(config_root),
+            settings.to_str().expect("utf-8 settings path"),
+            &base,
+            Some(&canonical_config_root),
         );
         assert!(result.is_ok());
+
+        std::fs::remove_dir_all(&config_root).ok();
+        std::fs::remove_dir_all(&base).ok();
     }
 
     #[test]

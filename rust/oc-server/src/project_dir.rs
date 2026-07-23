@@ -130,8 +130,13 @@ pub fn normalize_directory_path(input: &str) -> String {
 }
 
 /// 获取 home 目录。
+///
+/// 读取的 env var 由 [`crate::git::paths::home_env_var_name()`] 决定
+/// (Windows=`USERPROFILE`,其他=`HOME`),与 Node `os.homedir()` 对齐。
 fn home_dir() -> Option<String> {
-    std::env::var("HOME").ok().filter(|s| !s.is_empty())
+    std::env::var(crate::git::paths::home_env_var_name())
+        .ok()
+        .filter(|s| !s.is_empty())
 }
 
 /// settings.json 结构 (只读所需字段)。
@@ -308,9 +313,10 @@ mod tests {
 
     #[test]
     fn normalize_tilde_slash() {
-        std::env::set_var("HOME", "/testhome");
+        let var_name = crate::git::paths::home_env_var_name();
+        std::env::set_var(var_name, "/testhome");
         assert_eq!(normalize_directory_path("~/projects"), "/testhome/projects");
-        std::env::remove_var("HOME");
+        std::env::remove_var(var_name);
     }
 
     #[test]

@@ -443,9 +443,10 @@ mod tests {
             ));
             let _ = std::fs::create_dir_all(&path);
             let prev_data_dir = std::env::var("GRIDFORGE_DATA_DIR").ok();
-            let prev_home = std::env::var("HOME").ok();
+            let home_var = crate::git::paths::home_env_var_name();
+            let prev_home = std::env::var(home_var).ok();
             std::env::set_var("GRIDFORGE_DATA_DIR", &path);
-            std::env::set_var("HOME", &path);
+            std::env::set_var(home_var, &path);
             Self {
                 path,
                 prev_data_dir,
@@ -463,8 +464,8 @@ mod tests {
                 None => std::env::remove_var("GRIDFORGE_DATA_DIR"),
             }
             match &self.prev_home {
-                Some(p) => std::env::set_var("HOME", p),
-                None => std::env::remove_var("HOME"),
+                Some(p) => std::env::set_var(crate::git::paths::home_env_var_name(), p),
+                None => std::env::remove_var(crate::git::paths::home_env_var_name()),
             }
             let _ = std::fs::remove_dir_all(&self.path);
         }

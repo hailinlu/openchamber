@@ -88,11 +88,11 @@ pub fn get_target_skill_dir(
 ) -> PathBuf {
     match (scope, target_source) {
         ("user", "agents") => {
-            let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+            let home = crate::git::paths::home_dir_string();
             PathBuf::from(home).join(".agents").join("skills")
         }
         ("user", _) => {
-            let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+            let home = crate::git::paths::home_dir_string();
             PathBuf::from(home).join(".config").join("opencode").join("skills")
         }
         ("project", "agents") => {
@@ -107,7 +107,7 @@ pub fn get_target_skill_dir(
         }
         // fallback: treat as user + opencode
         _ => {
-            let home = std::env::var("HOME").unwrap_or_else(|_| "/tmp".to_string());
+            let home = crate::git::paths::home_dir_string();
             PathBuf::from(home).join(".config").join("opencode").join("skills")
         }
     }
@@ -385,13 +385,32 @@ mod tests {
     #[test]
     fn test_get_target_skill_dir_user_opencode() {
         let dir = get_target_skill_dir("user", "opencode", None);
-        assert!(dir.to_string_lossy().contains(".config/opencode/skills"));
+        // 跨平台: 用 components 检查后缀,避免 Windows 反斜杠与 Unix 正斜杠的断言分歧。
+        let tail: Vec<_> = dir
+            .components()
+            .filter_map(|c| c.as_os_str().to_str())
+            .rev()
+            .take(3)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>();
+        assert_eq!(tail, vec![".config", "opencode", "skills"]);
     }
 
     #[test]
     fn test_get_target_skill_dir_user_agents() {
         let dir = get_target_skill_dir("user", "agents", None);
-        assert!(dir.to_string_lossy().contains(".agents/skills"));
+        let tail: Vec<_> = dir
+            .components()
+            .filter_map(|c| c.as_os_str().to_str())
+            .rev()
+            .take(2)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect::<Vec<_>>();
+        assert_eq!(tail, vec![".agents", "skills"]);
     }
 
     #[test]

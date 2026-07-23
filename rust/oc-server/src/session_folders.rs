@@ -173,10 +173,38 @@ mod tests {
 
     #[tokio::test]
     async fn atomic_write_cleans_up_tmp_on_rename_failure() {
-        // 写入到一个不存在的目录 → rename 失败, tmp 应被清理
-        let path = std::path::PathBuf::from("/nonexistent/dir/file.json");
-        let result = atomic_write(&path, "{}").await;
+        // rename 失败路径: 目标已存在为目录 → rename(file, dir) 在 Unix/Windows 均失败
+        // (EISDIR / NotADirectory)。原测试用硬编码 `/nonexistent/...` 在 Windows 上会被
+        // 当成当前盘符根相对路径并被 create_dir_all 成功创建,无法触发失败。
+        let dir = std::env::temp_dir().join(format!(
+            "oc-test-atomic-rename-{}-{}-{}",
+            std::process::id(),
+            chrono::Utc::now().timestamp_millis(),
+            TEST_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+        ));
+        tokio::fs::create_dir_all(&dir).await.unwrap();
+        // 目标路径是一个已存在的目录 → rename 文件覆盖目录会失败
+        let target = dir.join("dest");
+        tokio::fs::create_dir(&target).await.unwrap();
+
+        let result = atomic_write(&target, "{}").await;
         assert!(result.is_err());
+
+        // tmp 文件应已被清理: 目录内不得残留 *.tmp-* 文件
+        let mut rd = tokio::fs::read_dir(&dir).await.unwrap();
+        let mut leftovers = Vec::new();
+        while let Ok(Some(entry)) = rd.next_entry().await {
+            if entry.file_name().to_string_lossy().contains(".tmp-") {
+                leftovers.push(entry.file_name());
+            }
+        }
+        assert!(
+            leftovers.is_empty(),
+            "tmp file was not cleaned up: {:?}",
+            leftovers
+        );
+
+        let _ = tokio::fs::remove_dir_all(&dir).await;
     }
 
     #[test]

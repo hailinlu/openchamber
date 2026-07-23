@@ -722,11 +722,15 @@ mod tests {
     use crate::opencode::auth::tests as auth_tests;
     use std::env;
 
-    /// 各测试隔离的临时 HOME(共享 auth::TEST_LOCK 以跨模块串行)。
+    /// 各测试隔离的临时 home(共享 auth::TEST_LOCK 以跨模块串行)。
+    ///
+    /// 读取/写入的 env var 由 [`crate::git::paths::home_env_var_name()`] 决定
+    /// (Windows=`USERPROFILE`,其他=`HOME`),与生产代码 `home_dir_string` 对齐。
     fn with_temp_home<F: FnOnce(PathBuf)>(f: F) {
         let _guard = auth_tests::TEST_LOCK
             .lock()
             .unwrap_or_else(|e| e.into_inner());
+        let var_name = crate::git::paths::home_env_var_name();
         // 进入时清理可能 leak 的 OPENCODE_CONFIG
         env::remove_var("OPENCODE_CONFIG");
         let temp = std::env::temp_dir().join(format!(
@@ -736,13 +740,13 @@ mod tests {
         ));
         let _ = std::fs::remove_dir_all(&temp);
         std::fs::create_dir_all(&temp).unwrap();
-        let prev = env::var("HOME").ok();
-        env::set_var("HOME", &temp);
+        let prev = env::var(var_name).ok();
+        env::set_var(var_name, &temp);
         f(temp.clone());
         env::remove_var("OPENCODE_CONFIG");
         match prev {
-            Some(v) => env::set_var("HOME", v),
-            None => env::remove_var("HOME"),
+            Some(v) => env::set_var(var_name, v),
+            None => env::remove_var(var_name),
         }
         let _ = std::fs::remove_dir_all(&temp);
     }

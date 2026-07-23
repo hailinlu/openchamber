@@ -63,9 +63,8 @@ pub struct SupportingFile {
 // ---------------------------------------------------------------------------
 
 fn home_dir() -> PathBuf {
-    std::env::var("HOME")
-        .map(PathBuf::from)
-        .unwrap_or_else(|_| PathBuf::from("/tmp"))
+    // 用共享的、平台感知的 home 解析(Windows 读 USERPROFILE),对齐 Node os.homedir()。
+    crate::git::paths::home_dir()
 }
 
 fn user_opencode_skills_dir() -> PathBuf {
