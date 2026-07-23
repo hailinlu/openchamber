@@ -51,7 +51,7 @@ pub async fn hosts_set(args: &Value, _app: &AppHandle) -> Result<Value, String> 
 ///
 /// 两阶段探测:
 /// 1. (可选) identity gate: GET /health (unauth) → 比较 serverId
-/// 2. version: GET /version (auth) → HTTP status → status string
+/// 2. version: GET /api/version (auth) → HTTP status → status string
 ///
 /// 返回 `{ status: 'ok'|'auth'|'unreachable'|'wrong-service', latencyMs }`
 pub async fn host_probe(args: &Value, _app: &AppHandle) -> Result<Value, String> {
@@ -81,7 +81,7 @@ pub async fn host_probe(args: &Value, _app: &AppHandle) -> Result<Value, String>
     }
 
     // Stage 2: version probe
-    let version_url = format!("{}/version", base_url);
+    let version_url = version_probe_url(base_url);
     let start = std::time::Instant::now();
     match fetch_status_with_timeout(&version_url, token, Duration::from_secs(10)).await {
         Ok(status_code) => {
@@ -95,6 +95,20 @@ pub async fn host_probe(args: &Value, _app: &AppHandle) -> Result<Value, String>
         }
         Err(_) => Ok(json!({ "status": "unreachable", "latencyMs": null })),
     }
+}
+
+/// 构造 version probe URL。
+///
+/// oc-server 的版本端点是 `/api/version` (`routes.rs:86-97`),不是 `/version`。
+/// 历史上 Tauri 探测的是 `/version`,与 oc-server 路由不匹配 → 服务端
+/// 走 SPA fallback 路径(`/api/*` 显式 NOT_FOUND 之外的剩余 → 走 headless
+/// fallback 或 404)→ 返回 200 但不是有效响应 / 直接 404 → 探测超时 →
+/// host probe 错误标 `unreachable`, UI 把 Local 误判为不可达。
+///
+/// `/api/version` 是 `/api/` 前缀,被 `static_files::is_api_path` 视为 API 路径
+/// (line 32-35), 不会落到 SPA fallback, 一定由 axum 路由处理 → 返回 JSON。
+fn version_probe_url(base_url: &str) -> String {
+    format!("{}/api/version", base_url)
 }
 
 /// `desktop_install_id_get` — 返回稳定 per-install ID。
@@ -247,5 +261,32 @@ mod tests {
     async fn select_pairing_candidate_empty_list() {
         let result = select_pairing_candidate(&[], Duration::from_secs(1)).await;
         assert!(result.is_none());
+    }
+
+    /// Regression: Tauri host_probe 必须探测 oc-server 真实存在的端点 `/api/version`
+    /// (`rust/oc-server/src/routes.rs:86`), 而不是历史上的 `/version` (oc-server
+    /// 未注册该路由)。误探测 `/version` → 请求要么命中 SPA fallback (返回 HTML 200
+    /// 但 `fetch_status` 仍会看到 200 然后错误判定 `ok` —— 任何监听 127.0.0.1 的 HTTP
+    /// 服务都可能误报), 要么命中 headless fallback (JSON 200) —— 都会让 Local
+    /// 实例可达性被错误判定。
+    ///
+    /// 这里锁死 endpoint 字符串, 防止以后再次错配。`host_probe` 会在调用
+    /// `version_probe_url` 之前先 `url.trim_end_matches('/')`, 所以
+    /// `version_probe_url` 自身不需要再做去尾斜杠处理 —— 那是 caller 的责任。
+    #[test]
+    fn version_probe_url_uses_oc_server_endpoint() {
+        assert_eq!(
+            version_probe_url("http://127.0.0.1:58980"),
+            "http://127.0.0.1:58980/api/version"
+        );
+        assert_eq!(
+            version_probe_url("https://example.com:443"),
+            "https://example.com:443/api/version"
+        );
+        // 锁死 path 段 (`/api/version`), 防止有人手抖改回 `/version`。
+        assert!(
+            version_probe_url("http://127.0.0.1:1").ends_with("/api/version"),
+            "version endpoint must be /api/version (oc-server route)"
+        );
     }
 }
