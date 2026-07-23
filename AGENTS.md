@@ -228,7 +228,7 @@ All scripts are in `package.json`.
 - Desktop dev (Electron, legacy): `bun run electron:dev`
 - Desktop dev (Tauri, migration target): `bun run tauri:dev` (in-process oc-server; orchestrator: `scripts/tauri-dev.mjs` → `scripts/dev-web-hmr.mjs` + `cargo tauri dev`)
 - Desktop dev (Tauri, sidecar fallback): `bun run tauri:dev:sidecar` (`OPENCHAMBER_SIDECAR=1`)
-- Desktop build (Tauri): `cargo tauri build` (run inside `rust/oc-tauri/src-tauri`; expects prebuilt UI at `rust/ui-dist`)
+- Desktop build (Tauri): `bun run tauri:build` (orchestrator: `scripts/tauri-build.mjs` → builds web, stages to `rust/oc-tauri/ui-dist`, then `cargo tauri build`). Equivalent manual: `bun run build:web`, copy `packages/web/dist` → `rust/oc-tauri/ui-dist`, then `cargo tauri build` inside `rust/oc-tauri/src-tauri`. (`tauri.conf.json` `frontendDist: "../ui-dist"` resolves relative to `src-tauri`, i.e. `rust/oc-tauri/ui-dist`, not `rust/ui-dist`.)
 - Rust build/test: `cargo build` / `cargo test` (run inside `rust/`)
 - VS Code build: `bun run vscode:build`
 - Release smoke build: `bun run release:test` (shell script: `scripts/test-release-build.sh`)

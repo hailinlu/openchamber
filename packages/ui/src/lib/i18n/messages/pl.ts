@@ -941,6 +941,7 @@ export const dict: Record<I18nKey, string> = {
   'onboarding.desktopRecovery.localUnavailable.description': 'Nie można było uruchomić OpenCode CLI lub nie jest zainstalowany. Zainstaluj OpenCode lub połącz się z serwerem zdalnym.',
   'onboarding.desktopRecovery.localUnavailable.retry': 'Ponów lokalnie',
   'onboarding.desktopRecovery.localUnavailable.useLocal': 'Skonfiguruj lokalny',
+  'onboarding.desktopRecovery.localUnavailable.showErrorDetails': 'Pokaż szczegóły błędu',
   'onboarding.desktopRecovery.noDefaultConnection.title': 'Brak domyślnego połączenia',
   'onboarding.desktopRecovery.noDefaultConnection.description': 'Nie można było znaleźć twojego zapisanego domyślnego połączenia. Wybierz sposób połączenia.',
   'onboarding.desktopRecovery.remoteUnreachable.title': 'Serwer zdalny nieosiągalny',

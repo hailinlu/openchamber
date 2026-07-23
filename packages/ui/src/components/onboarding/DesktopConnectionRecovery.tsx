@@ -15,6 +15,8 @@ export type DesktopConnectionRecoveryProps = {
   variant: RecoveryVariant;
   hostLabel?: string;
   hostUrl?: string;
+  /** Optional backend error detail (local-unavailable). Shown collapsed by default. */
+  diagnostic?: string;
   onRetry?: () => void;
   onUseLocal?: () => void;
   onUseRemote?: () => void;
@@ -35,6 +37,7 @@ export function DesktopConnectionRecovery({
   variant,
   hostLabel,
   hostUrl,
+  diagnostic,
   onRetry,
   onUseLocal,
   onUseRemote,
@@ -82,6 +85,20 @@ export function DesktopConnectionRecovery({
             )}
           </p>
         </div>
+
+        {/* Optional backend error detail (local-unavailable).
+            Collapsed by default — the anyhow chain can be long and include
+            raw opencode stdout/stderr. Developer-facing diagnostic, not prose. */}
+        {diagnostic && (
+          <details className="text-xs">
+            <summary className="cursor-pointer text-muted-foreground select-none hover:text-foreground">
+              {t('onboarding.desktopRecovery.localUnavailable.showErrorDetails')}
+            </summary>
+            <pre className="mt-2 max-h-48 overflow-auto rounded-md border border-border bg-muted/40 p-2 whitespace-pre-wrap break-all font-mono text-foreground/80">
+              {diagnostic}
+            </pre>
+          </details>
+        )}
 
         {/* Host info if available */}
         {hostUrl && (variant === 'remote-unreachable' || variant === 'remote-wrong-service' || variant === 'remote-incompatible') && (

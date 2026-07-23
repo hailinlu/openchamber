@@ -2612,6 +2612,7 @@ export const dict: Record<I18nKey, string> = {
   'onboarding.desktopRecovery.localUnavailable.description': 'OpenCode CLI를 시작할 수 없거나 설치되어 있지 않습니다. OpenCode를 설치하거나 원격 서버에 연결하세요.',
   'onboarding.desktopRecovery.localUnavailable.retry': '로컬 다시 시도',
   'onboarding.desktopRecovery.localUnavailable.useLocal': '로컬 설정',
+  'onboarding.desktopRecovery.localUnavailable.showErrorDetails': '오류 세부정보 표시',
   'onboarding.desktopRecovery.noDefaultConnection.title': '기본 연결이 없습니다',
   'onboarding.desktopRecovery.noDefaultConnection.description': '저장된 기본 연결을 찾을 수 없습니다. 연결 방식을 선택하세요.',
   'onboarding.desktopRecovery.remoteUnreachable.title': '원격 서버에 연결할 수 없습니다',

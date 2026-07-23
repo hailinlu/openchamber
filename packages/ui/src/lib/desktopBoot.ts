@@ -39,7 +39,7 @@ export type DesktopBootView =
   | { screen: 'main' }
   | { screen: 'main'; hostId: string; url: string }
   | { screen: 'chooser' }
-  | { screen: 'recovery'; variant: 'local-unavailable' }
+  | { screen: 'recovery'; variant: 'local-unavailable'; diagnostic?: string }
   | { screen: 'recovery'; variant: 'remote-unreachable'; hostId: string; url: string }
   | { screen: 'recovery'; variant: 'remote-incompatible'; hostId: string; url: string }
   | { screen: 'recovery'; variant: 'remote-wrong-service'; hostId: string; url: string }
@@ -183,7 +183,7 @@ export function resolveDesktopBootView(
 
   // Recovery screens - something is wrong
   if (outcome.target === 'local' && outcome.status === 'unreachable') {
-    return { screen: 'recovery', variant: 'local-unavailable' };
+    return { screen: 'recovery', variant: 'local-unavailable', diagnostic: getInjectedBootDiagnostic() };
   }
 
   if (outcome.target === 'remote') {
@@ -278,6 +278,27 @@ export function getInjectedBootOutcome(): DesktopBootOutcome | null {
 
   const result = validateBootOutcome(raw);
   return result.valid ? result.outcome : null;
+}
+
+/**
+ * Read the optional diagnostic string injected by the native desktop host.
+ *
+ * The Rust shell injects `window.__GRIDFORGE_BOOT_DIAGNOSTIC__` only when the
+ * backend fails to start (boot outcome `unreachable`), carrying the anyhow
+ * full causal chain of the failure. It is displayed in the recovery screen so
+ * users/developers can see the real backend error instead of a generic message.
+ *
+ * Returns the raw string when present and non-empty, otherwise `undefined`.
+ */
+export function getInjectedBootDiagnostic(): string | undefined {
+  if (typeof window === 'undefined') return undefined;
+
+  const raw = (window as { __GRIDFORGE_BOOT_DIAGNOSTIC__?: unknown })
+    .__GRIDFORGE_BOOT_DIAGNOSTIC__;
+
+  if (typeof raw !== 'string') return undefined;
+  const trimmed = raw.trim();
+  return trimmed.length > 0 ? raw : undefined;
 }
 
 /**

@@ -2578,6 +2578,7 @@ export const dict: Record<I18nKey, string> = {
   "onboarding.desktopRecovery.localUnavailable.description": "OpenCode CLI не вдалося запустити або не встановлено. Встановіть OpenCode або підключіться до віддаленого сервера.",
   "onboarding.desktopRecovery.localUnavailable.retry": "Повторити Local",
   "onboarding.desktopRecovery.localUnavailable.useLocal": "Налаштувати Local",
+  "onboarding.desktopRecovery.localUnavailable.showErrorDetails": "Показати деталі помилки",
   "onboarding.desktopRecovery.noDefaultConnection.title": "Немає підключення за замовчуванням",
   "onboarding.desktopRecovery.noDefaultConnection.description": "Не вдалося знайти збережене з’єднання за умовчанням. Виберіть спосіб підключення.",
   "onboarding.desktopRecovery.remoteUnreachable.title": "Віддалений сервер недоступний",

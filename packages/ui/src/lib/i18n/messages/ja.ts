@@ -2609,6 +2609,7 @@ export const dict: Record<I18nKey, string> = {
   'onboarding.desktopRecovery.localUnavailable.description': 'OpenCode CLIを起動できないか、インストールされていません。OpenCodeをインストールするか、代わりにリモートサーバーに接続してください。',
   'onboarding.desktopRecovery.localUnavailable.retry': 'ローカルを再試行',
   'onboarding.desktopRecovery.localUnavailable.useLocal': 'ローカルをセットアップ',
+  'onboarding.desktopRecovery.localUnavailable.showErrorDetails': 'エラーの詳細を表示',
   'onboarding.desktopRecovery.noDefaultConnection.title': 'デフォルト接続がありません',
   'onboarding.desktopRecovery.noDefaultConnection.description': '保存されたデフォルト接続が見つかりませんでした。接続方法を選択してください。',
   'onboarding.desktopRecovery.remoteUnreachable.title': 'リモートサーバーに到達できません',

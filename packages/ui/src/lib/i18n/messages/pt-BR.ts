@@ -2578,6 +2578,7 @@ export const dict: Record<I18nKey, string> = {
   "onboarding.desktopRecovery.localUnavailable.description": "A CLI do OpenCode não pôde ser iniciada ou não está instalada. Instale o OpenCode ou conecte um servidor remoto no lugar dela.",
   "onboarding.desktopRecovery.localUnavailable.retry": "Tentar novamente Local",
   "onboarding.desktopRecovery.localUnavailable.useLocal": "Configurar Local",
+  "onboarding.desktopRecovery.localUnavailable.showErrorDetails": "Mostrar detalhes do erro",
   "onboarding.desktopRecovery.noDefaultConnection.title": "Sem conexão padrão",
   "onboarding.desktopRecovery.noDefaultConnection.description": "Sua conexão padrão salva não pôde ser encontrada. Escolha como deseja se conectar.",
   "onboarding.desktopRecovery.remoteUnreachable.title": "Servidor remoto não disponível",

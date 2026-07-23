@@ -2577,6 +2577,7 @@ export const dict: Record<I18nKey, string> = {
   'onboarding.desktopRecovery.localUnavailable.description': 'OpenCode CLI 無法啟動或未安裝。請安裝 OpenCode，或改為連接遠端伺服器。',
   'onboarding.desktopRecovery.localUnavailable.retry': '重試本地',
   'onboarding.desktopRecovery.localUnavailable.useLocal': '設定本地',
+  'onboarding.desktopRecovery.localUnavailable.showErrorDetails': '顯示錯誤詳細資料',
   'onboarding.desktopRecovery.noDefaultConnection.title': '無預設連線',
   'onboarding.desktopRecovery.noDefaultConnection.description': '找不到已儲存的預設連線。請選擇你的連線方式。',
   'onboarding.desktopRecovery.remoteUnreachable.title': '遠端伺服器無法連線',

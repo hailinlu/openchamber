@@ -19,6 +19,8 @@ type OnboardingScreenProps = {
   recoveryHostUrl?: string;
   /** Host label for recovery context */
   recoveryHostLabel?: string;
+  /** Optional diagnostic detail for recovery context (local-unavailable backend error) */
+  recoveryDiagnostic?: string;
   /** Callback when user enters local setup from recovery */
   onEnterLocalSetup?: () => void;
   /** Callback when user wants to switch to remote (first-launch only) */
@@ -32,6 +34,7 @@ export function OnboardingScreen({
   recoveryVariant = 'missing-default-host',
   recoveryHostUrl,
   recoveryHostLabel,
+  recoveryDiagnostic,
   onEnterLocalSetup,
 }: OnboardingScreenProps) {
   const [showRecoveryRemoteForm, setShowRecoveryRemoteForm] = React.useState(false);
@@ -55,6 +58,7 @@ export function OnboardingScreen({
         variant={recoveryVariant}
         hostUrl={recoveryHostUrl}
         hostLabel={recoveryHostLabel}
+        diagnostic={recoveryDiagnostic}
         showRemoteForm={showRecoveryRemoteForm}
         onCloseRemoteForm={() => setShowRecoveryRemoteForm(false)}
         onSwitchToLocalFromRemote={() => {

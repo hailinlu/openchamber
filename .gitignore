@@ -100,3 +100,23 @@ docs/superpowers/plans/2026-07-15-oc-server-3c-group-2-small-model.md
 
 # Local Git worktrees
 .worktrees/
+
+# 临时调试探针 (一次性编译产物, 仅用于本机排查; 代码中 probe_ 前缀是函数名, 非这些二进制)
+rust/probe_atomic.exe
+rust/probe_atomic.pdb
+rust/probe_windows_paths.pdb
+
+# Agent 工具的 brainstorm 缓存 (与 .zcode/.codegraph 同类, 机器本地)
+.superpowers/
+
+# Tauri oc-server 运行时生成的用户配置/会话状态 (含实时 session id 等本地数据,
+# 与已忽略的 rust/**/.config/openchamber/ 同源, 仅目录名随产品名变化)
+rust/oc-tauri/src-tauri/.config/
+
+# Tauri 桌面构建产物的预构建 UI 资源 (构建产物, 见 scripts/tauri-build.mjs 暂存逻辑)
+rust/oc-tauri/ui-dist/
+
+# 临时 smoke-test 脚本与实施计划草稿 (本机排查用, 不入库)
+docs/superpowers/plans/2026-07-17-tauri-windows-shell-parity.md
+docs/superpowers/plans/smoke-detect-miss.mjs
+docs/superpowers/plans/smoke-detect-only.mjs

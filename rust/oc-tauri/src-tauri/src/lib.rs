@@ -16,6 +16,7 @@ mod discovery;
 mod ipc;
 mod menu;
 mod mini_chat;
+mod opencode_discovery;
 mod power;
 mod settings;
 mod sidecar;
@@ -27,9 +28,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use backend::BackendHandle;
-use ipc::globals::{build_early_globals_script, build_init_script, RuntimeContext};
+use ipc::globals::{build_init_script, RuntimeContext};
 use sidecar::SidecarBuilder;
-use tauri::Manager;
+use tauri::{Manager, WebviewUrl, WebviewWindowBuilder};
 
 /// 全局后端句柄 + 它专属的 tokio 运行时。
 struct BackendState {
@@ -90,76 +91,331 @@ pub(crate) fn request_quit(app: &tauri::AppHandle) {
     app.exit(0);
 }
 
-/// 配置主窗口 shell (必须在后端启动之前调用)。
+// =========================================================================
+// 同源化 Tauri 生产 webview: oc-server 托管 UI dist
+// =========================================================================
+//
+// 根因: `WebviewUrl::App("index.html")` 让 page origin = `tauri.localhost`
+// (Win/Linux) 或 `tauri://localhost` (macOS), 与 oc-server 的
+// `http://127.0.0.1:<port>` 不一致 → cross-origin → CORS 失败 / 渲染
+// 异常 (AGENTS.md "Frequently-misdiagnosed runtime issues")。
+//
+// 修复: 生产构建走 `WebviewUrl::External(<loopback>)`, 让
+// `location.origin === __GRIDFORGE_API_BASE_URL__`, 同源 fetch 直通。
+// Dev 保持 `WebviewUrl::App` (Vite :5180 + proxy 处理跨源)。
+//
+// 相关 env: `GRIDFORGE_DIST_DIR` — oc-server 用来定位要托管的 ui-dist。
+// 仅在调用方未设置 (env unset 或空) 且默认路径 <CARGO_MANIFEST_DIR>/../ui-dist
+// 存在时, oc-tauri 才注入这个 env, 给 sidecar 走 `--dist-dir`, 给 in-process
+// 走 `clap` 的 env (oc-server::Config::load 自动读)。
+
+/// 主窗口 URL 决策结果 (dev/release 走不同路径)。
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum MainUrlDecision {
+    /// Dev: `WebviewUrl::App("index.html")` → Tauri 走 devUrl (Vite)。
+    AppIndexHtml,
+    /// Release: `WebviewUrl::External(<loopback URL>)` → oc-server 托管 UI。
+    ExternalLoopback(String),
+}
+
+/// 纯函数: 根据 debug_assertions + 当前后端 port 决定主窗口 URL 策略。
 ///
-/// 负责 platform-native 的窗口骨架: 图标 + Windows 无边框 + 后台启动时隐藏。
-/// 不依赖后端 base_url,因此可以在 backend 启动前/失败时安全执行。
-fn configure_main_window_shell(app: &tauri::AppHandle, background_start: bool) {
-    let Some(window) = app.get_webview_window("main") else {
-        log::warn!("main window not found during shell setup");
-        return;
-    };
+/// - `debug = true`  → App 路径 (devUrl, Vite + proxy 处理 cross-origin)。
+/// - `debug = false` + `port > 0` → External loopback URL, 携带真实
+///   port + trailing slash, 确保 page origin === __GRIDFORGE_API_BASE_URL__。
+/// - `debug = false` + `port == 0` → App 路径。后端启动失败 / 不可达时
+///   [`ctx_suggested_port`] 返回 0 (无 api_base_url, local_origin 是占位);
+///   这种情况下绝对不能合成 `External("http://127.0.0.1:0/")` ——
+///   port 0 是保留值, Webview 拿到的是无效 origin + 让 bundled UI
+///   去取一个不存在的资源。让 Tauri 走 frontendDist (`WebviewUrl::App`)
+///   即可, page origin 变成 `tauri.localhost` 但恢复屏不依赖 API base
+///   URL, 渲染逻辑走 `local_origin`-占位 + `boot_status=unreachable`
+///   这条路。
+fn decide_main_webview_url(debug_assertions: bool, port: u16) -> MainUrlDecision {
+    if debug_assertions {
+        return MainUrlDecision::AppIndexHtml;
+    }
+    if port == 0 {
+        // 后端不可达 / 端口未知 — 用 App 让 bundled UI 渲染恢复屏,
+        // 而不是用一个 External 127.0.0.1:0 (无效) 或 tauri:// External 兜底
+        // (后者会让 `__GRIDFORGE_LOCAL_ORIGIN__` 与 page origin 错位)。
+        MainUrlDecision::AppIndexHtml
+    } else {
+        // trailing slash 让 Webview 把 "/" 当成目录而非"host 边界", 浏览器
+        // 解析出的 location.origin 是 "http://127.0.0.1:<port>" (无 path),
+        // 与 __GRIDFORGE_API_BASE_URL__ 严格相等 → 同源。
+        MainUrlDecision::ExternalLoopback(format!("http://127.0.0.1:{}/", port))
+    }
+}
 
-    // 1. 窗口图标 — 用 tauri.conf.json bundle 配置的图标 (dev/build 都生效)
-    if let Some(icon) = app.default_window_icon().cloned() {
-        if let Err(error) = window.set_icon(icon) {
-            log::warn!("failed to set main window icon: {}", error);
+/// dist-dir 决策结果。
+///
+/// 三态决策: env 已设置 (无论空与非空) 一律保留, 仅在 env 缺席时决定是否
+/// 计算/注入默认值。
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum DistDirDecision {
+    /// env 已设置 (非空) → 保留现状, 调用方**不**调用 `set_var`。
+    Use(std::path::PathBuf),
+    /// env 已设置 (空字符串) → 保留现状 (不覆盖), 调用方**不**调用 `set_var`。
+    /// 不管 candidate 路径是否存在, 都尊重用户的显式空设置。
+    PreserveEmpty,
+    /// env 缺席, candidate 存在 → 调用方应 `set_var("GRIDFORGE_DIST_DIR", candidate)`。
+    SetDefault(std::path::PathBuf),
+    /// env 缺席, candidate 不存在 → 调用方 log warn, 不动 env。
+    Skip,
+}
+
+/// 纯函数: 决定 `GRIDFORGE_DIST_DIR` 应该如何被处理。
+///
+/// 合约:
+/// - `env_override == Some(non-empty)` → `Use(env)` (尊重既有值, 不覆盖)。
+/// - `env_override == Some(empty)` → `PreserveEmpty` (尊重显式空设置, 不覆盖;
+///   与"env 未设置"是两种不同概念, 不应混淆)。
+/// - `env_override == None, candidate 存在` → `SetDefault(candidate)`
+///   (env 完全缺席时计算默认并注入)。
+/// - `env_override == None, candidate 不存在` → `Skip`
+///   (env 缺席 + 默认路径不存在 → 不动, 让失败可观察)。
+///
+/// `candidate_exists` 参数化让本函数可测试 (避免在单测里创建/删除临时目录)。
+///
+/// `env_override` 接受 `Option<&OsStr>`:
+/// - `env::var_os(...).as_deref()` 直接喂入 (生产路径);
+/// - 单元测试可以用 `OsString::from(...)` / `&str` / `OsString::new()` 等统一接入。
+fn resolve_dist_dir_decision(
+    env_override: Option<&std::ffi::OsStr>,
+    candidate: &std::path::Path,
+    candidate_exists: bool,
+) -> DistDirDecision {
+    // env 已设置 (Some, 不论空与非空): 优先尊重用户/外层已设置的值,
+    // 不覆盖 — 包括用户显式把 GRIDFORGE_DIST_DIR 设成空字符串的情况。
+    if let Some(raw) = env_override {
+        if raw.is_empty() {
+            return DistDirDecision::PreserveEmpty;
         }
+        return DistDirDecision::Use(std::path::PathBuf::from(raw));
     }
-
-    // 2. Windows 关闭原生 chrome (使用 web title bar + 自绘窗口控制)
-    #[cfg(target_os = "windows")]
-    if let Err(error) = window.set_decorations(false) {
-        log::warn!("failed to disable Windows window decorations: {}", error);
+    // env 完全缺席 (None): 才考虑用候选默认值。
+    if candidate_exists {
+        return DistDirDecision::SetDefault(candidate.to_path_buf());
     }
+    DistDirDecision::Skip
+}
 
-    // 3. 注入静态全局变量 (提前注入, 不依赖后端端口)
-    //
-    // 设 `window.__GRIDFORGE_ELECTRON__` / `__GRIDFORGE_PLATFORM__`。
-    // 这些值在编译期即确定, 不等后端启动: 确保 React hydration 时
-    // `isElectronShell()` / `usesFramelessElectronChrome()` 能正确检测。
-    //
-    // 同时注入 `__GRIDFORGE_API_BASE_URL__` 和 `__GRIDFORGE_LOCAL_ORIGIN__`
-    // (基于 GRIDFORGE_PORT env), 以防页面加载快于后端启动导致 WS 请求
-    // 走相对路径经 Vite proxy 转发时 ECONNRESET。
-    // 后端启动后 `inject_main_window_runtime` 会用实际端口覆盖。
-    //
-    // `window.eval()` 在 Tauri 2 的 setup 阶段可能因页面未加载而失败,
-    // 但 UI 侧有 `isTauriShell()` 回退 (`window.__TAURI__`), 此处为
-    // belt-and-suspenders 方案。
-    let early_script = build_early_globals_script();
-    if let Err(error) = window.eval(&early_script) {
-        log::warn!(
-            "failed to inject early globals (will rely on UI fallback): {}",
-            error,
-        );
+/// 纯函数: 默认 ui-dist 路径, 锚定 `CARGO_MANIFEST_DIR` 以保证 cwd 无关。
+fn default_ui_dist_path() -> std::path::PathBuf {
+    std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("ui-dist")
+}
+
+/// 纯函数: 给 sidecar 构造 `--dist-dir <path>` 参数对 (或空)。
+///
+/// `dist_dir` 为 None 时返回空 Vec, 调用方应直接跳过 arg 注入。
+fn build_dist_dir_args(dist_dir: Option<&std::path::Path>) -> Vec<String> {
+    match dist_dir {
+        Some(p) => match p.to_str() {
+            Some(s) => vec!["--dist-dir".to_string(), s.to_string()],
+            None => {
+                // 非 UTF-8 路径: 退化为空 — 调用方应记录诊断, 避免
+                // 静默丢参。生产路径几乎不会触发 (Windows UTF-16 / Unix
+                // bytes 路径), 仅在测试覆盖率外保留 fail-safe。
+                Vec::new()
+            }
+        },
+        None => Vec::new(),
     }
+}
 
-    // 4. 后台启动 → 立即隐藏 (托盘激活后用 Show GridForge 恢复)
-    if background_start {
-        if let Err(error) = window.hide() {
-            log::warn!("failed to hide main window for background launch: {}", error);
+/// 注入 `GRIDFORGE_DIST_DIR` env (在 sidecar 与 in-process oc-server 启动之前)。
+///
+/// 规则:
+/// - 已设置 (非空) → 尊重, 不动; log info 说明用的什么值。
+/// - 已设置 (空字符串) → 尊重显式空设置, 不动; log info 提示用户显式置空。
+/// - 完全未设置 + `<CARGO_MANIFEST_DIR>/../ui-dist` 存在 → 注入, log info。
+/// - 完全未设置 + 候选路径不存在 → Skip, log warn (让失败可观察)。
+///
+/// 严格尊重"显式 env": 用户把 `GRIDFORGE_DIST_DIR` 设成什么就是什么,
+/// 包括空串。**只**在 env 完全缺席 (var_os 返回 None) 时才计算/注入默认。
+fn set_oc_server_dist_dir_env() {
+    let env_value = std::env::var_os("GRIDFORGE_DIST_DIR");
+    let candidate = default_ui_dist_path();
+    let candidate_exists = candidate.is_dir();
+    let decision = resolve_dist_dir_decision(env_value.as_deref(), &candidate, candidate_exists);
+    match decision {
+        DistDirDecision::Use(existing) => {
+            // env 已设置 (非空): 尊重, 不动; log info 说明用的什么值。
+            log::info!(
+                "GRIDFORGE_DIST_DIR already set to {:?}, using override",
+                existing
+            );
+        }
+        DistDirDecision::PreserveEmpty => {
+            // env 显式置空: 尊重, 不动 (与 env 缺席语义不同, 不要混淆)。
+            // 不把空字符串当作"未设置"然后自动覆盖成 candidate — 那会破坏
+            // 用户用 `GRIDFORGE_DIST_DIR="" ./gridforge` 显式禁用 ui 托管的用法。
+            log::info!(
+                "GRIDFORGE_DIST_DIR explicitly set to empty; preserving (not overwriting with default)"
+            );
+        }
+        DistDirDecision::SetDefault(path) => {
+            // env 完全缺席: 计算默认值并注入。
+            let path_str = path.to_string_lossy().to_string();
+            log::info!("setting GRIDFORGE_DIST_DIR={}", path_str);
+            std::env::set_var("GRIDFORGE_DIST_DIR", &path_str);
+        }
+        DistDirDecision::Skip => {
+            log::warn!(
+                "GRIDFORGE_DIST_DIR not set and {} is not a directory; UI will fail to load in prod",
+                candidate.display()
+            );
         }
     }
 }
 
-/// 向主窗口注入运行时桥 (后端就绪后调用)。
+/// 创建主窗口 (代码建窗, **必须**在后端就绪、`BackendPort` 注册后调用)。
 ///
-/// 仅负责依赖后端 base_url / 端口的运行时脚本注入,以及 macOS vibrancy 应用。
-fn inject_main_window_runtime(app: &tauri::AppHandle, init_script: &str) {
-    let Some(window) = app.get_webview_window("main") else {
-        return;
+/// 复刻 `mini_chat::create_mini_chat_window` 的注入模式: 拿到真实端口后,
+/// 用 `build_init_script(ctx)` (静态全局 + 端口相关全局 + 桥) 作为
+/// `initialization_script`。`initialization_script` 在页面 JS 执行前、
+/// 每次导航前运行, 因此 `main.tsx` / `runtimeConfig.ts` 同步读取
+/// `__GRIDFORGE_API_BASE_URL__` 时一定拿到正确值 —— 彻底消除 prod 的
+/// 首次加载竞态 (旧实现窗口建在后端启动前, 首次加载时端口未知 → 读空 →
+/// 回退到 `tauri.localhost` → 所有请求返回 HTML → `<!doctype` JSON 报错)。
+///
+/// `ctx` 由调用方在后端就绪后构造 (含真实端口 + client token + runtime headers)。
+fn create_main_window(app: &tauri::AppHandle, ctx: &RuntimeContext, background_start: bool) {
+    // 同源化 webview URL: dev 走 WebviewUrl::App (Vite devUrl + proxy),
+    // prod 走 WebviewUrl::External(loopback), 让 page origin 一致 —
+    // 消除 tauri.localhost / 127.0.0.1 跨源 CORS 失败。
+    //
+    // 注: 后端不可达时 (port == 0) 走 AppIndexHtml 让 bundled UI 渲染
+    // 恢复屏, 而不是合出一个 `External("http://127.0.0.1:0/")`。
+    // 同样地, 这里**不**再有 `tauri://localhost` External 兜底:
+    // 那会让 page origin 与 `__GRIDFORGE_LOCAL_ORIGIN__` 错位 (后者是
+    // `http://tauri.localhost`), 比纯 App 路径更糟。
+    let url = match decide_main_webview_url(cfg!(debug_assertions), ctx_suggested_port(ctx)) {
+        MainUrlDecision::AppIndexHtml => WebviewUrl::App("index.html".into()),
+        MainUrlDecision::ExternalLoopback(s) => {
+            // 此分支仅在 port > 0 时进入, URL 形如 `http://127.0.0.1:<port>/`,
+            // 是绝对标准 ASCII URL, url::Url::parse 在生产路径不会失败。
+            // 这里**不**再回落到 tauri:// External 兜底: 那会让 page origin
+            // 与 `__GRIDFORGE_LOCAL_ORIGIN__` (= http://tauri.localhost)
+            // 错位, 把恢复屏逻辑搞坏。spec review 已要求移除误导性兜底,
+            // 改用 expect 在实测到 url crate 行为异常时给出明确失败位置。
+            let parsed = url::Url::parse(&s).unwrap_or_else(|e| {
+                // 旧 fallback (`tauri://localhost/`) 让 webview 把这个
+                // URL 当 External 处理, 拿到的是 tauri://localhost origin,
+                // 与 initial_script 注入的 __GRIDFORGE_LOCAL_ORIGIN__
+                // (= http://tauri.localhost) 不一致, 反把恢复屏搞坏。
+                // panic 在 unwrap_or_else 里走 div 路径, 等价于 expect。
+                panic!(
+                    "main-window URL {:?} failed to parse (tauri:// External \
+                     fallback removed by spec review): {}",
+                    s, e
+                );
+            });
+            WebviewUrl::External(parsed)
+        }
     };
 
-    // 1. 注入 init_script (后端 base_url / 桥全局变量)
-    if let Err(error) = window.eval(init_script) {
-        log::warn!("failed to inject main window runtime: {}", error);
+    let mut builder = WebviewWindowBuilder::new(app, "main", url)
+        .title("GridForge")
+        .inner_size(1280.0, 800.0)
+        .min_inner_size(720.0, 480.0)
+        .resizable(true)
+        // 后台启动时不显示窗口 (托盘激活后用 Show GridForge 恢复)。
+        // 比"显示后隐藏"更干净, 消除背景启动闪窗。
+        .visible(!background_start)
+        // 完整 init script: 静态全局变量 + 端口相关全局变量 (含真实端口) + 桥。
+        // initialization_script 每次导航前运行, 首次加载与 reload 都能拿到正确 base URL。
+        .initialization_script(&build_init_script(ctx));
+
+    // Windows/Linux 关闭原生 chrome (使用 web title bar + 自绘窗口控制)。
+    // macOS 保持原生 frame。
+    #[cfg(not(target_os = "macos"))]
+    {
+        builder = builder.decorations(false);
     }
 
-    // 2. macOS vibrancy (可选, 默认开)
+    let window = match builder.build() {
+        Ok(window) => window,
+        Err(error) => {
+            log::error!("failed to create main window: {}", error);
+            return;
+        }
+    };
+
+    // macOS vibrancy (可选, 默认开)。
+    // `window` 仅在 macOS+vibrancy 下被引用, 其它平台保留绑定避免编译错误。
     #[cfg(all(target_os = "macos", feature = "vibrancy"))]
     {
         apply_vibrancy_if_enabled(&window);
+    }
+    #[cfg(not(all(target_os = "macos", feature = "vibrancy")))]
+    {
+        let _ = &window;
+    }
+}
+
+/// 构造主窗口的 `RuntimeContext` (后端就绪后调用)。
+///
+/// 复刻 `mini_chat::create_mini_chat_window`: 基于真实端口构造 ctx,
+/// 并从 `SettingsStore` 读 `desktopLocalClientToken` / `desktopRuntimeHeaders`
+/// (UI 认证 HTTP API 请求需要), 使主窗口与 mini chat 窗口的注入对齐。
+/// `home_directory` / `relay_host_id` 在主窗口暂不需要, 保持 None。
+fn build_main_window_ctx(port: u16) -> RuntimeContext {
+    let client_token = settings::SettingsStore::get("desktopLocalClientToken")
+        .and_then(|v| v.as_str().map(|s| s.to_string()));
+    let runtime_headers = settings::SettingsStore::get("desktopRuntimeHeaders")
+        .and_then(|v| if v.is_object() { Some(v.clone()) } else { None });
+    let mut ctx = RuntimeContext::from_sidecar_port(port);
+    ctx.client_token = client_token;
+    ctx.runtime_headers = runtime_headers;
+    ctx
+}
+
+/// 从 `RuntimeContext` 提取建议的 loopback 端口。
+///
+/// - Ok 后端: `api_base_url` (或 `local_origin`) 形式为 `http://127.0.0.1:<port>`,
+///   用 [`backend::parse_port`] 提取。
+/// - Err 后端: `api_base_url` 为 None, `local_origin` 是 `tauri.localhost` 占位。
+///   这种情况下没有真实端口, 退回到 0; `decide_main_webview_url` 看到 port=0
+///   会主动选 `WebviewUrl::App("index.html")`, 让 bundled UI 渲染 unreachable
+///   恢复屏, **不**再合成无意义的 `External("http://127.0.0.1:0/")` 或
+///   误导性的 `External("tauri://localhost/")`。
+fn ctx_suggested_port(ctx: &RuntimeContext) -> u16 {
+    if let Some(ref url) = ctx.api_base_url {
+        return backend::parse_port(url);
+    }
+    // 无 api_base_url 时尝试 local_origin (Ok 路径也是这个值; Err 路径是占位)。
+    // parse_port 内部用 expect, Err 路径会 panic, 这里改用 try 版本避免炸。
+    if let Some(pos) = ctx.local_origin.rfind(':') {
+        let after = &ctx.local_origin[pos + 1..];
+        if let Some(stripped) = after.strip_suffix('/') {
+            if let Ok(p) = stripped.parse::<u16>() {
+                return p;
+            }
+        }
+        if let Ok(p) = after.parse::<u16>() {
+            return p;
+        }
+    }
+    0
+}
+
+/// 后端启动失败时, Err 恢复窗注入的 `local_origin` 占位值。
+///
+/// 生产 webview 的页面 origin 在 Windows/Linux 是 `http://tauri.localhost`,
+/// macOS 是 `tauri://localhost`。Tauri 代码层拿不到 webview 的运行时 origin,
+/// 这里按平台返回固定占位。`isDesktopLocalOriginActive` (`desktop.ts:508-510`)
+/// 在"无 api_base_url + local_origin 非空 + bootOutcome.target==='local'"时
+/// 返回 true —— 只要这个值非空, UI 就会渲染 local-unavailable 恢复屏
+/// 而非 restart 循环。精确匹配 page origin 不是必需的。
+fn unreachable_local_origin() -> String {
+    if cfg!(target_os = "macos") {
+        "tauri://localhost".to_string()
+    } else {
+        "http://tauri.localhost".to_string()
     }
 }
 
@@ -194,19 +450,21 @@ pub fn run() {
         .manage(mini_chat::MiniChatManager::new())
         .manage(ssh::SshManager::new())
         .setup(|app| {
-            if cfg!(debug_assertions) {
-                app.handle().plugin(
-                    tauri_plugin_log::Builder::default()
-                        .level(log::LevelFilter::Info)
-                        .build(),
-                )?;
-            }
+            // 文件日志: 生产也需启用。后端 spawn 失败的诊断信息唯一出口 ——
+            // `log::error!("oc-server embed startup failed: {:#}", e)` 等若被
+            // release 排除, 用户将无法定位后端为何起不来。
+            // tauri-plugin-log 2.9.0 默认 targets = [Stdout, LogDir],
+            // Windows 写到 C:\Users\{user}\AppData\Local\com.gridforge.desktop\logs。
+            app.handle().plugin(
+                tauri_plugin_log::Builder::default()
+                    .level(log::LevelFilter::Info)
+                    .build(),
+            )?;
 
-            // --- 配置主窗口 shell (在后端启动之前) ---
-            // 不依赖后端 base_url/端口: 图标 + Windows 无边框 + 后台启动时立即隐藏。
-            // 这样后台启动时窗口不会先闪一下再消失,且 Windows chrome 与后端就绪解耦。
+            // 后台启动标志: 托盘/窗口隐藏判断需要, 在后端启动前计算一次。
+            // 主窗口本身推迟到后端就绪后创建 (见下方 sidecar / in-process 分支),
+            // 这样 initialization_script 能内嵌真实端口, 消除首次加载竞态。
             let background_start = should_start_in_background(std::env::args());
-            configure_main_window_shell(app.handle(), background_start);
 
             // --- 创建系统托盘 (在后端启动之前) ---
             // 必须在 `SidecarBuilder::start()` / `OcServer::start()` 之前调用,
@@ -259,6 +517,17 @@ pub fn run() {
                 }
             }
 
+            // --- 探测 opencode 二进制 (仅桌面端, 后端启动之前) ---
+            // 打包运行时不继承 dev 启动器设的 OPENCODE_BINARY。Windows 上
+            // `Command::new("opencode")` 不可靠地解析 .cmd shim, 导致 spawn
+            // 失败 → "Local OpenCode Unavailable"。这里复刻 tauri-dev.mjs 的
+            // resolveOpencodeBinary, 把探测到的真实路径写进 OPENCODE_BINARY。
+            // 用户显式设置时完全尊重, 不覆盖。
+            #[cfg(desktop)]
+            {
+                opencode_discovery::resolve_and_export();
+            }
+
             // --- 启动后端 (仅桌面端) ---
             #[cfg(desktop)]
             {
@@ -268,9 +537,31 @@ pub fn run() {
 
                 if backend::use_sidecar() {
                     // —— 回退路径: sidecar 子进程 ——
+                    // 同源化生产构建: 让 oc-server 托管 ui-dist, 让 webview 访问
+                    // `http://127.0.0.1:<port>/` (同源) 而非 tauri.localhost (跨源)。
+                    // 必须在 builder.start() 之前注入 env, 否则 sidecar CLI 看不到。
+                    set_oc_server_dist_dir_env();
+
                     let mut builder = SidecarBuilder::new()
-                        .ready_timeout(std::time::Duration::from_secs(45))
-                        .arg("--api-only");
+                        .ready_timeout(std::time::Duration::from_secs(45));
+                    // --dist-dir <path>: 让 sidecar 在生产时也能 serve UI 资源;
+                    // 只在 env 既有可用的非空值时才加 (env 不存在 / 空 / NonUtf8
+                    // 都跳过)。`env::var_os` 必须在 set_oc_server_dist_dir_env
+                    // **之后**读取, 这样若该函数注入了默认路径, 此处也能拿到。
+                    // 注意: set_var 后 OS env 已被更新 (Even if it was a SetDefault),
+                    // 所以下面这一行就是实际传给 sidecar 的 dist-dir 值。
+                    for arg in build_dist_dir_args(
+                        std::env::var_os("GRIDFORGE_DIST_DIR")
+                            .as_ref()
+                            // 空字符串视为"未设置" (不传给 sidecar, 避免空参数)
+                            // — 用户的"显式禁用 ui 托管"靠 env 缺席/空实现,
+                            // 不需要 sidecar 看到路径。
+                            .filter(|s| !s.is_empty())
+                            .map(|s| std::path::PathBuf::from(s))
+                            .as_deref(),
+                    ) {
+                        builder = builder.arg(arg);
+                    }
                     // Dev 模式: 如果 GRIDFORGE_PORT 已设置，使用固定端口确保
                     // Vite early injection、proxy 和 sidecar 使用同一个端口。
                     if cfg!(debug_assertions) {
@@ -289,9 +580,10 @@ pub fn run() {
                             log::info!("sidecar ready on port {}", port);
                             mini_chat::set_backend_port(app.handle(), port);
 
-                            let ctx = RuntimeContext::from_sidecar_port(port);
-                            let init_script = build_init_script(&ctx);
-                            inject_main_window_runtime(app.handle(), &init_script);
+                            // 后端就绪 → 创建主窗口。
+                            // initialization_script 内嵌真实端口, 消除首次加载竞态。
+                            let ctx = build_main_window_ctx(port);
+                            create_main_window(app.handle(), &ctx, background_start);
 
                             *BACKEND.lock().unwrap() = Some(BackendState {
                                 handle: Some(BackendHandle::Sidecar(h)),
@@ -301,10 +593,24 @@ pub fn run() {
                         Err(e) => {
                             log::error!("sidecar startup failed: {:#}", e);
                             drop(rt);
+                            // 后端失败也要建窗: 注入 unreachable boot outcome,
+                            // UI 据此渲染 local-unavailable 恢复屏 (而非只起托盘)。
+                            // 不注入 api_base_url (无后端, 不谎报地址)。
+                            // 把 anyhow 完整因果链作为 diagnostic 注入, 恢复屏
+                            // 可展开显示, 让用户/开发者看到真实失败原因。
+                            let ctx = RuntimeContext::for_unreachable_backend(
+                                unreachable_local_origin(),
+                                Some(format!("{:#}", e)),
+                            );
+                            create_main_window(app.handle(), &ctx, background_start);
                         }
                     }
                 } else {
                     // —— 新路径: 进程内嵌入 oc-server ——
+                    // 同源化: 在 oc-server 启动前注入 GRIDFORGE_DIST_DIR,
+                    // 让进程内 oc-server 也能托管 UI (clap #[arg(env = ...)] 自动读)。
+                    set_oc_server_dist_dir_env();
+
                     let server_result = rt.block_on(async {
                         let config = oc_server::Config::load()?;
                         oc_server::OcServer::start(config).await
@@ -316,9 +622,10 @@ pub fn run() {
                             log::info!("oc-server (in-process) ready on port {}", port);
                             mini_chat::set_backend_port(app.handle(), port);
 
-                            let ctx = RuntimeContext::from_sidecar_port(port);
-                            let init_script = build_init_script(&ctx);
-                            inject_main_window_runtime(app.handle(), &init_script);
+                            // 后端就绪 → 创建主窗口。
+                            // initialization_script 内嵌真实端口, 消除首次加载竞态。
+                            let ctx = build_main_window_ctx(port);
+                            create_main_window(app.handle(), &ctx, background_start);
 
                             *BACKEND.lock().unwrap() = Some(BackendState {
                                 handle: Some(BackendHandle::InProcess(server)),
@@ -328,6 +635,16 @@ pub fn run() {
                         Err(e) => {
                             log::error!("oc-server embed startup failed: {:#}", e);
                             drop(rt);
+                            // 后端失败也要建窗: 注入 unreachable boot outcome,
+                            // UI 据此渲染 local-unavailable 恢复屏 (而非只起托盘)。
+                            // 不注入 api_base_url (无后端, 不谎报地址)。
+                            // 把 anyhow 完整因果链作为 diagnostic 注入, 恢复屏
+                            // 可展开显示, 让用户/开发者看到真实失败原因。
+                            let ctx = RuntimeContext::for_unreachable_backend(
+                                unreachable_local_origin(),
+                                Some(format!("{:#}", e)),
+                            );
+                            create_main_window(app.handle(), &ctx, background_start);
                         }
                     }
                 }
@@ -641,5 +958,199 @@ mod tests {
         assert_eq!(state.transition(true), Some(true));
         assert_eq!(state.transition(true), None);
         assert_eq!(state.transition(false), Some(false));
+    }
+
+    // ------------------------------------------------------------------
+    // TDD RED phase: same-origin main-window URL decision.
+    //
+    // Production cross-origin root cause: `WebviewUrl::App("index.html")`
+    // makes the page origin `tauri.localhost` (Win/Linux) or
+    // `tauri://localhost` (macOS), incompatible with oc-server's
+    // `http://127.0.0.1:<port>` origin. Dev profile keeps the App URL
+    // so Vite :5180 + proxy still works (cross-origin only in prod).
+    // ------------------------------------------------------------------
+    #[test]
+    fn main_url_decision_dev_returns_app_path() {
+        // debug_assertions = true → Vite dev URL, not loopback.
+        let decision = decide_main_webview_url(true, 12345);
+        assert_eq!(decision, MainUrlDecision::AppIndexHtml);
+    }
+
+    #[test]
+    fn main_url_decision_release_returns_loopback_with_trailing_slash() {
+        // debug_assertions = false → external URL must be the loopback
+        // origin with trailing slash, so WebView origin == api_base_url.
+        let decision = decide_main_webview_url(false, 12345);
+        match decision {
+            MainUrlDecision::ExternalLoopback(url) => {
+                assert_eq!(url, "http://127.0.0.1:12345/");
+            }
+            other => panic!("expected ExternalLoopback, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn main_url_decision_release_carries_real_port() {
+        // The decision must reflect the OS-assigned port verbatim —
+        // tauri.localhost is intentionally avoided.
+        for port in [1u16, 80, 5180, 58980, 65535] {
+            let decision = decide_main_webview_url(false, port);
+            match decision {
+                MainUrlDecision::ExternalLoopback(url) => {
+                    assert!(
+                        url.ends_with(&format!(":{}/", port)),
+                        "url {:?} must end with :{}/",
+                        url,
+                        port
+                    );
+                    assert!(
+                        url.starts_with("http://127.0.0.1:"),
+                        "url {:?} must use loopback, not tauri.localhost",
+                        url
+                    );
+                }
+                other => panic!("expected ExternalLoopback, got {:?}", other),
+            }
+        }
+    }
+
+    #[test]
+    fn main_url_decision_release_with_no_usable_port_returns_app_path() {
+        // Backend failure / unreachable context: `ctx_suggested_port`
+        // returns 0 because api_base_url is None and local_origin is a
+        // placeholder. Production with port == 0 must NOT synthesize an
+        // External "http://127.0.0.1:0/" loopback (port 0 is reserved,
+        // and forcing the bundled UI through a phantom origin breaks the
+        // recovery screen). Instead, fall back to WebviewUrl::App so
+        // Tauri's frontendDist serves the bundled UI directly — the UI
+        // then sees `tauri.localhost` origin (acceptable for the
+        // local-unavailable recovery screen path which is local-driven,
+        // not API-driven).
+        let decision = decide_main_webview_url(false, 0);
+        assert_eq!(decision, MainUrlDecision::AppIndexHtml);
+    }
+
+    #[test]
+    fn main_url_decision_dev_with_no_port_still_returns_app_path() {
+        // Dev profile already uses WebviewUrl::App unconditionally; the
+        // port-0 fallback must not break that invariant.
+        let decision = decide_main_webview_url(true, 0);
+        assert_eq!(decision, MainUrlDecision::AppIndexHtml);
+    }
+
+    // ------------------------------------------------------------------
+    // TDD RED phase: default ui-dist path + dist-dir env decision.
+    //
+    // The pure helper computes the candidate default ui-dist path
+    // (CARGO_MANIFEST_DIR/../ui-dist). The pure decision helper picks
+    // either an existing env override, or the candidate, or skips.
+    // ------------------------------------------------------------------
+    #[test]
+    fn default_ui_dist_path_is_manifest_relative() {
+        // The default is anchored at CARGO_MANIFEST_DIR so the path is
+        // deterministic regardless of cwd, and the same in dev/release.
+        let expected = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("ui-dist");
+        assert_eq!(default_ui_dist_path(), expected);
+    }
+
+    #[test]
+    fn dist_dir_decision_prefers_existing_env_override() {
+        // When GRIDFORGE_DIST_DIR is already set (non-empty), the helper
+        // must use that value and NOT overwrite it. This protects users
+        // who intentionally redirect the bundle to a custom location.
+        let env_value = std::ffi::OsString::from("/some/explicit/override");
+        let candidate = std::path::PathBuf::from("/never/reached");
+        let decision = resolve_dist_dir_decision(Some(&env_value), &candidate, true);
+        assert_eq!(decision, DistDirDecision::Use(std::path::PathBuf::from(&env_value)));
+    }
+
+    #[test]
+    fn dist_dir_decision_falls_back_to_candidate_when_dir_exists() {
+        // No env override, candidate path exists → caller must inject the
+        // candidate as the new env value. The variant is `SetDefault`
+        // (not `Use`) to make the "user override" vs "computed default"
+        // distinction explicit at the call site — `set_var` should only
+        // be invoked on the SetDefault branch.
+        let candidate = std::env::temp_dir(); // temp dir is always a directory
+        let decision = resolve_dist_dir_decision(None, &candidate, true);
+        assert_eq!(decision, DistDirDecision::SetDefault(candidate));
+    }
+
+    #[test]
+    fn dist_dir_decision_skips_when_no_env_and_candidate_missing() {
+        // No env, candidate missing → Skip (do not set env); caller
+        // is expected to log a warning so the misconfiguration is
+        // observable in the log instead of silently failing.
+        let candidate = std::path::PathBuf::from("/this/path/does/not/exist/anywhere");
+        let decision = resolve_dist_dir_decision(None, &candidate, false);
+        assert!(matches!(decision, DistDirDecision::Skip));
+    }
+
+    #[test]
+    fn dist_dir_decision_preserves_empty_env_string_does_not_overwrite() {
+        // An explicitly-empty env (e.g. `GRIDFORGE_DIST_DIR=""`) is a
+        // USER signal and must be preserved as-is — even if a candidate
+        // default path exists. The previous "treat-empty-as-unset"
+        // semantic silently swallowed the user's intent and let us
+        // overwrite an empty string with the candidate; the new contract
+        // respects the explicit value (none vs empty are distinct).
+        let empty = std::ffi::OsString::new();
+        let candidate = std::env::temp_dir(); // temp dir is always a directory
+        let decision = resolve_dist_dir_decision(Some(&empty), &candidate, true);
+        assert_eq!(decision, DistDirDecision::PreserveEmpty);
+        // Sanity: even when candidate is missing, the explicit empty
+        // value is preserved (it never falls through to Skip).
+        let missing = std::path::PathBuf::from("/nope/never/here");
+        let decision_missing =
+            resolve_dist_dir_decision(Some(&empty), &missing, false);
+        assert_eq!(decision_missing, DistDirDecision::PreserveEmpty);
+    }
+
+    #[test]
+    fn dist_dir_decision_set_default_when_env_absent_and_candidate_exists() {
+        // Some env (non-empty) and Some env (empty) take priority; only
+        // an entirely-absent env (None) lets the candidate be set. This
+        // test pins the canonical "no env, default applies" path after
+        // the API moved from Use(env|candidate) → Use|SetDefault split.
+        let candidate = std::env::temp_dir(); // temp dir is always a directory
+        let decision = resolve_dist_dir_decision(None, &candidate, true);
+        assert_eq!(decision, DistDirDecision::SetDefault(candidate));
+    }
+
+    #[test]
+    fn dist_dir_decision_use_returns_env_path_verbatim() {
+        // After the API split, `Use` carries the *env* path verbatim —
+        // the caller still must NOT `set_var` (the value is already
+        // there). This test pins that semantic.
+        let env_value = std::ffi::OsString::from("/some/explicit/override");
+        let candidate = std::path::PathBuf::from("/never/reached");
+        let decision = resolve_dist_dir_decision(Some(&env_value), &candidate, true);
+        match decision {
+            DistDirDecision::Use(path) => {
+                assert_eq!(path, std::path::PathBuf::from(&env_value));
+            }
+            other => panic!("expected Use, got {:?}", other),
+        }
+    }
+
+    // ------------------------------------------------------------------
+    // TDD RED phase: dist-dir CLI args builder.
+    //
+    // Sidecar builder currently accepts only impl Into<String>; the
+    // production wiring passes an OsString-typed path through it, so
+    // the helper either returns "--dist-dir <path>" tokens or [].
+    // ------------------------------------------------------------------
+    #[test]
+    fn build_dist_dir_args_emits_pair_when_present() {
+        let p = std::path::PathBuf::from("/var/data/ui-dist");
+        let args = build_dist_dir_args(Some(&p));
+        assert_eq!(args, vec!["--dist-dir", "/var/data/ui-dist"]);
+    }
+
+    #[test]
+    fn build_dist_dir_args_empty_when_absent() {
+        assert!(build_dist_dir_args(None).is_empty());
     }
 }

@@ -871,6 +871,8 @@ function App({ apis }: AppProps) {
     // Recovery screens
     const recoveryVariant = mapBootViewToRecoveryVariant(bootView);
     const hostUrl = bootView.screen === 'recovery' && 'url' in bootView ? bootView.url : undefined;
+    const recoveryDiagnostic =
+      bootView.screen === 'recovery' && 'diagnostic' in bootView ? bootView.diagnostic : undefined;
 
     return (
       <ErrorBoundary>
@@ -881,6 +883,7 @@ function App({ apis }: AppProps) {
               recoveryVariant={recoveryVariant}
               recoveryHostUrl={hostUrl}
               recoveryHostLabel={undefined}
+              recoveryDiagnostic={recoveryDiagnostic}
               onCliAvailable={handleDesktopBootDismiss}
             />
           </React.Suspense>

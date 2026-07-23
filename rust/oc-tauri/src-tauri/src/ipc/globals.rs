@@ -9,6 +9,19 @@
 
 use serde_json::json;
 
+/// 后端启动结果, 驱动注入的 `__GRIDFORGE_DESKTOP_BOOT_OUTCOME__`。
+///
+/// - `Ok`: 后端就绪 (sidecar 健康检查通过 / oc-server 绑定成功) →
+///   boot outcome `{target:'local', status:'ok'}`。
+/// - `Unreachable`: 后端启动失败 (`OcServer::start` / sidecar 返回 Err) →
+///   boot outcome `{target:'local', status:'unreachable'}`, UI 据此渲染
+///   local-unavailable 恢复屏 (`desktopBoot.ts:185-187`)。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BootStatus {
+    Ok,
+    Unreachable,
+}
+
 /// 运行时上下文: setup 阶段从 sidecar / CLI args 解析出的标量值。
 /// None 的字段不注入 (与 preload.mjs 的条件暴露一致)。
 pub struct RuntimeContext {
@@ -19,6 +32,13 @@ pub struct RuntimeContext {
     pub relay_host_id: Option<String>,
     pub runtime_headers: Option<serde_json::Value>,
     pub macos_major: Option<i32>,
+    pub boot_status: BootStatus,
+    /// 后端启动失败时的诊断信息 (anyhow 完整因果链)。
+    ///
+    /// 仅在 `boot_status == Unreachable` 时有意义; 注入为
+    /// `__GRIDFORGE_BOOT_DIAGNOSTIC__` (JSON 字符串), 供 UI 恢复屏展开显示,
+    /// 让用户/开发者看到后端真实的失败原因 (而非笼统的 "could not be started")。
+    pub diagnostic: Option<String>,
 }
 
 impl RuntimeContext {
@@ -32,6 +52,32 @@ impl RuntimeContext {
             relay_host_id: None,
             runtime_headers: None,
             macos_major: detect_macos_major(),
+            boot_status: BootStatus::Ok,
+            diagnostic: None,
+        }
+    }
+
+    /// 后端启动失败时用的上下文: 无 api_base_url (不谎报后端地址),
+    /// boot_status = Unreachable。`local_origin` 由调用方提供 (Err 窗
+    /// 用 `unreachable_local_origin()` 占位, `isDesktopLocalOriginActive`
+    /// 只要求非空即可让 UI 渲染恢复屏而非 restart 循环)。
+    ///
+    /// `diagnostic`: 后端失败原因 (anyhow `{:#}` 完整因果链)。非空时注入为
+    /// `__GRIDFORGE_BOOT_DIAGNOSTIC__`, 恢复屏可展开显示, 取代笼统文案。
+    pub fn for_unreachable_backend(
+        local_origin: String,
+        diagnostic: Option<String>,
+    ) -> Self {
+        Self {
+            local_origin,
+            api_base_url: None,
+            client_token: None,
+            home_directory: None,
+            relay_host_id: None,
+            runtime_headers: None,
+            macos_major: detect_macos_major(),
+            boot_status: BootStatus::Unreachable,
+            diagnostic,
         }
     }
 }
@@ -85,9 +131,28 @@ pub fn platform_string() -> &'static str {
 /// 事件走 Tauri 的 `event.listen`, 复现 Electron 的 listen 双路径
 /// (handler 回调 + DOM CustomEvent)。
 pub fn build_init_script(ctx: &RuntimeContext) -> String {
-    let mut globals = Vec::new();
+    // 组合: 静态全局变量 (平台/壳身份) + 端口/运行时相关全局变量 + 桥。
+    // 静态部分复用 build_static_globals_script; 端口/运行时部分复用
+    // build_port_globals_script; 桥复用 BRIDGE_JS。
+    let static_globals = build_static_globals_script();
+    let port_globals = build_port_globals_script(ctx);
+    format!("{}\n{}\n{}", static_globals, port_globals, BRIDGE_JS)
+}
 
-    // --- 标量全局变量 (条件注入, 与 preload.mjs 一致) ---
+/// 生成仅含**依赖后端端口/运行时上下文**的全局变量脚本。
+///
+/// 这些全局变量 (`__GRIDFORGE_API_BASE_URL__`、`__GRIDFORGE_LOCAL_ORIGIN__`、
+/// client token、home、relay host id、runtime headers、boot outcome) 只有在
+/// 后端启动 (成功或失败) 后才能确定。主窗口/mini chat 窗口都在**后端启动后**
+/// 建窗 (成功分支注入真实端口; 失败分支用 `for_unreachable_backend` 注入
+/// unreachable boot outcome, 不注入 api_base_url), 因此这些值由 `build_init_script`
+/// 组合进 `initialization_script` (在页面 JS 执行前、每次导航前运行),
+/// 彻底消除首次加载竞态与 reload gap。
+///
+/// `__GRIDFORGE_MACOS_MAJOR__` 虽不依赖端口, 但来自 RuntimeContext,
+/// 与其它运行时全局放在一起以保持来源一致。
+pub fn build_port_globals_script(ctx: &RuntimeContext) -> String {
+    let mut globals = Vec::new();
 
     // __GRIDFORGE_LOCAL_ORIGIN__ — Remote 页面也需要 (HostSwitcher 判断 Local 入口)
     globals.push(format_js_global(
@@ -129,48 +194,47 @@ pub fn build_init_script(ctx: &RuntimeContext) -> String {
         ));
     }
 
-    // __GRIDFORGE_PLATFORM__ — UI 用来判断 frameless chrome / control 侧
-    let platform = platform_string();
-    globals.push(format_js_global(
-        "__GRIDFORGE_PLATFORM__",
-        &json!(platform),
-    ));
-
-    // __GRIDFORGE_ELECTRON__ — 壳身份标识。UI 的 isElectronShell() 检查它。
-    // 注意: UI 的 isElectronShell() 检查的是 runtime === 'electron'。
-    // 为了让 UI 在 Tauri 下也走桌面壳分支, 我们仍标 runtime: 'electron'
-    // (桥接口完全等价, UI 不需要区分)。
-    // macVibrancy: 读 settings (默认 true, 与 Electron desktopVibrancy !== false 一致)。
-    // macVibrancySupported: 仅 macOS 为 true。
-    let mac_vibrancy_supported = cfg!(target_os = "macos");
-    let mac_vibrancy = if mac_vibrancy_supported {
-        crate::settings::SettingsStore::get_bool("desktopVibrancy", true)
-    } else {
-        false
+    // __GRIDFORGE_DESKTOP_BOOT_OUTCOME__ — 前端的桌面启动状态机依赖此值
+    // (desktopBoot.ts:185-187: unreachable → local-unavailable 恢复屏)。
+    // 复现 Electron main.mjs buildInitScript, 按 boot_status 选择 ok/unreachable。
+    let status_str = match ctx.boot_status {
+        BootStatus::Ok => "ok",
+        BootStatus::Unreachable => "unreachable",
     };
-    globals.push(format!(
-        "(function(){{window.__GRIDFORGE_ELECTRON__={{runtime:'electron',macVibrancy:{},macVibrancySupported:{}}};}})();",
-        mac_vibrancy, mac_vibrancy_supported
-    ));
-
-    // __GRIDFORGE_DESKTOP_BOOT_OUTCOME__ — 前端的桌面启动状态机依赖此值。
-    // 复现 Electron main.mjs buildInitScript。
-    // sidecar 已就绪(健康检查通过)后才设置, 此时 local 后端一定可达。
     globals.push(format_js_global(
         "__GRIDFORGE_DESKTOP_BOOT_OUTCOME__",
-        &serde_json::json!({"target": "local", "status": "ok"}),
+        &serde_json::json!({"target": "local", "status": status_str}),
     ));
 
-    let globals_js = globals.join("\n");
+    // __GRIDFORGE_BOOT_DIAGNOSTIC__ — 仅后端失败 (Unreachable) 且有诊断信息时注入。
+    // 把后端 anyhow 完整因果链透传给 UI, 恢复屏可展开显示, 取代笼统文案,
+    // 让用户/开发者看到后端真实的失败原因。正常路径不注入 (保持 undefined)。
+    if ctx.boot_status == BootStatus::Unreachable {
+        if let Some(ref diag) = ctx.diagnostic {
+            let trimmed = diag.trim();
+            if !trimmed.is_empty() {
+                globals.push(format_js_global(
+                    "__GRIDFORGE_BOOT_DIAGNOSTIC__",
+                    &serde_json::json!(trimmed),
+                ));
+            }
+        }
+    }
 
-    // --- __GRIDFORGE_DESKTOP__ 桥对象 ---
-    // 复现 preload.mjs:184-190 的 5 个方法。
-    // invoke → __TAURI__.core.invoke('gridforge_invoke', {cmd, args})
-    // openDialog → invoke('gridforge_dialog_open', {options})
-    // grantFileAccess → invoke('gridforge_file_grant', {filePath})
-    // openExternal → invoke('gridforge_invoke', {cmd:'desktop_open_external_url', args:{url}})
-    // listen → 订阅 'gridforge:emit', 双路径分发 (handler + DOM CustomEvent)
-    let bridge_js = r#"
+    globals.join("\n")
+}
+
+/// `window.__GRIDFORGE_DESKTOP__` 桥对象 JS (复现 preload.mjs:184-190 的 5 个方法)。
+///
+/// 桥只依赖 `window.__TAURI__` (由 `withGlobalTauri` 注入), **不依赖后端端口**,
+/// 因此可安全用于 `initialization_script` (在页面 JS 执行前、每次导航前运行)。
+///
+/// - invoke → __TAURI__.core.invoke('gridforge_invoke', {cmd, args})
+/// - openDialog → invoke('gridforge_dialog_open', {options})
+/// - grantFileAccess → invoke('gridforge_file_grant', {filePath})
+/// - openExternal → invoke('gridforge_invoke', {cmd:'desktop_open_external_url', args:{url}})
+/// - listen → 订阅 'gridforge:emit', 双路径分发 (handler + DOM CustomEvent)
+const BRIDGE_JS: &str = r#"
 (function() {
   // event listener 注册表 (复现 preload.mjs eventListeners Map)
   var __ocEventListeners = {};
@@ -264,43 +328,6 @@ pub fn build_init_script(ctx: &RuntimeContext) -> String {
   };
 })();
 "#;
-
-    format!("{}\n{}", globals_js, bridge_js)
-}
-
-/// 生成早期全局变量脚本 (在窗口创建后、后端启动前注入)。
-///
-/// 包含 `build_static_globals_script` 的全部内容, 额外基于环境变量
-/// `GRIDFORGE_PORT` 注入 `__GRIDFORGE_API_BASE_URL__` 和
-/// `__GRIDFORGE_LOCAL_ORIGIN__`, 使页面从加载第一刻起就能用绝对
-/// API base URL, 避免 WebSocket 走 Vite proxy 导致的 ECONNRESET。
-///
-/// 后端启动后 `inject_main_window_runtime` 会用实际端口覆盖这些值。
-pub fn build_early_globals_script() -> String {
-    let mut script = build_static_globals_script();
-
-    // 仅在 GRIDFORGE_PORT 环境变量已设置时注入基于 env 的 base URL。
-    // Dev 模式 (tauri-dev.mjs) 设 `GRIDFORGE_PORT=3001` → 注入。
-    // Production 模式无此 env → 跳过, 由后端启动后注入。
-    if let Ok(port) = std::env::var("GRIDFORGE_PORT") {
-        if let Ok(port_num) = port.trim().parse::<u16>() {
-            if port_num > 0 {
-                let origin = format!("http://127.0.0.1:{}", port_num);
-                script.push_str(&format_js_global(
-                    "__GRIDFORGE_LOCAL_ORIGIN__",
-                    &serde_json::json!(origin),
-                ));
-                script.push_str(&format_js_global(
-                    "__GRIDFORGE_API_BASE_URL__",
-                    &serde_json::json!(origin),
-                ));
-                script.push('\n');
-            }
-        }
-    }
-
-    script
-}
 
 /// 生成仅含"静态"全局变量的 init 脚本 (不依赖后端端口/运行时上下文)。
 ///
@@ -433,5 +460,129 @@ mod tests {
         assert!(!script.contains("__GRIDFORGE_LOCAL_ORIGIN__"));
         assert!(!script.contains("__GRIDFORGE_DESKTOP__"));
         assert!(!script.contains("http://"));
+    }
+
+    #[test]
+    fn build_init_script_includes_static_port_and_bridge() {
+        // build_init_script 是主窗口/mini chat 的 initialization_script,
+        // 必须同时含静态全局变量、端口相关全局变量 (含真实端口) 和桥。
+        // 这是修复 prod 注入竞态的关键契约: 后端就绪后建窗, 真实端口在
+        // initialization_script 里, 首次加载时 main.tsx 就能读到正确 base URL。
+        let ctx = RuntimeContext::from_sidecar_port(12345);
+        let script = build_init_script(&ctx);
+        // 静态全局变量
+        assert!(script.contains("__GRIDFORGE_PLATFORM__"));
+        assert!(script.contains("__GRIDFORGE_ELECTRON__"));
+        // 端口相关全局变量 (含真实端口)
+        assert!(script.contains("__GRIDFORGE_API_BASE_URL__"));
+        assert!(script.contains("__GRIDFORGE_LOCAL_ORIGIN__"));
+        assert!(script.contains("http://127.0.0.1:12345"));
+        assert!(script.contains("__GRIDFORGE_DESKTOP_BOOT_OUTCOME__"));
+        // 桥
+        assert!(script.contains("__GRIDFORGE_DESKTOP__"));
+        assert!(script.contains("gridforge_invoke"));
+    }
+
+    #[test]
+    fn build_port_globals_script_includes_port_and_runtime_values() {
+        let ctx = RuntimeContext::from_sidecar_port(12345);
+        let script = build_port_globals_script(&ctx);
+        // 端口相关变量必须存在
+        assert!(script.contains("__GRIDFORGE_API_BASE_URL__"));
+        assert!(script.contains("__GRIDFORGE_LOCAL_ORIGIN__"));
+        assert!(script.contains("http://127.0.0.1:12345"));
+        assert!(script.contains("__GRIDFORGE_DESKTOP_BOOT_OUTCOME__"));
+        // 端口脚本不应含桥 (桥在 initialization_script 中)
+        assert!(!script.contains("__GRIDFORGE_DESKTOP__"));
+    }
+
+    #[test]
+    fn build_port_globals_script_omits_api_base_url_when_none() {
+        // 当 api_base_url 为 None 时不应注入该变量
+        let mut ctx = RuntimeContext::from_sidecar_port(12345);
+        ctx.api_base_url = None;
+        let script = build_port_globals_script(&ctx);
+        assert!(!script.contains("__GRIDFORGE_API_BASE_URL__"));
+        // local_origin 仍应注入 (Remote 页面判断 Local 入口需要)
+        assert!(script.contains("__GRIDFORGE_LOCAL_ORIGIN__"));
+    }
+
+    #[test]
+    fn for_unreachable_backend_emits_unreachable_boot_outcome() {
+        // 后端启动失败时的 Err 窗上下文: 不注入 api_base_url (不谎报地址),
+        // boot outcome = unreachable, 驱动 UI 渲染 local-unavailable 恢复屏。
+        let ctx =
+            RuntimeContext::for_unreachable_backend("http://tauri.localhost".to_string(), None);
+        assert_eq!(ctx.boot_status, BootStatus::Unreachable);
+        assert_eq!(ctx.api_base_url, None);
+        assert_eq!(ctx.local_origin, "http://tauri.localhost");
+
+        let script = build_init_script(&ctx);
+        // boot outcome 必须是 unreachable (不是 ok), 否则 UI 会误以为后端正常。
+        assert!(script.contains("\"status\":\"unreachable\""));
+        assert!(!script.contains("\"status\":\"ok\""));
+        // 不注入 api_base_url: 无后端时不该谎报地址。
+        assert!(!script.contains("__GRIDFORGE_API_BASE_URL__"));
+        // local_origin 必须注入: isDesktopLocalOriginActive 需要非空值才能渲染恢复屏。
+        assert!(script.contains("__GRIDFORGE_LOCAL_ORIGIN__"));
+        assert!(script.contains("http://tauri.localhost"));
+        // 静态全局 + 桥仍需注入 (壳身份标识 + IPC 桥, 不依赖后端)。
+        assert!(script.contains("__GRIDFORGE_PLATFORM__"));
+        assert!(script.contains("__GRIDFORGE_DESKTOP__"));
+        // 无 diagnostic 时不注入该变量。
+        assert!(!script.contains("__GRIDFORGE_BOOT_DIAGNOSTIC__"));
+    }
+
+    #[test]
+    fn for_unreachable_backend_injects_diagnostic_when_present() {
+        // 后端失败带诊断信息: 把 anyhow 因果链透传给 UI 恢复屏展开显示。
+        let diag = "failed to spawn opencode binary `opencode`: program not found";
+        let ctx = RuntimeContext::for_unreachable_backend(
+            "http://tauri.localhost".to_string(),
+            Some(diag.to_string()),
+        );
+        assert_eq!(ctx.boot_status, BootStatus::Unreachable);
+        assert_eq!(ctx.diagnostic.as_deref(), Some(diag));
+
+        let script = build_init_script(&ctx);
+        // __GRIDFORGE_BOOT_DIAGNOSTIC__ 必须注入, 含完整诊断文本。
+        assert!(script.contains("__GRIDFORGE_BOOT_DIAGNOSTIC__"));
+        assert!(script.contains(diag));
+        // boot outcome 仍是 unreachable (diagnostic 不影响 outcome 本身)。
+        assert!(script.contains("\"status\":\"unreachable\""));
+    }
+
+    #[test]
+    fn for_unreachable_backend_omits_diagnostic_when_empty() {
+        // 空字符串 / 纯空白 diagnostic 不注入 (避免恢复屏显示空详情块)。
+        let ctx = RuntimeContext::for_unreachable_backend(
+            "http://tauri.localhost".to_string(),
+            Some("   \n\t ".to_string()),
+        );
+        let script = build_init_script(&ctx);
+        assert!(!script.contains("__GRIDFORGE_BOOT_DIAGNOSTIC__"));
+        // outcome 仍正确。
+        assert!(script.contains("\"status\":\"unreachable\""));
+    }
+
+    #[test]
+    fn ok_path_never_injects_diagnostic() {
+        // 正常路径 (后端就绪) 即使误设 diagnostic 也不注入
+        // (diagnostic 仅对 Unreachable 有意义)。
+        let mut ctx = RuntimeContext::from_sidecar_port(12345);
+        ctx.diagnostic = Some("should not appear".to_string());
+        let script = build_port_globals_script(&ctx);
+        assert!(!script.contains("__GRIDFORGE_BOOT_DIAGNOSTIC__"));
+        assert!(script.contains("\"status\":\"ok\""));
+    }
+
+    #[test]
+    fn from_sidecar_port_defaults_boot_status_ok() {
+        // 正常 (后端就绪) 路径: boot_status 默认 Ok, boot outcome = ok。
+        let ctx = RuntimeContext::from_sidecar_port(12345);
+        assert_eq!(ctx.boot_status, BootStatus::Ok);
+        let script = build_port_globals_script(&ctx);
+        assert!(script.contains("\"status\":\"ok\""));
+        assert!(!script.contains("\"status\":\"unreachable\""));
     }
 }

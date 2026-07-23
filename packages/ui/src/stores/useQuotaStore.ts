@@ -8,8 +8,23 @@ import { getRegisteredRuntimeAPIs } from '@/contexts/runtimeAPIRegistry';
 import { getDefaultModels } from '@/lib/quota/model-families';
 import { updateDesktopSettings } from '@/lib/persistence';
 import { runtimeFetch } from '@/lib/runtime-fetch';
+import { getRuntimeApiBaseUrl } from '@/lib/runtime-switch';
 
 const DEFAULT_REFRESH_INTERVAL_MS = 60000;
+
+/**
+ * Whether a runtime API base URL is available to route quota requests to.
+ *
+ * In the packaged Tauri build, `__GRIDFORGE_API_BASE_URL__` is injected only
+ * AFTER the backend starts (production has no `GRIDFORGE_PORT` env, so the
+ * early injection is skipped — unlike dev). If quota requests fire before
+ * that injection lands, the relative `/api/quota/...` path is served the
+ * webview's `index.html` SPA fallback (HTTP 200, `<!doctype html>…`),
+ * which the UI cannot parse as JSON. Gate all quota fetches on a real API
+ * base URL so we never hit that fallback. Read at call time (not cached) so
+ * the late injection is picked up on the next tick.
+ */
+const hasRuntimeApiBase = (): boolean => getRuntimeApiBaseUrl().trim().length > 0;
 
 interface QuotaSettingsState {
   autoRefresh: boolean;
@@ -162,6 +177,11 @@ export const useQuotaStore = create<QuotaStore>()(
       },
 
       fetchAllQuotas: async () => {
+        // Gate: no quota request until a runtime API base URL is available.
+        // See hasRuntimeApiBase() doc comment for the Tauri production race.
+        if (!hasRuntimeApiBase()) {
+          return;
+        }
         set({ isLoading: true, error: null });
         const providerIds = QUOTA_PROVIDERS.map((provider) => provider.id);
         try {
@@ -179,17 +199,36 @@ export const useQuotaStore = create<QuotaStore>()(
       },
 
       fetchProviderQuota: async (providerId) => {
+        // Gate: no quota request until a runtime API base URL is available.
+        // See hasRuntimeApiBase() doc comment for the Tauri production race.
+        if (!hasRuntimeApiBase()) {
+          return;
+        }
         set((state) => ({
           isFetchingProvider: { ...state.isFetchingProvider, [providerId]: true }
         }));
         try {
           const response = await runtimeFetch(`/api/quota/${encodeURIComponent(providerId)}`);
+
+          // A non-JSON body (e.g. the Tauri webview's index.html SPA fallback,
+          // or any proxy returning HTML) parses to null. Treat that as a hard
+          // failure rather than pushing null into `results` — otherwise the
+          // downstream `quotaResults.find((e) => e.providerId)` throws
+          // "Cannot read properties of null (reading 'providerId')".
+          // Likewise guard a payload that is not a plain object.
           const payload = await response.json().catch(() => null);
-          if (!response.ok) {
+          if (!response.ok || payload === null || typeof payload !== 'object') {
             throw new Error(payload?.error || 'Failed to fetch quota');
           }
 
           const result = payload as ProviderResult;
+          // Defense-in-depth: never allow a non-conforming object into `results`.
+          // If the server returns a malformed shape, route it through the same
+          // fallback as a thrown error so the UI shows a clean error instead of
+          // crashing on `.providerId` access.
+          if (result === null || typeof result !== 'object' || result.providerId !== providerId) {
+            throw new Error('Malformed quota response');
+          }
           set((state) => {
             const next = state.results.filter((entry) => entry.providerId !== providerId);
             next.push(result);

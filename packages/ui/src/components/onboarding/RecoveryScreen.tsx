@@ -13,6 +13,8 @@ type RecoveryScreenProps = {
   hostUrl?: string;
   /** Host label for recovery context */
   hostLabel?: string;
+  /** Optional backend error detail for recovery context (local-unavailable) */
+  diagnostic?: string;
   /** Callback when user wants to retry */
   onRetry?: () => void;
   /** Callback when user chooses remote */
@@ -33,6 +35,7 @@ export function RecoveryScreen({
   variant,
   hostUrl,
   hostLabel,
+  diagnostic,
   onRetry,
   onChooseRemote,
   showRemoteForm = false,
@@ -121,6 +124,7 @@ export function RecoveryScreen({
       variant={variant}
       hostLabel={hostLabel}
       hostUrl={hostUrl}
+      diagnostic={diagnostic}
       onRetry={handleRecoveryRetry}
       onUseLocal={handleRecoveryUseLocal}
       onUseRemote={handleRecoveryUseRemote}

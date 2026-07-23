@@ -2375,6 +2375,7 @@ export const dict = {
   'onboarding.desktopRecovery.localUnavailable.description': 'OpenCode CLI n\'a pas pu être démarré ou n\'est pas installé. Installez OpenCode ou connectez-vous plutôt à un serveur distant.',
   'onboarding.desktopRecovery.localUnavailable.retry': 'Réessayer en local',
   'onboarding.desktopRecovery.localUnavailable.useLocal': 'Configurer localement',
+  'onboarding.desktopRecovery.localUnavailable.showErrorDetails': 'Afficher les détails de l’erreur',
   'onboarding.desktopRecovery.noDefaultConnection.title': 'Aucune connexion par défaut',
   'onboarding.desktopRecovery.noDefaultConnection.description': 'Votre connexion par défaut enregistrée est introuvable. Choisissez comment vous souhaitez vous connecter.',
   'onboarding.desktopRecovery.remoteUnreachable.title': 'Serveur distant inaccessible',
