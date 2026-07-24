@@ -27,6 +27,14 @@ fn is_allowed_origin(origin: &str) -> bool {
         "capacitor://localhost",
         "http://localhost",
         "https://localhost",
+        // Tauri 2.x WebviewUrl::App 主窗口 origin (浏览器内置 scheme,
+        // 不走 localhost/127.0.0.1 这两个 host 段, 也不带端口, 所以
+        // 进 PACKAGED 常量数组, 不进下面的 port 正则)。
+        // 漏掉这些会导致 runtimeFetch 跨域请求被浏览器拒, 表现为
+        // "Local 不可达" + 窗口控制按钮失效 (恢复屏接管)。
+        "http://tauri.localhost",     // Windows / Linux
+        "https://tauri.localhost",    // macOS (Tauri 2.x)
+        "tauri://localhost",          // macOS (Tauri 1.x legacy)
     ];
     if PACKAGED.contains(&origin) {
         return true;
@@ -122,6 +130,48 @@ mod tests {
             "https://localhost",
         ] {
             assert!(is_allowed_origin(origin), "{} should be allowed", origin);
+        }
+    }
+
+    #[test]
+    fn allows_tauri_app_mode_origins() {
+        // Tauri 2.x WebviewUrl::App 主窗口 origin —— 主窗口走 App 模式
+        // (因为 WebviewUrl::External 不注入 window.__TAURI__), page origin
+        // 必然与 oc-server 的 127.0.0.1:<port> 不同 host, 跨域请求 CORS
+        // 头必须回显, 否则 runtimeFetch 全部失败 → "Local 不可达"
+        // 恢复屏 + 窗口控制按钮失效 (它们在恢复屏里没渲染)。
+        //
+        // 覆盖:
+        // - Windows / Linux: http://tauri.localhost
+        // - macOS (Tauri 2.x): https://tauri.localhost
+        // - macOS (Tauri 1.x legacy): tauri://localhost
+        for origin in [
+            "http://tauri.localhost",
+            "https://tauri.localhost",
+            "tauri://localhost",
+        ] {
+            assert!(
+                is_allowed_origin(origin),
+                "Tauri App origin {} should be allowed",
+                origin
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_tauri_lookalike_origins() {
+        // 防御性: 不要把同 host 段的部分子串误放进来。Tauri 实际 origin
+        // 段是 `tauri.localhost` (注意中间有点), 拼写错或前缀扩展必须被拒。
+        for origin in [
+            "https://tauri.evil.com",     // 段名不同
+            "http://nottauri.localhost",  // 段名前缀不同
+            "http://tauri.localhost.evil.com", // 段后追加
+        ] {
+            assert!(
+                !is_allowed_origin(origin),
+                "Tauri lookalike origin {} should be rejected",
+                origin
+            );
         }
     }
 
