@@ -189,18 +189,10 @@ async fn mint_grant_via_backend(file_path: &str) -> Result<Value, String> {
         .map_err(|e| format!("failed to parse grant response: {}", e))
 }
 
-/// 判断窗口 origin 是否 local (loopback 或 gridforge-ui:// 协议)。
+/// 判断窗口 origin 是否 local (统一在 `ipc::mod::is_local_origin`)。
+/// 详见 `ipc/mod.rs` 注释 —— Tauri 2.x App 模式的页面 origin 是
+/// `http(s)://tauri.localhost` (Win/Linux) 或 `tauri://localhost` (macOS),
+/// 必须纳入 local 集合才能让 dialog / file-grant 等 IPC 命令通过。
 fn is_local_origin(window: &WebviewWindow) -> bool {
-    let url = match window.url() {
-        Ok(u) => u,
-        Err(_) => return false,
-    };
-    let scheme = url.scheme();
-    // gridforge-ui://app (packaged UI) 或 http://127.0.0.1:* (loopback)
-    scheme == "gridforge-ui"
-        || (scheme == "http" || scheme == "https")
-            && url
-                .host_str()
-                .map(|h| h == "127.0.0.1" || h == "localhost")
-                .unwrap_or(false)
+    crate::ipc::is_local_origin(window)
 }
