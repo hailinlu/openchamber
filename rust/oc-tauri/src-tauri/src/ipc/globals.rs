@@ -165,7 +165,17 @@ pub fn build_port_globals_script(ctx: &RuntimeContext) -> String {
     }
 
     // local-only 全局变量 (UI 会从 location.origin 判断是否 local page)
-    // 在 Tauri loopback 模式下, 页面 origin == local_origin, 所以这些始终注入。
+    //
+    // 注意: 主窗口走 `WebviewUrl::App("index.html")` 后, page origin 与
+    // `__GRIDFORGE_LOCAL_ORIGIN__` 不再相等:
+    // - Dev: page origin = `http://127.0.0.1:5180` (Vite devUrl), local_origin
+    //   = oc-server 的 `http://127.0.0.1:<port>` (Vite proxy 转发)。
+    // - Prod: page origin = `tauri.localhost` (Win/Linux) 或 `tauri://localhost`
+    //   (macOS) (Tauri frontendDist), local_origin = oc-server 的
+    //   `http://127.0.0.1:<port>` (axum CORS 处理跨源)。
+    //
+    // `client_token` / `home_directory` / `relay_host_id` 这些是 desktop 本地
+    // 元数据, 与 origin 无关, 始终注入 (mini_chat 也用同一份 init_script)。
     if let Some(ref token) = ctx.client_token {
         globals.push(format_js_global(
             "__GRIDFORGE_CLIENT_TOKEN__",

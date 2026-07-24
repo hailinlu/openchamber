@@ -237,6 +237,24 @@ fn create_mini_chat_window(app: &AppHandle, label: &str, url: &str) -> Result<()
     // 这比 `window.eval()` (窗口创建后再注入) 更可靠:
     // eval 可能因页面未加载而失败, 或页面模块脚本跑在注入之前导致
     // `__GRIDFORGE_CLIENT_TOKEN__` 等全局变量未被 `createConfiguredWebAPIs` 读到。
+    // TODO(isolation/tauri-2-no-__TAURI__-for-external): mini_chat 仍走
+    // `WebviewUrl::External(<oc-server loopback>)`, 与主窗口 App 模式分裂。
+    // Tauri 2.x 对 External URL 不注入 `window.__TAURI__` (GitHub #4837, #5088),
+    // 因此 mini_chat 内的 `__GRIDFORGE_DESKTOP__.invoke` 也会静默失败。
+    // 当前 UI 还没触发过 mini_chat IPC, 没暴露症状。
+    //
+    // 修复路径 (独立的 1-PR 工作):
+    // 1. 改成 `WebviewUrl::App("mini-chat.html")` (Tauri `WebviewUrl::App`
+    //    只接受 PathBuf, 不支持 query string, 因此 URL 参数需另寻渠道)。
+    // 2. 把 query string (`mode` / `sessionId` / `directory` / `projectId`)
+    //    注入到 `window.__MINI_CHAT_QUERY__` (或单独的 init_script 行)。
+    // 3. mini-chat-main.tsx 在 `createConfiguredWebAPIs` 前先读取
+    //    `__MINI_CHAT_QUERY__` 并塞进 store / context。
+    //
+    // 在那之前, 此分支仍依赖 capabilities `remote.urls: 127.0.0.1:*` 让
+    // oc-server 内的 Tauri 命令 handler 能响应 — 但前端能不能发出 invoke
+    // 仍然取决于 `__TAURI__` 是否存在, 而 External 模式下不存在。这是一个
+    // 已知但暂未触发的隐藏 bug, 用户实际触发前不要"修"它 (避免引入新回归)。
     let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::External(parsed_url))
         .title("GridForge Mini Chat")
         .inner_size(MINI_CHAT_WIDTH, MINI_CHAT_HEIGHT)

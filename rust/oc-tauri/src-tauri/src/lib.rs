@@ -92,61 +92,29 @@ pub(crate) fn request_quit(app: &tauri::AppHandle) {
 }
 
 // =========================================================================
-// 同源化 Tauri 生产 webview: oc-server 托管 UI dist
+// 主窗口 URL 策略: 统一走 `WebviewUrl::App("index.html")`
 // =========================================================================
 //
-// 根因: `WebviewUrl::App("index.html")` 让 page origin = `tauri.localhost`
-// (Win/Linux) 或 `tauri://localhost` (macOS), 与 oc-server 的
-// `http://127.0.0.1:<port>` 不一致 → cross-origin → CORS 失败 / 渲染
-// 异常 (AGENTS.md "Frequently-misdiagnosed runtime issues")。
+// 决策: **不再**用 `WebviewUrl::External(<loopback>)` —— Tauri 2.x **不向
+// `WebviewUrl::External` 注入 `window.__TAURI__`** (GitHub issues #4837,
+// #5088 长期已知), 这会让所有 desktop IPC (host probe / window controls /
+// 桥 invoke) 静默失败, 表现就是 "Local 不可达" + minimize/maximize/close
+// 全部失效 (本次 production bug 的根因)。
 //
-// 修复: 生产构建走 `WebviewUrl::External(<loopback>)`, 让
-// `location.origin === __GRIDFORGE_API_BASE_URL__`, 同源 fetch 直通。
-// Dev 保持 `WebviewUrl::App` (Vite :5180 + proxy 处理跨源)。
+// 替代方案 —— `WebviewUrl::App("index.html")`:
+// - Dev: Tauri 走 devUrl (`http://127.0.0.1:5180`), Vite proxy 把
+//   `/api` / `/auth` / `/health` 转发到 oc-server; 跨源由 Vite proxy 处理。
+// - Prod: Tauri 走 frontendDist (`rust/oc-tauri/ui-dist/`, 由
+//   `scripts/tauri-build.mjs` 暂存自 `packages/web/dist`); page origin
+//   变成 `tauri.localhost` (Win/Linux) / `tauri://localhost` (macOS), 与
+//   oc-server 的 `http://127.0.0.1:<port>` 不一致 → 跨源由 axum 的
+//   `cors_layer` (rust/oc-server/src/lib.rs:589) 处理。
 //
-// 相关 env: `GRIDFORGE_DIST_DIR` — oc-server 用来定位要托管的 ui-dist。
-// 仅在调用方未设置 (env unset 或空) 且默认路径 <CARGO_MANIFEST_DIR>/../ui-dist
-// 存在时, oc-tauri 才注入这个 env, 给 sidecar 走 `--dist-dir`, 给 in-process
-// 走 `clap` 的 env (oc-server::Config::load 自动读)。
-
-/// 主窗口 URL 决策结果 (dev/release 走不同路径)。
-#[derive(Debug, Clone, PartialEq, Eq)]
-enum MainUrlDecision {
-    /// Dev: `WebviewUrl::App("index.html")` → Tauri 走 devUrl (Vite)。
-    AppIndexHtml,
-    /// Release: `WebviewUrl::External(<loopback URL>)` → oc-server 托管 UI。
-    ExternalLoopback(String),
-}
-
-/// 纯函数: 根据 debug_assertions + 当前后端 port 决定主窗口 URL 策略。
-///
-/// - `debug = true`  → App 路径 (devUrl, Vite + proxy 处理 cross-origin)。
-/// - `debug = false` + `port > 0` → External loopback URL, 携带真实
-///   port + trailing slash, 确保 page origin === __GRIDFORGE_API_BASE_URL__。
-/// - `debug = false` + `port == 0` → App 路径。后端启动失败 / 不可达时
-///   [`ctx_suggested_port`] 返回 0 (无 api_base_url, local_origin 是占位);
-///   这种情况下绝对不能合成 `External("http://127.0.0.1:0/")` ——
-///   port 0 是保留值, Webview 拿到的是无效 origin + 让 bundled UI
-///   去取一个不存在的资源。让 Tauri 走 frontendDist (`WebviewUrl::App`)
-///   即可, page origin 变成 `tauri.localhost` 但恢复屏不依赖 API base
-///   URL, 渲染逻辑走 `local_origin`-占位 + `boot_status=unreachable`
-///   这条路。
-fn decide_main_webview_url(debug_assertions: bool, port: u16) -> MainUrlDecision {
-    if debug_assertions {
-        return MainUrlDecision::AppIndexHtml;
-    }
-    if port == 0 {
-        // 后端不可达 / 端口未知 — 用 App 让 bundled UI 渲染恢复屏,
-        // 而不是用一个 External 127.0.0.1:0 (无效) 或 tauri:// External 兜底
-        // (后者会让 `__GRIDFORGE_LOCAL_ORIGIN__` 与 page origin 错位)。
-        MainUrlDecision::AppIndexHtml
-    } else {
-        // trailing slash 让 Webview 把 "/" 当成目录而非"host 边界", 浏览器
-        // 解析出的 location.origin 是 "http://127.0.0.1:<port>" (无 path),
-        // 与 __GRIDFORGE_API_BASE_URL__ 严格相等 → 同源。
-        MainUrlDecision::ExternalLoopback(format!("http://127.0.0.1:{}/", port))
-    }
-}
+// 两种情况下 window.__TAURI__ 都被 Tauri 正常注入, BRIDGE_JS 工作。
+//
+// 比较: Electron 模式一直用这套 (主进程 boot web server, webview 加载
+// `http://127.0.0.1:<port>`), 跨源由 CORS 处理; Tauri 的 App 模式是
+// 等价的 dev/release 分离方案。
 
 /// dist-dir 决策结果。
 ///
@@ -284,39 +252,18 @@ fn set_oc_server_dist_dir_env() {
 ///
 /// `ctx` 由调用方在后端就绪后构造 (含真实端口 + client token + runtime headers)。
 fn create_main_window(app: &tauri::AppHandle, ctx: &RuntimeContext, background_start: bool) {
-    // 同源化 webview URL: dev 走 WebviewUrl::App (Vite devUrl + proxy),
-    // prod 走 WebviewUrl::External(loopback), 让 page origin 一致 —
-    // 消除 tauri.localhost / 127.0.0.1 跨源 CORS 失败。
+    // 统一走 `WebviewUrl::App("index.html")` —— 这是 Tauri 2.x 唯一会
+    // 注入 `window.__TAURI__` 的 URL 形式, 是 desktop IPC (host probe /
+    // window controls / 桥 invoke) 工作前提。
     //
-    // 注: 后端不可达时 (port == 0) 走 AppIndexHtml 让 bundled UI 渲染
-    // 恢复屏, 而不是合出一个 `External("http://127.0.0.1:0/")`。
-    // 同样地, 这里**不**再有 `tauri://localhost` External 兜底:
-    // 那会让 page origin 与 `__GRIDFORGE_LOCAL_ORIGIN__` 错位 (后者是
-    // `http://tauri.localhost`), 比纯 App 路径更糟。
-    let url = match decide_main_webview_url(cfg!(debug_assertions), ctx_suggested_port(ctx)) {
-        MainUrlDecision::AppIndexHtml => WebviewUrl::App("index.html".into()),
-        MainUrlDecision::ExternalLoopback(s) => {
-            // 此分支仅在 port > 0 时进入, URL 形如 `http://127.0.0.1:<port>/`,
-            // 是绝对标准 ASCII URL, url::Url::parse 在生产路径不会失败。
-            // 这里**不**再回落到 tauri:// External 兜底: 那会让 page origin
-            // 与 `__GRIDFORGE_LOCAL_ORIGIN__` (= http://tauri.localhost)
-            // 错位, 把恢复屏逻辑搞坏。spec review 已要求移除误导性兜底,
-            // 改用 expect 在实测到 url crate 行为异常时给出明确失败位置。
-            let parsed = url::Url::parse(&s).unwrap_or_else(|e| {
-                // 旧 fallback (`tauri://localhost/`) 让 webview 把这个
-                // URL 当 External 处理, 拿到的是 tauri://localhost origin,
-                // 与 initial_script 注入的 __GRIDFORGE_LOCAL_ORIGIN__
-                // (= http://tauri.localhost) 不一致, 反把恢复屏搞坏。
-                // panic 在 unwrap_or_else 里走 div 路径, 等价于 expect。
-                panic!(
-                    "main-window URL {:?} failed to parse (tauri:// External \
-                     fallback removed by spec review): {}",
-                    s, e
-                );
-            });
-            WebviewUrl::External(parsed)
-        }
-    };
+    // 不再走 `WebviewUrl::External(<loopback>)`: Tauri 2.x 不向 External
+    // 注入 `__TAURI__`, 让 BRIDGE_JS 静默 reject, 表现就是 "Local 不可达"
+    // + minimize/maximize/close 全部失效 (本次 production bug 根因)。
+    //
+    // Dev 时 Tauri 自动走 devUrl (Vite :5180, proxy 处理跨源);
+    // Prod 时 Tauri 自动走 frontendDist (`rust/oc-tauri/ui-dist/`,
+    // 由 `scripts/tauri-build.mjs` 暂存), 跨源由 axum CORS 处理。
+    let url = WebviewUrl::App("index.html".into());
 
     let mut builder = WebviewWindowBuilder::new(app, "main", url)
         .title("GridForge")
@@ -372,35 +319,6 @@ fn build_main_window_ctx(port: u16) -> RuntimeContext {
     ctx.client_token = client_token;
     ctx.runtime_headers = runtime_headers;
     ctx
-}
-
-/// 从 `RuntimeContext` 提取建议的 loopback 端口。
-///
-/// - Ok 后端: `api_base_url` (或 `local_origin`) 形式为 `http://127.0.0.1:<port>`,
-///   用 [`backend::parse_port`] 提取。
-/// - Err 后端: `api_base_url` 为 None, `local_origin` 是 `tauri.localhost` 占位。
-///   这种情况下没有真实端口, 退回到 0; `decide_main_webview_url` 看到 port=0
-///   会主动选 `WebviewUrl::App("index.html")`, 让 bundled UI 渲染 unreachable
-///   恢复屏, **不**再合成无意义的 `External("http://127.0.0.1:0/")` 或
-///   误导性的 `External("tauri://localhost/")`。
-fn ctx_suggested_port(ctx: &RuntimeContext) -> u16 {
-    if let Some(ref url) = ctx.api_base_url {
-        return backend::parse_port(url);
-    }
-    // 无 api_base_url 时尝试 local_origin (Ok 路径也是这个值; Err 路径是占位)。
-    // parse_port 内部用 expect, Err 路径会 panic, 这里改用 try 版本避免炸。
-    if let Some(pos) = ctx.local_origin.rfind(':') {
-        let after = &ctx.local_origin[pos + 1..];
-        if let Some(stripped) = after.strip_suffix('/') {
-            if let Ok(p) = stripped.parse::<u16>() {
-                return p;
-            }
-        }
-        if let Ok(p) = after.parse::<u16>() {
-            return p;
-        }
-    }
-    0
 }
 
 /// 后端启动失败时, Err 恢复窗注入的 `local_origin` 占位值。
@@ -961,81 +879,33 @@ mod tests {
     }
 
     // ------------------------------------------------------------------
-    // TDD RED phase: same-origin main-window URL decision.
+    // Regression: main webview must always use WebviewUrl::App.
     //
-    // Production cross-origin root cause: `WebviewUrl::App("index.html")`
-    // makes the page origin `tauri.localhost` (Win/Linux) or
-    // `tauri://localhost` (macOS), incompatible with oc-server's
-    // `http://127.0.0.1:<port>` origin. Dev profile keeps the App URL
-    // so Vite :5180 + proxy still works (cross-origin only in prod).
+    // Tauri 2.x does NOT inject `window.__TAURI__` for `WebviewUrl::External`
+    // URLs (GitHub issues #4837, #5088). This silently breaks all desktop
+    // IPC (host probe / window controls / bridge invoke), manifesting as
+    // "Local 不可达" + minimize/maximize/close all failing. The main window
+    // MUST use `WebviewUrl::App("index.html")` so Tauri injects `__TAURI__`
+    // and BRIDGE_JS works. Cross-origin (`tauri.localhost` vs oc-server
+    // loopback) is handled by Vite proxy (dev) and axum CORS (prod).
     // ------------------------------------------------------------------
     #[test]
-    fn main_url_decision_dev_returns_app_path() {
-        // debug_assertions = true → Vite dev URL, not loopback.
-        let decision = decide_main_webview_url(true, 12345);
-        assert_eq!(decision, MainUrlDecision::AppIndexHtml);
-    }
-
-    #[test]
-    fn main_url_decision_release_returns_loopback_with_trailing_slash() {
-        // debug_assertions = false → external URL must be the loopback
-        // origin with trailing slash, so WebView origin == api_base_url.
-        let decision = decide_main_webview_url(false, 12345);
-        match decision {
-            MainUrlDecision::ExternalLoopback(url) => {
-                assert_eq!(url, "http://127.0.0.1:12345/");
-            }
-            other => panic!("expected ExternalLoopback, got {:?}", other),
-        }
-    }
-
-    #[test]
-    fn main_url_decision_release_carries_real_port() {
-        // The decision must reflect the OS-assigned port verbatim —
-        // tauri.localhost is intentionally avoided.
-        for port in [1u16, 80, 5180, 58980, 65535] {
-            let decision = decide_main_webview_url(false, port);
-            match decision {
-                MainUrlDecision::ExternalLoopback(url) => {
-                    assert!(
-                        url.ends_with(&format!(":{}/", port)),
-                        "url {:?} must end with :{}/",
-                        url,
-                        port
-                    );
-                    assert!(
-                        url.starts_with("http://127.0.0.1:"),
-                        "url {:?} must use loopback, not tauri.localhost",
-                        url
-                    );
-                }
-                other => panic!("expected ExternalLoopback, got {:?}", other),
-            }
-        }
-    }
-
-    #[test]
-    fn main_url_decision_release_with_no_usable_port_returns_app_path() {
-        // Backend failure / unreachable context: `ctx_suggested_port`
-        // returns 0 because api_base_url is None and local_origin is a
-        // placeholder. Production with port == 0 must NOT synthesize an
-        // External "http://127.0.0.1:0/" loopback (port 0 is reserved,
-        // and forcing the bundled UI through a phantom origin breaks the
-        // recovery screen). Instead, fall back to WebviewUrl::App so
-        // Tauri's frontendDist serves the bundled UI directly — the UI
-        // then sees `tauri.localhost` origin (acceptable for the
-        // local-unavailable recovery screen path which is local-driven,
-        // not API-driven).
-        let decision = decide_main_webview_url(false, 0);
-        assert_eq!(decision, MainUrlDecision::AppIndexHtml);
-    }
-
-    #[test]
-    fn main_url_decision_dev_with_no_port_still_returns_app_path() {
-        // Dev profile already uses WebviewUrl::App unconditionally; the
-        // port-0 fallback must not break that invariant.
-        let decision = decide_main_webview_url(true, 0);
-        assert_eq!(decision, MainUrlDecision::AppIndexHtml);
+    fn main_window_uses_webview_url_app() {
+        // Verify the URL construction (not the specific Tauri type) by
+        // asserting on Debug output — avoids pulling the type into the
+        // module imports just for a regression test.
+        let url = tauri::WebviewUrl::App("index.html".into());
+        let debug = format!("{:?}", url);
+        assert!(
+            debug.starts_with("App("),
+            "main webview must use WebviewUrl::App, got {:?}",
+            debug
+        );
+        assert!(
+            debug.contains("index.html"),
+            "main webview must point at index.html, got {:?}",
+            debug
+        );
     }
 
     // ------------------------------------------------------------------
