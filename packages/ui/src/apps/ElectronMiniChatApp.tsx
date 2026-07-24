@@ -38,11 +38,42 @@ type ElectronMiniChatAppProps = {
 };
 
 const readMiniChatConfig = (): MiniChatConfig => {
-  const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : new URLSearchParams();
-  const mode = params.get('mode') === 'session' ? 'session' : 'draft';
-  const sessionId = params.get('sessionId')?.trim() || null;
-  const directory = params.get('directory')?.trim() || null;
-  const projectId = params.get('projectId')?.trim() || null;
+  // 优先从 Tauri init script 注入的 `window.__MINI_CHAT_QUERY__` 读
+  // (Tauri 2.x App 模式下 WebviewUrl::App 不接受 URL query string,
+  //  Rust 端 mini_chat.rs 把 mode/sessionId/directory/projectId 注入到这个全局变量)。
+  // 找不到再退到 `window.location.search`:
+  // - Vite dev / vite preview / Web / VS Code / Electron 等其它壳仍用 URL query 启动 mini-chat,
+  //   保持兼容 (那条路径无人重写)。
+  // - 即使 Tauri 路径上的 init script 因故未注入 (例如 capabilities 漏配),
+  //   UI 也能拿到 draft 模式默认值而不是白屏。
+  const injected = typeof window !== 'undefined'
+    ? (window as unknown as { __MINI_CHAT_QUERY__?: Record<string, unknown> }).__MINI_CHAT_QUERY__
+    : undefined;
+
+  let modeRaw: string | null = null;
+  let sessionIdRaw: string | null = null;
+  let directoryRaw: string | null = null;
+  let projectIdRaw: string | null = null;
+
+  if (injected && typeof injected === 'object') {
+    modeRaw = typeof injected.mode === 'string' ? injected.mode : null;
+    sessionIdRaw = typeof injected.sessionId === 'string' ? injected.sessionId : null;
+    directoryRaw = typeof injected.directory === 'string' ? injected.directory : null;
+    projectIdRaw = typeof injected.projectId === 'string' ? injected.projectId : null;
+  }
+
+  if (modeRaw === null && typeof window !== 'undefined') {
+    const params = new URLSearchParams(window.location.search);
+    modeRaw = params.get('mode');
+    sessionIdRaw = sessionIdRaw ?? params.get('sessionId');
+    directoryRaw = directoryRaw ?? params.get('directory');
+    projectIdRaw = projectIdRaw ?? params.get('projectId');
+  }
+
+  const mode = modeRaw === 'session' ? 'session' : 'draft';
+  const sessionId = sessionIdRaw?.trim() || null;
+  const directory = directoryRaw?.trim() || null;
+  const projectId = projectIdRaw?.trim() || null;
   return { mode, sessionId, directory, projectId };
 };
 

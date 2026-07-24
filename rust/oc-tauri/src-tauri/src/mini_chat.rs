@@ -111,15 +111,17 @@ pub async fn open_session_mini_chat(args: &Value, app: &AppHandle) -> Result<Val
     }
 
     let label = format!("mini-chat-session-{}", session_id);
-    let url = format!(
-        "{}/mini-chat.html?mode=session&sessionId={}&directory={}&projectId={}",
-        origin,
-        url_encode(&session_id),
-        url_encode(&directory),
-        url_encode(project_id),
-    );
 
-    create_mini_chat_window(app, &label, &url)?;
+    // App 模式: window.__MINI_CHAT_QUERY__ 由 init script 注入 (见 build_mini_chat_query_init_script);
+    // 不再用 URL query string 传参 (WebviewUrl::App 不接受 query)。
+    let query_params: Vec<(String, String)> = vec![
+        ("mode".to_string(), "session".to_string()),
+        ("sessionId".to_string(), session_id.clone()),
+        ("directory".to_string(), directory.clone()),
+        ("projectId".to_string(), project_id.to_string()),
+    ];
+
+    create_mini_chat_window(app, &label, &query_params)?;
 
     // 登记到去重 map
     manager.register(&origin, &session_id, &label);
@@ -151,14 +153,14 @@ pub async fn open_draft_mini_chat(args: &Value, app: &AppHandle) -> Result<Value
             .map(|d| d.as_millis())
             .unwrap_or(0)
     );
-    let url = format!(
-        "{}/mini-chat.html?mode=draft&directory={}&projectId={}",
-        origin,
-        url_encode(&directory),
-        url_encode(project_id),
-    );
 
-    create_mini_chat_window(app, &label, &url)?;
+    let query_params: Vec<(String, String)> = vec![
+        ("mode".to_string(), "draft".to_string()),
+        ("directory".to_string(), directory.clone()),
+        ("projectId".to_string(), project_id.to_string()),
+    ];
+
+    create_mini_chat_window(app, &label, &query_params)?;
 
     Ok(json!({ "label": label }))
 }
@@ -208,9 +210,26 @@ pub async fn get_window_pinned(_args: &Value, window: &WebviewWindow) -> Result<
 ///
 /// init_script 会注入 `__GRIDFORGE_CLIENT_TOKEN__` (从 SettingsStore 读取的
 /// `desktopLocalClientToken`), 使窗口内的 JS 能认证 HTTP API 请求。
-fn create_mini_chat_window(app: &AppHandle, label: &str, url: &str) -> Result<(), String> {
-    let parsed_url = url::Url::parse(url).map_err(|e| format!("invalid URL: {}", e))?;
-
+///
+/// 关键决策: 走 `WebviewUrl::App("mini-chat.html")` 而不是 External。
+/// Tauri 2.x 对 External URL **不**注入 `window.__TAURI__` (GitHub #4837,
+/// #5088), 那会让 `window.__GRIDFORGE_DESKTOP__.invoke` 在 mini_chat 内
+/// 全部静默 reject —— 包括 close 按钮调用的 `desktop_close_current_window`、
+/// pin 切换的 `desktop_set_window_pinned`、focus 主窗口的
+/// `desktop_focus_main_window` 等所有 IPC。这正是用户实际触发后才暴露的
+/// 隐藏 bug, 本函数 + capabilities (加 `mini-chat-*` glob) + UI 端
+/// `readMiniChatConfig` (从 `__MINI_CHAT_QUERY__` 读) 三方对齐后才能修。
+///
+/// `WebviewUrl::App` 只接受 PathBuf, 不支持 query string。原本 URL 上的
+/// `?mode=…&sessionId=…` 由 `query_params` 传入, 序列化成 JS 对象后注入
+/// 到 `window.__MINI_CHAT_QUERY__`, UI 在 init 时优先读这个全局变量,
+/// 找不到再退到 `window.location.search` (Vite dev / Vite preview 仍走 URL
+/// query, 兼容旧路径)。
+fn create_mini_chat_window(
+    app: &AppHandle,
+    label: &str,
+    query_params: &[(String, String)],
+) -> Result<(), String> {
     // 先读取 client token 和 runtime headers (SettingsStore 是同步的)
     let client_token = crate::settings::SettingsStore::get("desktopLocalClientToken")
         .and_then(|v| v.as_str().map(|s| s.to_string()));
@@ -233,35 +252,22 @@ fn create_mini_chat_window(app: &AppHandle, label: &str, url: &str) -> Result<()
     ctx.runtime_headers = runtime_headers;
     let init_script = build_init_script(&ctx);
 
-    // 用 initialization_script 注入 init script, 在页面 JS 执行前运行。
-    // 这比 `window.eval()` (窗口创建后再注入) 更可靠:
-    // eval 可能因页面未加载而失败, 或页面模块脚本跑在注入之前导致
-    // `__GRIDFORGE_CLIENT_TOKEN__` 等全局变量未被 `createConfiguredWebAPIs` 读到。
-    // TODO(isolation/tauri-2-no-__TAURI__-for-external): mini_chat 仍走
-    // `WebviewUrl::External(<oc-server loopback>)`, 与主窗口 App 模式分裂。
-    // Tauri 2.x 对 External URL 不注入 `window.__TAURI__` (GitHub #4837, #5088),
-    // 因此 mini_chat 内的 `__GRIDFORGE_DESKTOP__.invoke` 也会静默失败。
-    // 当前 UI 还没触发过 mini_chat IPC, 没暴露症状。
-    //
-    // 修复路径 (独立的 1-PR 工作):
-    // 1. 改成 `WebviewUrl::App("mini-chat.html")` (Tauri `WebviewUrl::App`
-    //    只接受 PathBuf, 不支持 query string, 因此 URL 参数需另寻渠道)。
-    // 2. 把 query string (`mode` / `sessionId` / `directory` / `projectId`)
-    //    注入到 `window.__MINI_CHAT_QUERY__` (或单独的 init_script 行)。
-    // 3. mini-chat-main.tsx 在 `createConfiguredWebAPIs` 前先读取
-    //    `__MINI_CHAT_QUERY__` 并塞进 store / context。
-    //
-    // 在那之前, 此分支仍依赖 capabilities `remote.urls: 127.0.0.1:*` 让
-    // oc-server 内的 Tauri 命令 handler 能响应 — 但前端能不能发出 invoke
-    // 仍然取决于 `__TAURI__` 是否存在, 而 External 模式下不存在。这是一个
-    // 已知但暂未触发的隐藏 bug, 用户实际触发前不要"修"它 (避免引入新回归)。
-    let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::External(parsed_url))
+    // 追加 __MINI_CHAT_QUERY__ 全局注入 (App 模式替代 URL query)。
+    // 单独拼接到 init_script 末尾, 而不是改 RuntimeContext, 因为 query 是
+    // mini-chat-only 关注, 不应影响主窗口 / 其它 future window。
+    let query_init_script = build_mini_chat_query_init_script(query_params);
+    let full_init_script = format!("{}\n{}", init_script, query_init_script);
+
+    // App 模式: Tauri 自动把 dev (Vite :5180) / prod (frontendDist) 路径解析好。
+    // capabilities/default.json 已添加 "mini-chat-*" glob 命中此窗口, 否则
+    // __TAURI__ 不会注入, 与主窗口分裂。
+    let mut builder = WebviewWindowBuilder::new(app, label, WebviewUrl::App("mini-chat.html".into()))
         .title("GridForge Mini Chat")
         .inner_size(MINI_CHAT_WIDTH, MINI_CHAT_HEIGHT)
         .min_inner_size(MINI_CHAT_MIN_WIDTH, MINI_CHAT_MIN_HEIGHT)
         .resizable(true)
         .visible(true)
-        .initialization_script(&init_script);
+        .initialization_script(&full_init_script);
 
     // 平台 chrome (与主窗口一致):
     // - macOS: 原生 frame + hidden title bar + traffic lights at {16,17}
@@ -294,6 +300,29 @@ fn create_mini_chat_window(app: &AppHandle, label: &str, url: &str) -> Result<()
     });
 
     Ok(())
+}
+
+/// 把 key/value 对序列化成 JSON 对象, 输出 JS 赋值语句注入到 init script。
+///
+/// 用途: Tauri 2.x 的 `WebviewUrl::App` 只接受 PathBuf, 不支持 query string;
+/// mini-chat 需要的 `mode` / `sessionId` / `directory` / `projectId` 改注入到
+/// `window.__MINI_CHAT_QUERY__` 全局变量, 由 UI 在 init 时优先读取。
+///
+/// 失败安全: 序列化失败时返回空对象 (`{}`), 不阻断窗口创建 —— 让 UI 走
+/// `window.location.search` fallback (dev 路径仍有 query) 或走 draft 模式
+/// 默认值, 不该因为 query 序列化失败就让用户连 mini-chat 都打不开。
+fn build_mini_chat_query_init_script(params: &[(String, String)]) -> String {
+    let mut obj = serde_json::Map::new();
+    for (k, v) in params {
+        // 空字符串当作"未提供" — 让 UI 的 `?.trim() || null` 路径生效,
+        // 而不是把 `""` 当成有效 directory 写进 store。
+        if v.is_empty() {
+            continue;
+        }
+        obj.insert(k.clone(), serde_json::Value::String(v.clone()));
+    }
+    let json = serde_json::to_string(&obj).unwrap_or_else(|_| "{}".to_string());
+    format!("window.__MINI_CHAT_QUERY__ = {};", json)
 }
 
 /// 从全局 backend port 或 HMR UI URL 获取 → 构造 origin。
@@ -332,31 +361,50 @@ pub fn set_backend_port(app: &AppHandle, port: u16) {
     app.manage(BackendPort(port));
 }
 
-/// 简易 URL 编码 (不依赖外部 crate)。
-fn url_encode(s: &str) -> String {
-    let mut result = String::with_capacity(s.len());
-    for byte in s.bytes() {
-        match byte {
-            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => {
-                result.push(byte as char);
-            }
-            _ => {
-                result.push_str(&format!("%{:02X}", byte));
-            }
-        }
-    }
-    result
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn url_encode_basic() {
-        assert_eq!(url_encode("hello world"), "hello%20world");
-        assert_eq!(url_encode("/path/to/dir"), "%2Fpath%2Fto%2Fdir");
-        assert_eq!(url_encode("abc123-_.~"), "abc123-_.~");
+    fn mini_chat_query_init_script_serializes_params() {
+        let script = build_mini_chat_query_init_script(&[
+            ("mode".to_string(), "session".to_string()),
+            ("sessionId".to_string(), "ses_abc123".to_string()),
+            ("directory".to_string(), "C:\\Users\\me\\repo".to_string()),
+            ("projectId".to_string(), "".to_string()),
+        ]);
+        // Must produce a `window.__MINI_CHAT_QUERY__ = {...};` assignment
+        // parseable by `readMiniChatConfig` (ElectronMiniChatApp.tsx).
+        assert!(script.starts_with("window.__MINI_CHAT_QUERY__ = "));
+        assert!(script.ends_with(";"));
+        // Empty projectId must be omitted (UI reads it as null, not "") so
+        // .trim() || null correctly treats it as absent.
+        assert!(!script.contains("projectId"));
+        // Non-empty values are JSON-quoted (backslash, quotes escaped).
+        assert!(script.contains("\"mode\":\"session\""));
+        assert!(script.contains("\"sessionId\":\"ses_abc123\""));
+        // Windows path with backslash gets JSON-escaped.
+        assert!(script.contains("C:\\\\Users\\\\me\\\\repo"));
+    }
+
+    #[test]
+    fn mini_chat_query_init_script_empty_when_no_params() {
+        let script = build_mini_chat_query_init_script(&[]);
+        // Must still be a valid JS statement (empty object), so readMiniChatConfig
+        // can safely access __MINI_CHAT_QUERY__ without throwing.
+        assert_eq!(script, "window.__MINI_CHAT_QUERY__ = {};");
+    }
+
+    #[test]
+    fn mini_chat_query_init_script_omits_empty_values() {
+        // Empty values must be dropped entirely (not serialized as ""),
+        // so UI's `param?.trim() || null` reads them as null instead of "".
+        let script = build_mini_chat_query_init_script(&[
+            ("mode".to_string(), "draft".to_string()),
+            ("directory".to_string(), "".to_string()),
+        ]);
+        assert!(script.contains("\"mode\":\"draft\""));
+        assert!(!script.contains("directory"));
     }
 
     #[test]
